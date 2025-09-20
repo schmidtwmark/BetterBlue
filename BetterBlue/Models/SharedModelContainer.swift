@@ -70,19 +70,19 @@ func createSharedModelContainer() throws -> ModelContainer {
         let storeURL = getSimulatorStoreURL()
         return try createContainer(storeURL: storeURL, schema: schema)
     #else
-        if let cloudContainer = try? ModelContainer(
-            for: BBAccount.self,
-            BBVehicle.self,
-            BBHTTPLog.self,
-            ClimatePreset.self,
-            configurations: .init(
-                "iCloud.com.markschmidt.BetterBlue"
-            )
+
+        let cloudConfig = ModelConfiguration(
+            "iCloud.com.markschmidt.BetterBlue",
+            cloudKitDatabase: .automatic
+        )
+
+        if let container = try? ModelContainer(
+            for: schema,
+            configurations: [cloudConfig]
         ) {
-            return cloudContainer
+            return container
         }
         let storeURL = try getAppGroupStoreURL()
         return try createContainer(storeURL: storeURL, schema: schema)
     #endif
-
 }

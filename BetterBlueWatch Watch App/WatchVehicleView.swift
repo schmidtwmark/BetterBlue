@@ -56,6 +56,16 @@ struct WatchVehicleView: View {
         currentVehicle.climateStatus?.airControlOn ?? false
     }
 
+    private var isPluggedIn: Bool {
+        guard currentVehicle.isElectric, let evStatus = currentVehicle.evStatus else { return false }
+        return evStatus.pluggedIn
+    }
+
+    private var isCharging: Bool {
+        guard currentVehicle.isElectric, let evStatus = currentVehicle.evStatus else { return false }
+        return evStatus.charging
+    }
+
     // VehicleAction instances
     private var lockAction: MainVehicleAction {
         MainVehicleAction(
@@ -110,88 +120,128 @@ struct WatchVehicleView: View {
         )
     }
 
-    var body: some View {
-        VStack(spacing: 8) {
-            //                // Vehicle name at the top
-            VStack {
-                // Status info with inline refresh button
-                HStack(spacing: 4) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        VStack(spacing: 4) {
-                            HStack {
-                                Text(currentVehicle.displayName)
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                    .multilineTextAlignment(.center)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                            }
-                            HStack {
-                                Image(systemName: currentVehicle.isElectric ? "bolt.fill" : "fuelpump.fill")
-                                    .foregroundColor(currentVehicle.isElectric ? .green : .orange)
-                                    .font(.caption)
+    private var startChargeAction: MainVehicleAction {
+        MainVehicleAction(
+            action: { statusUpdater in
+                try await performChargeAction(shouldStart: true, statusUpdater: statusUpdater)
+            },
+            icon: "bolt.slash",
+            label: "Start Charge",
+            inProgressLabel: "Starting",
+            completedText: "Charging",
+            color: .gray,
+        )
+    }
 
-                                Text(rangeText)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            if let lastUpdated = currentVehicle.lastUpdated {
+    private var stopChargeAction: MainVehicleAction {
+        MainVehicleAction(
+            action: { statusUpdater in
+                try await performChargeAction(shouldStart: false, statusUpdater: statusUpdater)
+            },
+            icon: "bolt.fill",
+            label: "Stop Charge",
+            inProgressLabel: "Stopping",
+            completedText: "Stopped",
+            color: .green,
+            shouldPulse: true
+        )
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                //                // Vehicle name at the top
+                VStack {
+                    // Status info with inline refresh button
+                    HStack(spacing: 4) {
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            VStack(spacing: 4) {
                                 HStack {
-                                    Text(formatUpdateTime(lastUpdated))
-                                        .font(.caption2)
+                                    Text(currentVehicle.displayName)
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                        .multilineTextAlignment(.center)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                }
+                                HStack {
+                                    Image(systemName: currentVehicle.isElectric ? "bolt.fill" : "fuelpump.fill")
+                                        .foregroundColor(currentVehicle.isElectric ? .green : .orange)
+                                        .font(.caption)
+
+                                    Text(rangeText)
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                     Spacer()
                                 }
+                                if let lastUpdated = currentVehicle.lastUpdated {
+                                    HStack {
+                                        Text(formatUpdateTime(lastUpdated))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                    }
+                                }
                             }
                         }
-                    }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
 
-                    Spacer()
+                        Spacer()
 
-                    // Inline refresh button
-                    Button {
-                        Task {
-                            await refreshStatus()
+                        // Inline refresh button
+                        Button {
+                            Task {
+                                await refreshStatus()
+                            }
+                        } label: {
+                            if isRefreshing {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
                         }
-                    } label: {
-                        if isRefreshing {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
+                        .buttonStyle(.glass)
+                        .frame(width: 30, height: 30)
+                        .disabled(isRefreshing)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(isRefreshing)
+                }
+
+                // Context-sensitive action buttons
+                VStack(spacing: 8) {
+                    // Lock/Unlock button (context-sensitive)
+                    WatchVehicleButton(
+                        currentAction: isLocked ? unlockAction : lockAction,
+                        allActions: [lockAction, unlockAction],
+                        menuLabel: "Door Actions",
+                        vehicle: vehicle,
+                    )
+
+                    // Climate button (context-sensitive)
+                    WatchVehicleButton(
+                        currentAction: isClimateRunning ? stopClimateAction : startClimateAction,
+                        allActions: [startClimateAction, stopClimateAction],
+                        menuLabel: "Climate Actions",
+                        vehicle: vehicle,
+                    )
+
+                    // Charge button (only for plugged-in electric vehicles)
+                    if isPluggedIn {
+                        WatchVehicleButton(
+                            currentAction: isCharging ? stopChargeAction : startChargeAction,
+                            allActions: [startChargeAction, stopChargeAction],
+                            menuLabel: "Charge Actions",
+                            vehicle: vehicle,
+                        )
+                    }
                 }
             }
-
-            // Context-sensitive action buttons
-            VStack(spacing: 8) {
-                // Lock/Unlock button (context-sensitive)
-                WatchVehicleButton(
-                    currentAction: isLocked ? unlockAction : lockAction,
-                    allActions: [lockAction, unlockAction],
-                    menuLabel: "Door Actions",
-                    vehicle: vehicle,
-                )
-
-                // Climate button (context-sensitive)
-                WatchVehicleButton(
-                    currentAction: isClimateRunning ? stopClimateAction : startClimateAction,
-                    allActions: [startClimateAction, stopClimateAction],
-                    menuLabel: "Climate Actions",
-                    vehicle: vehicle,
-                )
-            }
+            .padding()
         }
-        .padding()
         .onAppear {
             // Auto-refresh if data is older than 5 minutes
             if let lastUpdated = currentVehicle.lastUpdated,
@@ -293,6 +343,26 @@ struct WatchVehicleView: View {
             statusMessageUpdater: statusUpdater,
         )
     }
+
+    private func performChargeAction(shouldStart: Bool, statusUpdater: @escaping @Sendable (String) -> Void) async throws {
+        guard let account = currentVehicle.account else {
+            throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+        }
+
+        if shouldStart {
+            try await account.startCharge(currentVehicle, modelContext: modelContext)
+        } else {
+            try await account.stopCharge(currentVehicle, modelContext: modelContext)
+        }
+
+        try await currentVehicle.waitForStatusChange(
+            modelContext: modelContext,
+            condition: { status in
+                status.evStatus?.charging == shouldStart
+            },
+            statusMessageUpdater: statusUpdater,
+        )
+    }
 }
 
 // Watch-specific vehicle button component using VehicleAction architecture
@@ -315,6 +385,7 @@ struct WatchVehicleButton: View {
                 } else {
                     Image(systemName: currentAction.icon)
                         .spin(currentAction.shouldRotate)
+                        .pulse(currentAction.shouldPulse)
                         .foregroundColor(currentAction.color)
                 }
             }

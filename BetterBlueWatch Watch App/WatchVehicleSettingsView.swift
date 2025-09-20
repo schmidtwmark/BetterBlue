@@ -34,7 +34,7 @@ struct WatchVehicleSettingsView: View {
                     }
                 }
                 Section("Watch Background") {
-                    ForEach(BBVehicle.availableBackgrounds, id: \.name) { background in
+                    ForEach(BBVehicle.availableWatchBackgrounds, id: \.name) { background in
                         Button {
                             updateWatchBackground(to: background.name)
                         } label: {
