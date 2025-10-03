@@ -15,6 +15,7 @@ extension Bundle {
     var releaseVersionNumber: String? {
         return infoDictionary?["CFBundleShortVersionString"] as? String
     }
+
     var buildVersionNumber: String? {
         return infoDictionary?["CFBundleVersion"] as? String
     }
@@ -119,34 +120,34 @@ struct SettingsView: View {
                     Text("Units")
                 }
 
-                    Section {
-#if DEBUG
+                Section {
+                    #if DEBUG
                         NavigationLink("Map Centering Debug") {
                             MapCenteringDebugView()
                         }
 
-#endif
-                        NavigationLink("HTTP Logs") {
-                            HTTPLogView()
-                        }
-
-                        NavigationLink("Sync Diagnostics") {
-                            DiagnosticInfoView()
-                        }
-
-                        Button("Clear All Data") {
-                            showingClearDataAlert = true
-                        }
-                        .foregroundColor(.red)
-
-                        if let result = clearDataResult {
-                            Text(result)
-                                .font(.caption)
-                                .foregroundColor(result.contains("Error") ? .red : .green)
-                        }
-                    } header: {
-                        Text("Debug Settings")
+                    #endif
+                    NavigationLink("HTTP Logs") {
+                        HTTPLogView()
                     }
+
+                    NavigationLink("Sync Diagnostics") {
+                        DiagnosticInfoView()
+                    }
+
+                    Button("Clear All Data") {
+                        showingClearDataAlert = true
+                    }
+                    .foregroundColor(.red)
+
+                    if let result = clearDataResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundColor(result.contains("Error") ? .red : .green)
+                    }
+                } header: {
+                    Text("Debug Settings")
+                }
 
                 // About section with version and GitHub links
                 Section {
@@ -187,7 +188,6 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-
                 }
             }
             .navigationTitle("Settings")
@@ -200,16 +200,16 @@ struct SettingsView: View {
             }
         }
         .alert("Clear All Data", isPresented: $showingClearDataAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Clear All", role: .destructive) {
-                    clearAllData()
-                }
-            } message: {
-                Text(
-                    "This will permanently delete all accounts, vehicles, debug " +
-                        "configurations, and other app data. This action cannot be undone.",
-                )
+            Button("Cancel", role: .cancel) {}
+            Button("Clear All", role: .destructive) {
+                clearAllData()
             }
+        } message: {
+            Text(
+                "This will permanently delete all accounts, vehicles, debug " +
+                    "configurations, and other app data. This action cannot be undone.",
+            )
+        }
     }
 
     private func deleteAccounts(offsets: IndexSet) {

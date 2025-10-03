@@ -5,8 +5,8 @@
 //  Created by Mark Schmidt on 9/17/25.
 //
 
-import MapKit
 import BetterBlueKit
+import MapKit
 
 extension BBVehicle {
     var coordinate: CLLocationCoordinate2D? {

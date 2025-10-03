@@ -250,5 +250,4 @@ struct VehicleTitleView: View {
             }
         }
     }
-
 }

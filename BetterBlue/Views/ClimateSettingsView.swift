@@ -25,7 +25,7 @@ struct ClimateSettingsContent: View {
     var body: some View {
         List {
             // Preset info section with editable name and icon
-            Section("Preset Info") {
+            Section {
                 HStack {
                     Menu {
                         ForEach(ClimatePreset.availableIcons, id: \.icon) { option in
@@ -63,6 +63,18 @@ struct ClimateSettingsContent: View {
                         .disabled(preset.isSelected)
                     }
                 }
+                Picker("Climate Duration", selection: Binding(
+                    get: { preset.climateOptions.duration },
+                    set: { newValue in
+                        preset.climateOptions.duration = newValue
+                        savePreset(preset)
+                    }
+                )) {
+                    Text("5 minutes").tag(5)
+                    Text("10 minutes").tag(10)
+                    Text("20 minutes").tag(20)
+                }
+                .pickerStyle(.menu)
             }
 
             climateControlsSection

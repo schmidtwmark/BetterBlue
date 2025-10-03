@@ -331,12 +331,103 @@ private func sendNotification(title: String, body: String) async {
     #endif
 }
 
+// MARK: - Control Center Configuration Intents
+
+struct LockVehicleControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Lock Vehicle"
+    static var description = IntentDescription("Lock your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to lock"
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+            throw IntentError.noVehicleSelected
+        }
+        let lockIntent = LockVehicleIntent()
+        lockIntent.vehicle = vehicle
+        _ = try await lockIntent.perform()
+        return .result()
+    }
+}
+
+struct UnlockVehicleControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Unlock Vehicle"
+    static var description = IntentDescription("Unlock your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to unlock",
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+            throw IntentError.noVehicleSelected
+        }
+        let unlockIntent = UnlockVehicleIntent()
+        unlockIntent.vehicle = vehicle
+        _ = try await unlockIntent.perform()
+        return .result()
+    }
+}
+
+struct StartClimateControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Start Climate Control"
+    static var description = IntentDescription("Start climate control for your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to start climate control",
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+            throw IntentError.noVehicleSelected
+        }
+        let startIntent = StartClimateIntent()
+        startIntent.vehicle = vehicle
+        _ = try await startIntent.perform()
+        return .result()
+    }
+}
+
+struct StopClimateControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Stop Climate Control"
+    static var description = IntentDescription("Stop climate control for your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to stop climate control",
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+            throw IntentError.noVehicleSelected
+        }
+        let stopIntent = StopClimateIntent()
+        stopIntent.vehicle = vehicle
+        _ = try await stopIntent.perform()
+        return .result()
+    }
+}
+
 // MARK: - Intent Errors
 
 enum IntentError: Swift.Error, LocalizedError {
     case vehicleNotFound
     case accountNotFound
     case refreshFailed(String)
+    case noVehicleSelected
 
     var errorDescription: String? {
         switch self {
@@ -346,6 +437,8 @@ enum IntentError: Swift.Error, LocalizedError {
             "Account not found for vehicle"
         case let .refreshFailed(message):
             "Failed to refresh vehicle status: \(message)"
+        case .noVehicleSelected:
+            "Please edit this control and select a vehicle before using it"
         }
     }
 }

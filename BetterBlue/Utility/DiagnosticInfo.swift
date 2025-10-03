@@ -104,16 +104,16 @@ struct DiagnosticInfo {
 
     private static func getDeviceType() -> String {
         #if os(watchOS)
-        return "Apple Watch"
+            return "Apple Watch"
         #elseif os(iOS)
-        return "iPhone/iPad"
+            return "iPhone/iPad"
         #else
-        return "Unknown"
+            return "Unknown"
         #endif
     }
 
     @MainActor
-    private static func collectCloudKitStatus(from context: ModelContext) async -> CloudKitDiagnostic? {
+    private static func collectCloudKitStatus(from _: ModelContext) async -> CloudKitDiagnostic? {
         // Use the BetterBlue CloudKit container identifier
         let containerID = "iCloud.com.markschmidt.BetterBlue"
         let container = CKContainer(identifier: containerID)
@@ -263,11 +263,11 @@ struct DiagnosticInfoView: View {
                         }
                     }
                 }
-#if os(watchOS)
+                #if os(watchOS)
                 .listStyle(.automatic)
-#else
+                #else
                 .listStyle(.insetGrouped)
-#endif
+                #endif
             } else {
                 VStack {
                     Text("Failed to collect diagnostic information")
@@ -278,19 +278,19 @@ struct DiagnosticInfoView: View {
         }
         .navigationTitle("Sync Diagnostics")
         .navigationBarTitleDisplayMode(.inline)
-.toolbar {
+        .toolbar {
             if let diagnosticInfo = diagnosticInfo {
-#if !os(watchOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    ShareLink(
-                        item: diagnosticInfo.formattedOutput,
-                        subject: Text("BetterBlue Sync Diagnostics"),
-                        message: Text("Diagnostic information from BetterBlue app")
-                    ) {
-                        Image(systemName: "square.and.arrow.up")
+                #if !os(watchOS)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        ShareLink(
+                            item: diagnosticInfo.formattedOutput,
+                            subject: Text("BetterBlue Sync Diagnostics"),
+                            message: Text("Diagnostic information from BetterBlue app")
+                        ) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
                     }
-                }
-#endif
+                #endif
             }
         }
         .task {
@@ -384,9 +384,9 @@ struct DiagnosticInfoView: View {
                 .foregroundColor(.secondary)
             Spacer()
             Text(value)
-#if !os(watchOS)
+            #if !os(watchOS)
                 .textSelection(.enabled)
-#endif
+            #endif
         }
     }
 

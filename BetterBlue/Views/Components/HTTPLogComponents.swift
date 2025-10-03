@@ -14,17 +14,16 @@ struct JSONBodyView: View {
     @Namespace private var transition
 
     var body: some View {
-
         Text(AttributedString(content))
             .font(.system(.caption, design: .monospaced))
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
-        .sheet(isPresented: $showingShareSheet) {
-            ShareSheet(activityItems: [content])
-                .navigationTransition(
-                    .zoom(sourceID: "json-share)", in: transition ),
-                )
-        }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareSheet(activityItems: [content])
+                    .navigationTransition(
+                        .zoom(sourceID: "json-share)", in: transition),
+                    )
+            }
     }
 }
 

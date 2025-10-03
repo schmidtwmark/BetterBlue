@@ -1,5 +1,5 @@
 //
-//  SharedFakeVehicleListView.swift
+//  FakeVehicleListView.swift
 //  BetterBlue
 //
 //  Reusable fake vehicle management component

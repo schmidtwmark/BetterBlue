@@ -92,7 +92,8 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             }
 
             guard let bbVehicle = targetVehicle,
-                  let account = bbVehicle.account else {
+                  let account = bbVehicle.account
+            else {
                 print("🔄 [Widget] No vehicle or account found for refresh")
                 return await getVehicleEntityFromContext(for: configuration, context: context)
             }
@@ -103,9 +104,9 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             let thirtyMinutesInSeconds: TimeInterval = 30 * 60
 
             if timeSinceLastUpdate < thirtyMinutesInSeconds {
-                print("📱 [Widget] Using fresh data for \(vehicleName) (updated \(Int(timeSinceLastUpdate/60))m ago)")
+                print("📱 [Widget] Using fresh data for \(vehicleName) (updated \(Int(timeSinceLastUpdate / 60))m ago)")
             } else {
-                print("🔄 [Widget] Refreshing stale vehicle status for \(vehicleName) (last updated \(Int(timeSinceLastUpdate/60))m ago)")
+                print("🔄 [Widget] Refreshing stale vehicle status for \(vehicleName) (last updated \(Int(timeSinceLastUpdate / 60))m ago)")
 
                 // Refresh vehicle status only if data is stale
                 try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)

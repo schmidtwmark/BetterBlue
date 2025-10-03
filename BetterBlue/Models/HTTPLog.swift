@@ -9,8 +9,8 @@ import Foundation
 import SwiftData
 
 enum DeviceType: String, Codable, CaseIterable {
-    case iPhone = "iPhone"
-    case iPad = "iPad"
+    case iPhone
+    case iPad
     case mac = "Mac"
     case widget = "Widget"
     case watch = "Watch"

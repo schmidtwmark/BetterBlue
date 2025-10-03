@@ -16,6 +16,13 @@ struct VehicleWidgetEntryView: View {
     var body: some View {
         if let vehicle = entry.vehicle {
             VehicleControlsWidget(vehicle: vehicle)
+                .containerBackground(for: .widget) {
+                    LinearGradient(
+                        gradient: Gradient(colors: vehicle.backgroundGradient),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
         } else {
             VStack {
                 Image(systemName: "car.fill")
@@ -26,6 +33,9 @@ struct VehicleWidgetEntryView: View {
                 Text("Add an account in the app")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+            .containerBackground(for: .widget) {
+                Color(.systemBackground)
             }
         }
     }
@@ -95,13 +105,6 @@ struct UnifiedVehicleWidget: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, isSmall ? 0 : 16)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: vehicle.backgroundGradient),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
     }
 }
 
@@ -289,6 +292,138 @@ struct VehicleButtonsView: View {
         batteryPercentage: 85.0,
         timestamp: Date(),
         backgroundColorName: "white",
+    )
+
+    VehicleWidgetEntry(date: .now, vehicle: placeholderVehicle, configuration: VehicleWidgetIntent())
+}
+
+struct LockScreenVehicleWidgetView: View {
+    let entry: VehicleWidgetEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if let vehicle = entry.vehicle {
+            switch family {
+            case .accessoryCircular:
+                LockScreenRangeWidget(vehicle: vehicle)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
+            case .accessoryRectangular:
+                LockScreenWideRangeWidget(vehicle: vehicle)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
+            default:
+                LockScreenRangeWidget(vehicle: vehicle)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
+            }
+        } else {
+            Image(systemName: "car.fill")
+                .foregroundColor(.secondary)
+                .font(.title2)
+                .containerBackground(for: .widget) {
+                    Color.clear
+                }
+        }
+    }
+}
+
+struct LockScreenProgressIcon: View {
+    let vehicle: VehicleEntity
+    let lineWidth = 3.0
+
+    private var rangePercentage: Double {
+        guard let batteryPercentage = vehicle.batteryPercentage else { return 0.0 }
+        return batteryPercentage / 100.0
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.secondary.opacity(0.3), lineWidth: lineWidth)
+
+            Circle()
+                .trim(from: 0, to: rangePercentage)
+                .stroke(Color.primary,
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 1), value: rangePercentage)
+
+            Image(systemName: vehicle.isElectric ? "bolt.car.fill" : "car.fill")
+        }
+        .frame(width: 44, height: 44)
+    }
+}
+
+struct LockScreenRangeWidget: View {
+    let vehicle: VehicleEntity
+
+    var body: some View {
+        LockScreenProgressIcon(
+            vehicle: vehicle,
+        )
+    }
+}
+
+struct LockScreenWideRangeWidget: View {
+    let vehicle: VehicleEntity
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Progress icon on the left
+            LockScreenProgressIcon(
+                vehicle: vehicle,
+            )
+
+            // Vehicle name and range text
+            VStack(alignment: .leading, spacing: 1) {
+                Text(vehicle.displayName)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                Text(vehicle.rangeText)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+#Preview(as: .accessoryCircular) {
+    BetterBlueLockScreenWidget()
+} timeline: {
+    let placeholderVehicle = VehicleEntity(
+        id: "test",
+        displayName: "Model Y",
+        vin: "test",
+        isElectric: true,
+        rangeText: "280 mi",
+        batteryPercentage: 75.0,
+        timestamp: Date(),
+        backgroundColorName: "white"
+    )
+
+    VehicleWidgetEntry(date: .now, vehicle: placeholderVehicle, configuration: VehicleWidgetIntent())
+}
+
+#Preview(as: .accessoryRectangular) {
+    BetterBlueLockScreenWidget()
+} timeline: {
+    let placeholderVehicle = VehicleEntity(
+        id: "test",
+        displayName: "Ioniq 5",
+        vin: "test",
+        isElectric: true,
+        rangeText: "250 mi",
+        batteryPercentage: 85.0,
+        timestamp: Date(),
+        backgroundColorName: "white"
     )
 
     VehicleWidgetEntry(date: .now, vehicle: placeholderVehicle, configuration: VehicleWidgetIntent())

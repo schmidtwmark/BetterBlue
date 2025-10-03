@@ -13,5 +13,10 @@ import WidgetKit
 struct BetterBlueWidgetBundle: WidgetBundle {
     var body: some Widget {
         BetterBlueWidget()
+        BetterBlueLockScreenWidget()
+        VehicleLockControlWidget()
+        VehicleUnlockControlWidget()
+        ClimateStartControlWidget()
+        ClimateStopControlWidget()
     }
 }

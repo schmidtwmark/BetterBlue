@@ -10,11 +10,11 @@ import Foundation
 import SwiftData
 
 #if os(iOS)
-import UIKit
+    import UIKit
 #elseif os(macOS)
-import AppKit
+    import AppKit
 #elseif os(watchOS)
-import WatchKit
+    import WatchKit
 #endif
 
 @MainActor
@@ -26,7 +26,7 @@ class HTTPLogSinkManager {
     private init() {}
 
     func configure(with container: ModelContainer, deviceType: DeviceType) {
-        self.modelContainer = container
+        modelContainer = container
         self.deviceType = deviceType
     }
 
@@ -72,15 +72,15 @@ class HTTPLogSinkManager {
 
     static func detectMainAppDeviceType() -> DeviceType {
         #if os(macOS)
-        return .mac
+            return .mac
         #elseif os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return .iPad
-        } else {
-            return .iPhone
-        }
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                return .iPad
+            } else {
+                return .iPhone
+            }
         #else
-        return .iPhone
+            return .iPhone
         #endif
     }
 }

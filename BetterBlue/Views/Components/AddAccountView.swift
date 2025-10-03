@@ -80,10 +80,10 @@ struct AddAccountView: View {
                                 .foregroundColor(.primary)
 
                             if let openSourceString = try? AttributedString(
-                                  markdown: "If you'd like to help bring BetterBlue to your region," +
-                                  " please consider [contributing to the open source project]" +
-                                  "(https://github.com/schmidtwmark/BetterBlueKit).") {
-                                  Text(openSourceString)
+                                markdown: "If you'd like to help bring BetterBlue to your region," +
+                                    " please consider [contributing to the open source project]" +
+                                    "(https://github.com/schmidtwmark/BetterBlueKit).") {
+                                Text(openSourceString)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -165,10 +165,10 @@ struct AddAccountView: View {
                         Text("BetterBlue stores your credentials securely on your device and in iCloud.")
 
                         let link = "[GitHub](https://github.com/schmidtwmark/BetterBlue)"
-                         if let openSourceString = try? AttributedString(
-                              markdown: "BetterBlue is fully open source. To view the source code, visit \(link).") {
-                              Text(openSourceString)
-                          }
+                        if let openSourceString = try? AttributedString(
+                            markdown: "BetterBlue is fully open source. To view the source code, visit \(link).") {
+                            Text(openSourceString)
+                        }
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)

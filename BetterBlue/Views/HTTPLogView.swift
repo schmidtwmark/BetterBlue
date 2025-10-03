@@ -107,7 +107,6 @@ struct HTTPLogRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-
                 // Request Type Badge
                 Text(log.requestType.displayName)
                     .font(.caption)

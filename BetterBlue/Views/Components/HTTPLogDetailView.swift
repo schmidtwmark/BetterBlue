@@ -6,8 +6,8 @@
 //
 
 import BetterBlueKit
-import SwiftUI
 import Highlight
+import SwiftUI
 
 struct HTTPLogDetailView: View {
     let log: HTTPLog
@@ -59,13 +59,13 @@ struct HTTPLogDetailView: View {
             // Stack Trace Tab (only show if stack trace exists)
             if log.stackTrace != nil {
                 HTTPLogStackTraceView(
-                log: log,
-                copiedMessage: $copiedMessage
-            )
-                    .tabItem {
-                        Image(systemName: "list.bullet.rectangle")
-                        Text("Stack Trace")
-                    }
+                    log: log,
+                    copiedMessage: $copiedMessage
+                )
+                .tabItem {
+                    Image(systemName: "list.bullet.rectangle")
+                    Text("Stack Trace")
+                }
             }
         }
         .navigationTitle("HTTP Log Details")
@@ -86,7 +86,6 @@ struct HTTPLogDetailView: View {
 }
 
 extension HTTPLog {
-
     var formattedRequestBody: NSAttributedString? {
         guard let requestBody else { return nil }
         return formatJSON(requestBody)
@@ -107,6 +106,7 @@ extension HTTPLog {
         return JsonSyntaxHighlightProvider.shared.highlight(formattedString, as: .json)
     }
 }
+
 // Unified HTTP Log Content View
 struct HTTPLogContentView: View {
     let title: String
@@ -171,7 +171,8 @@ struct HTTPLogStackTraceView: View {
                 StackTraceView(
                     log: log,
                     showingRawStackTrace: $showingRawStackTrace,
-                    showingShareSheet: $showingShareSheet)
+                    showingShareSheet: $showingShareSheet
+                )
             } header: {
                 HStack {
                     Text("Stack Trace")

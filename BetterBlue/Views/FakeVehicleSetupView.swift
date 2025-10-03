@@ -181,7 +181,7 @@ struct FakeVehicleDetailView: View {
         let hasEV = vehicle.evStatus != nil
         let hasGas = vehicle.gasRange != nil
 
-        if hasEV && hasGas {
+        if hasEV, hasGas {
             vehicleType = .pluginHybrid
         } else if hasEV {
             vehicleType = .electric

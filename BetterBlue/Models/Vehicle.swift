@@ -97,8 +97,8 @@ extension BBVehicle {
         if let evStatus = status.evStatus, status.gasRange == nil {
             self.evStatus = evStatus
         }
-        if self.isElectric {
-            self.gasRange = nil
+        if isElectric {
+            gasRange = nil
         }
         location = status.location
         lockStatus = status.lockStatus
