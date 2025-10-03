@@ -54,7 +54,6 @@ struct VehicleMapMarker: View {
         } label: {
             Circle()
                 .fill(Color.blue)
-                .frame(width: 50, height: 50)
                 .overlay(
                     Circle()
                         .stroke(Color.white, lineWidth: 3),
@@ -64,6 +63,9 @@ struct VehicleMapMarker: View {
                         .foregroundColor(.white)
                         .font(.title2),
                 )
+                .frame(width: 50, height: 50)
+                .contentShape(Circle())
+                .padding(4)
         }
     }
 }

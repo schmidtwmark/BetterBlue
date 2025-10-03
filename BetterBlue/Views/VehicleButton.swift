@@ -134,6 +134,7 @@ struct VehicleControlButton: View {
                 }
             }
             .padding()
+            .glassEffect()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         primaryAction: {
@@ -145,7 +146,6 @@ struct VehicleControlButton: View {
                 }
             }
         }
-        .glassEffect()
     }
 
     private func performAction(action: VehicleAction) async {
