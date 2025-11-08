@@ -1,0 +1,3 @@
+[submodule "BetterBlueKit"]
+	path = BetterBlueKit
+	url = https://github.com/schmidtwmark/BetterBlueKit.git

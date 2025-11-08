@@ -4,7 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BetterBlue is a native iOS/watchOS app for controlling Hyundai and Kia vehicles via BlueLink/Kia Connect services. Built with SwiftUI, SwiftData, and powered by the [BetterBlueKit](https://github.com/schmidtwmark/BetterBlueKit) Swift package (located at `/Users/markschmidt/Documents/BetterBlueKit`).
+BetterBlue is a native iOS/watchOS app for controlling Hyundai and Kia vehicles via BlueLink/Kia Connect services. Built with SwiftUI, SwiftData, and powered by the [BetterBlueKit](https://github.com/schmidtwmark/BetterBlueKit) Swift package.
+
+### BetterBlueKit Submodule
+
+BetterBlueKit is included as a **git submodule** in the `BetterBlueKit/` directory. This allows local development and testing of BetterBlueKit changes without pushing to GitHub. The project is configured to use the local package via `XCLocalSwiftPackageReference`.
+
+To initialize or update the submodule after cloning:
+```bash
+git submodule update --init --recursive
+```
+
+**Important**: The local submodule has the SwiftLint plugin commented out in `Package.swift` to avoid build conflicts with the main project. When pushing BetterBlueKit changes upstream, you may need to uncomment the plugin configuration in the standalone repository.
 
 ## Build Commands
 
@@ -27,10 +38,9 @@ xcodebuild -scheme WidgetExtension build
 ```
 
 ### Linting
-SwiftLint is configured via the BetterBlueKit Swift package plugin. To lint manually:
+SwiftLint has been removed from the project to avoid plugin conflicts when BetterBlueKit is used as a local package. You can run SwiftLint manually if needed:
 ```bash
-cd /Users/markschmidt/Documents/BetterBlueKit
-swift build
+swiftlint lint
 ```
 
 ## Architecture
