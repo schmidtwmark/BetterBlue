@@ -34,17 +34,22 @@ class HTTPLogSinkManager {
         guard let modelContainer, let deviceType else { return nil }
 
         return { httpLog in
-            Task { @MainActor in
-                let context = modelContainer.mainContext
-                let bbHttpLog = BBHTTPLog(log: httpLog, deviceType: deviceType)
-                context.insert(bbHttpLog)
-
+            // Use detached task to prevent crashes if widget is killed
+            Task.detached {
                 do {
+                    // Create a background context to avoid blocking the main thread
+                    let context = ModelContext(modelContainer)
+                    let bbHttpLog = BBHTTPLog(log: httpLog, deviceType: deviceType)
+                    context.insert(bbHttpLog)
+
                     try context.save()
 
-                    // Clean up old logs to maintain a soft limit of 100 logs
-                    try await self.cleanupOldLogs(context: context)
+                    // Only clean up for non-widget contexts to avoid extended processing
+                    if deviceType != .widget {
+                        try await self.cleanupOldLogs(context: context)
+                    }
                 } catch {
+                    // Silently fail for widgets to prevent crashes
                     print("🔴 [HTTPLog] Failed to save HTTP log: \(error)")
                 }
             }
