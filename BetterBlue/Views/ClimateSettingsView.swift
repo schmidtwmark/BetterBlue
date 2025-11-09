@@ -103,15 +103,6 @@ struct ClimateSettingsContent: View {
         }
     }
 
-    var defrostIcon: String {
-        preset.climateOptions.defrost ?
-            "windshield.front.and.heat.waves" : "windshield.front.and.wiper"
-    }
-
-    var defrostColor: Color {
-        preset.climateOptions.defrost ? Color.orange : Color.secondary
-    }
-
     @ViewBuilder
     private var climateControlsSection: some View {
         // Temperature Section
@@ -128,30 +119,31 @@ struct ClimateSettingsContent: View {
             )
             .frame(height: 250)
             .padding(.bottom, -20)
+
+            // Front Defrost
             HStack(spacing: 16) {
-                // Defrost icon
-                Image(systemName: defrostIcon)
+                Image(systemName: preset.climateOptions.frontDefrost ?
+                    "windshield.front.and.heat.waves" : "windshield.front.and.wiper")
                     .font(.title2)
-                    .foregroundColor(defrostColor)
+                    .foregroundColor(preset.climateOptions.frontDefrost ? Color.orange : Color.secondary)
                     .frame(width: 32)
 
-                // Text and toggle
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Defrost")
+                        Text("Front Defrost")
                             .font(.subheadline)
                             .fontWeight(.medium)
 
-                        Text(preset.climateOptions.defrost ? "On" : "Off")
+                        Text(preset.climateOptions.frontDefrost ? "On" : "Off")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     Spacer()
                     Toggle("", isOn: Binding(
-                        get: { preset.climateOptions.defrost },
+                        get: { preset.climateOptions.frontDefrost },
                         set: { newValue in
-                            preset.climateOptions.defrost = newValue
+                            preset.climateOptions.frontDefrost = newValue
                             savePreset(preset)
                         },
                     ))
@@ -161,32 +153,70 @@ struct ClimateSettingsContent: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
-                preset.climateOptions.defrost ?
+                preset.climateOptions.frontDefrost ?
                     Color.orange.opacity(0.1) :
                     Color.clear,
             )
-            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.defrost)
+            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.frontDefrost)
+            .listRowInsets(EdgeInsets())
+
+            // Rear Defrost
+            HStack(spacing: 16) {
+                Image(systemName: preset.climateOptions.rearDefrost ?
+                    "windshield.rear.and.heat.waves" : "windshield.rear.and.wiper")
+                    .font(.title2)
+                    .foregroundColor(preset.climateOptions.rearDefrost ? Color.orange : Color.secondary)
+                    .frame(width: 32)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Rear Defrost")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Text(preset.climateOptions.rearDefrost ? "On" : "Off")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { preset.climateOptions.rearDefrost },
+                        set: { newValue in
+                            preset.climateOptions.rearDefrost = newValue
+                            savePreset(preset)
+                        },
+                    ))
+                    .labelsHidden()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                preset.climateOptions.rearDefrost ?
+                    Color.orange.opacity(0.1) :
+                    Color.clear,
+            )
+            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.rearDefrost)
             .listRowInsets(EdgeInsets())
         }
 
         // Heated Steering Wheel Section
         Section("Accessories") {
             HStack(spacing: 16) {
-                // Steering wheel icon
-                Image(systemName: preset.climateOptions.steeringWheel > 0 ?
+                Image(systemName: preset.climateOptions.steeringWheel ?
                     "steeringwheel.and.heat.waves" : "steeringwheel")
                     .font(.title2)
-                    .foregroundColor(preset.climateOptions.steeringWheel > 0 ? Color.orange : Color.secondary)
+                    .foregroundColor(preset.climateOptions.steeringWheel ? Color.orange : Color.secondary)
                     .frame(width: 32)
 
-                // Text and toggle
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Steering Wheel Heat")
                             .font(.subheadline)
                             .fontWeight(.medium)
 
-                        Text(preset.climateOptions.steeringWheel > 0 ? "On" : "Off")
+                        Text(preset.climateOptions.steeringWheel ? "On" : "Off")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -194,9 +224,9 @@ struct ClimateSettingsContent: View {
                     Spacer()
 
                     Toggle("", isOn: Binding(
-                        get: { preset.climateOptions.steeringWheel > 0 },
+                        get: { preset.climateOptions.steeringWheel },
                         set: { isOn in
-                            preset.climateOptions.steeringWheel = isOn ? 1 : 0
+                            preset.climateOptions.steeringWheel = isOn
                             savePreset(preset)
                         },
                     ))
@@ -206,7 +236,7 @@ struct ClimateSettingsContent: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
-                preset.climateOptions.steeringWheel > 0 ?
+                preset.climateOptions.steeringWheel ?
                     Color.orange.opacity(0.1) :
                     Color.clear,
             )

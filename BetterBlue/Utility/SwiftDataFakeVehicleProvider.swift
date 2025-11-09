@@ -99,9 +99,9 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         case let .startClimate(options):
             print("🟢 [FakeAPI] Starting climate for fake vehicle '\(bbVehicle.vin)' at \(options.temperature.value)°")
             bbVehicle.climateStatus = VehicleStatus.ClimateStatus(
-                defrostOn: options.defrost,
+                defrostOn: options.frontDefrost,
                 airControlOn: options.climate,
-                steeringWheelHeatingOn: options.heating,
+                steeringWheelHeatingOn: options.steeringWheel,
                 temperature: options.temperature,
             )
         case .stopClimate:
