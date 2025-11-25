@@ -282,7 +282,7 @@ struct AddAccountView: View {
 
 #Preview("Add Account with Warning") {
     struct PreviewWrapper: View {
-        @State private var selectedRegion: Region = .europe
+        @State private var selectedRegion: Region = .canada
         @State private var selectedBrand: Brand = .hyundai
 
         var body: some View {
