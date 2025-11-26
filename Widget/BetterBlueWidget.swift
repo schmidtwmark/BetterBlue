@@ -67,7 +67,7 @@ struct VehicleLockControlWidget: ControlWidget {
             intent: LockVehicleControlIntent.self
         ) { intent in
             ControlWidgetButton(action: intent) {
-                if let vehicle = intent.vehicle, !vehicle.id.isEmpty {
+                if let vehicle = intent.vehicle {
                     Label("Lock \(vehicle.displayName)", systemImage: "lock.fill")
                 } else {
                     Label("Select Vehicle", systemImage: "lock.fill")
@@ -88,7 +88,7 @@ struct VehicleUnlockControlWidget: ControlWidget {
             intent: UnlockVehicleControlIntent.self
         ) { intent in
             ControlWidgetButton(action: intent) {
-                if let vehicle = intent.vehicle, !vehicle.id.isEmpty {
+                if let vehicle = intent.vehicle {
                     Label("Unlock \(vehicle.displayName)", systemImage: "lock.open.fill")
                 } else {
                     Label("Select Vehicle", systemImage: "lock.open.fill")
@@ -109,10 +109,10 @@ struct ClimateStartControlWidget: ControlWidget {
             intent: StartClimateControlIntent.self
         ) { intent in
             ControlWidgetButton(action: intent) {
-                if let vehicle = intent.vehicle, !vehicle.id.isEmpty {
-                    Label("Start Climate", systemImage: "thermometer.sun.fill")
+                if let preset = intent.preset {
+                    Label("Start \(preset.vehicleName) - \(preset.presetName)", systemImage: "thermometer.sun.fill")
                 } else {
-                    Label("Select Vehicle", systemImage: "thermometer.sun.fill")
+                    Label("Select Preset", systemImage: "thermometer.snowflake")
                 }
             }
         }
@@ -130,7 +130,7 @@ struct ClimateStopControlWidget: ControlWidget {
             intent: StopClimateControlIntent.self
         ) { intent in
             ControlWidgetButton(action: intent) {
-                if let vehicle = intent.vehicle, !vehicle.id.isEmpty {
+                if intent.vehicle != nil {
                     Label("Stop Climate", systemImage: "thermometer.snowflake")
                 } else {
                     Label("Select Vehicle", systemImage: "thermometer.snowflake")
@@ -140,5 +140,47 @@ struct ClimateStopControlWidget: ControlWidget {
         .promptsForUserConfiguration()
         .displayName("Stop Climate")
         .description("Stop climate control from Control Center")
+    }
+}
+
+@available(iOS 18, *)
+struct StartChargeControlWidget: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        AppIntentControlConfiguration(
+            kind: "com.betterblue.charge.start",
+            intent: StartChargeControlIntent.self
+        ) { intent in
+            ControlWidgetButton(action: intent) {
+                if intent.vehicle != nil {
+                    Label("Start Charge", systemImage: "bolt.fill")
+                } else {
+                    Label("Select Vehicle", systemImage: "bolt.fill")
+                }
+            }
+        }
+        .promptsForUserConfiguration()
+        .displayName("Start Charge")
+        .description("Start charging from Control Center")
+    }
+}
+
+@available(iOS 18, *)
+struct StopChargeControlWidget: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        AppIntentControlConfiguration(
+            kind: "com.betterblue.charge.stop",
+            intent: StopChargeControlIntent.self
+        ) { intent in
+            ControlWidgetButton(action: intent) {
+                if intent.vehicle != nil {
+                    Label("Stop Charge", systemImage: "bolt.slash.fill")
+                } else {
+                    Label("Select Vehicle", systemImage: "bolt.slash.fill")
+                }
+            }
+        }
+        .promptsForUserConfiguration()
+        .displayName("Stop Charge")
+        .description("Stop charging from Control Center")
     }
 }

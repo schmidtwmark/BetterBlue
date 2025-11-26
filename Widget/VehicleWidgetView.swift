@@ -267,7 +267,7 @@ struct VehicleButtonsView: View {
     BetterBlueWidget()
 } timeline: {
     let placeholderVehicle = VehicleEntity(
-        id: "test",
+        id: .init(),
         displayName: "Ioniq 5",
         vin: "test",
         isElectric: true,
@@ -284,7 +284,7 @@ struct VehicleButtonsView: View {
     BetterBlueWidget()
 } timeline: {
     let placeholderVehicle = VehicleEntity(
-        id: "test",
+        id: .init(),
         displayName: "Genesis GV60",
         vin: "test",
         isElectric: true,
@@ -399,7 +399,7 @@ struct LockScreenWideRangeWidget: View {
     BetterBlueLockScreenWidget()
 } timeline: {
     let placeholderVehicle = VehicleEntity(
-        id: "test",
+        id: .init(),
         displayName: "Model Y",
         vin: "test",
         isElectric: true,
@@ -416,7 +416,7 @@ struct LockScreenWideRangeWidget: View {
     BetterBlueLockScreenWidget()
 } timeline: {
     let placeholderVehicle = VehicleEntity(
-        id: "test",
+        id: .init(),
         displayName: "Ioniq 5",
         vin: "test",
         isElectric: true,

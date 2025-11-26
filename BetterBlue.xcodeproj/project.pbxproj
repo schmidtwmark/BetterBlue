@@ -77,6 +77,7 @@
 			membershipExceptions = (
 				Models/Account.swift,
 				Models/ClimatePreset.swift,
+				Models/ClimatePresetEntity.swift,
 				Models/HTTPLog.swift,
 				Models/SharedModelContainer.swift,
 				Models/Vehicle.swift,
@@ -120,6 +121,7 @@
 			membershipExceptions = (
 				Models/Account.swift,
 				Models/ClimatePreset.swift,
+				Models/ClimatePresetEntity.swift,
 				Models/HTTPLog.swift,
 				Models/SharedModelContainer.swift,
 				Models/Vehicle.swift,

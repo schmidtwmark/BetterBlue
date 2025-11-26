@@ -34,7 +34,7 @@ struct VehicleEntity: AppEntity {
         "Vehicle"
     static var defaultQuery = VehicleQuery()
 
-    var id: String
+    var id: UUID
     var displayName: String
     var vin: String
     var isElectric: Bool
@@ -58,7 +58,7 @@ struct VehicleEntity: AppEntity {
     }
 
     init(
-        id: String,
+        id: UUID,
         displayName: String,
         vin: String,
         isElectric: Bool,
@@ -78,7 +78,7 @@ struct VehicleEntity: AppEntity {
     }
 
     init(from bbVehicle: BBVehicle, with unit: Distance.Units) {
-        id = bbVehicle.id.uuidString
+        id = bbVehicle.id
         displayName = bbVehicle.displayName
         vin = bbVehicle.vin
         isElectric = bbVehicle.isElectric
@@ -118,7 +118,7 @@ struct VehicleEntity: AppEntity {
 
 struct VehicleQuery: EntityQuery {
     func entities(
-        for identifiers: [String],
+        for identifiers: [UUID],
     ) async throws -> [VehicleEntity] {
         try await MainActor.run {
             let modelContainer = try createSharedModelContainer()
@@ -128,7 +128,7 @@ struct VehicleQuery: EntityQuery {
             let settings = AppSettings.shared
 
             return vehicles
-                .filter { identifiers.contains($0.id.uuidString) }
+                .filter { identifiers.contains($0.id) }
                 .map { VehicleEntity(from: $0, with: settings.preferredDistanceUnit) }
         }
     }

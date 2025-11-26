@@ -89,31 +89,52 @@ struct StartClimateIntent: AppIntent {
     static var description = IntentDescription("Start climate control for your vehicle")
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Vehicle", description: "The vehicle to start climate control")
-    var vehicle: VehicleEntity?
+    @Parameter(title: "Preset", description: "The vehicle and preset to use")
+    var preset: ClimatePresetEntity?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         do {
-            guard let vehicle else {
+            let targetVin: String
+            let vehicleName: String
+            let presetId: UUID?
+
+            if let preset {
+                targetVin = preset.vehicleVin
+                vehicleName = preset.vehicleName
+                presetId = preset.id
+            } else {
                 throw NSError(
                     domain: "com.betterblue.app",
                     code: 0,
-                    userInfo: [NSLocalizedDescriptionKey: "No vehicle provided"],
+                    userInfo: [NSLocalizedDescriptionKey: "No vehicle or preset provided"],
                 )
             }
-            let targetVin = vehicle.vin
-            let vehicleName = vehicle.displayName
 
             try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                var options: ClimateOptions? = nil
+                if let presetId {
+                    let predicate = #Predicate<ClimatePreset> { $0.id == presetId }
+                    let descriptor = FetchDescriptor(predicate: predicate)
+                    if let preset = try? context.fetch(descriptor).first {
+                        options = preset.climateOptions
+                    }
+                }
                 print("Starting climate from intent, options: \(bbVehicle.safeClimatePresets)")
-                try await account.startClimate(bbVehicle, modelContext: context)
+                try await account.startClimate(bbVehicle, options: options, modelContext: context)
             }
 
-            await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(vehicleName)")
+            var dialog: IntentDialog
+            if let preset = preset {
+                dialog = "Climate start request sent to \(vehicleName) with preset \(preset.presetName)"
+                await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(vehicleName) with preset \(preset.presetName)")
+            } else {
+                dialog = "Climate start request sent to \(vehicleName)"
+                await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(vehicleName)")
+            }
 
             WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
-            return .result(dialog: "Climate start request sent to \(vehicleName)")
+            return .result(dialog: dialog)
         } catch {
             throw error
         }
@@ -149,6 +170,76 @@ struct StopClimateIntent: AppIntent {
 
             WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
             return .result(dialog: "Climate stop request sent to \(vehicleName)")
+        } catch {
+            throw error
+        }
+    }
+}
+
+struct StartChargeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Start Charging"
+    static var description = IntentDescription("Start charging for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to start charging")
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            guard let vehicle else {
+                throw NSError(
+                    domain: "com.betterblue.app",
+                    code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "No vehicle provided"],
+                )
+            }
+            let targetVin = vehicle.vin
+            let vehicleName = vehicle.displayName
+
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.startCharge(bbVehicle, modelContext: context)
+            }
+
+            await sendNotification(title: "Charge Request Sent", body: "Command sent to \(vehicleName)")
+
+            WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+            return .result(dialog: "Charge request sent to \(vehicleName)")
+        } catch {
+            throw error
+        }
+    }
+}
+
+struct StopChargeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Stop Charging"
+    static var description = IntentDescription("Stop charging for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to stop charging")
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            guard let vehicle else {
+                throw NSError(
+                    domain: "com.betterblue.app",
+                    code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "No vehicle provided"],
+                )
+            }
+            let targetVin = vehicle.vin
+            let vehicleName = vehicle.displayName
+
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.stopCharge(bbVehicle, modelContext: context)
+            }
+
+            await sendNotification(title: "Charge Stop Request Sent", body: "Command sent to \(vehicleName)")
+
+            WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+            return .result(dialog: "Charge stop request sent to \(vehicleName)")
         } catch {
             throw error
         }
@@ -334,7 +425,7 @@ private func sendNotification(title: String, body: String) async {
 // MARK: - Control Center Configuration Intents
 
 struct LockVehicleControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Lock Vehicle"
+    static var title: LocalizedStringResource = "Lock Vehicle (ControlKit)"
     static var description = IntentDescription("Lock your vehicle")
 
     @Parameter(
@@ -345,7 +436,7 @@ struct LockVehicleControlIntent: ControlConfigurationIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+        guard let vehicle = vehicle else {
             throw IntentError.noVehicleSelected
         }
         let lockIntent = LockVehicleIntent()
@@ -356,7 +447,7 @@ struct LockVehicleControlIntent: ControlConfigurationIntent {
 }
 
 struct UnlockVehicleControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Unlock Vehicle"
+    static var title: LocalizedStringResource = "Unlock Vehicle (ControlKit)"
     static var description = IntentDescription("Unlock your vehicle")
 
     @Parameter(
@@ -367,7 +458,7 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+        guard let vehicle = vehicle else {
             throw IntentError.noVehicleSelected
         }
         let unlockIntent = UnlockVehicleIntent()
@@ -378,29 +469,27 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 }
 
 struct StartClimateControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Start Climate Control"
+    static var title: LocalizedStringResource = "Start Climate Control (ControlKit)"
     static var description = IntentDescription("Start climate control for your vehicle")
 
-    @Parameter(
-        title: "Vehicle",
-        description: "Select the vehicle to start climate control",
-    )
-    var vehicle: VehicleEntity?
+    @Parameter(title: "Preset", description: "The climate control preset to use")
+    var preset: ClimatePresetEntity?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Start climate with \(\.$preset)")
+    }
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
-            throw IntentError.noVehicleSelected
-        }
         let startIntent = StartClimateIntent()
-        startIntent.vehicle = vehicle
+        startIntent.preset = preset
         _ = try await startIntent.perform()
         return .result()
     }
 }
 
 struct StopClimateControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Stop Climate Control"
+    static var title: LocalizedStringResource = "Stop Climate Control (ControlKit)"
     static var description = IntentDescription("Stop climate control for your vehicle")
 
     @Parameter(
@@ -411,10 +500,54 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        guard let vehicle = vehicle, !vehicle.id.isEmpty else {
+        guard let vehicle = vehicle else {
             throw IntentError.noVehicleSelected
         }
         let stopIntent = StopClimateIntent()
+        stopIntent.vehicle = vehicle
+        _ = try await stopIntent.perform()
+        return .result()
+    }
+}
+
+struct StartChargeControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Start Charging (ControlKit)"
+    static var description = IntentDescription("Start charging for your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to start charging",
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle else {
+            throw IntentError.noVehicleSelected
+        }
+        let startIntent = StartChargeIntent()
+        startIntent.vehicle = vehicle
+        _ = try await startIntent.perform()
+        return .result()
+    }
+}
+
+struct StopChargeControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Stop Charging (ControlKit)"
+    static var description = IntentDescription("Stop charging for your vehicle")
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to stop charging",
+    )
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard let vehicle = vehicle else {
+            throw IntentError.noVehicleSelected
+        }
+        let stopIntent = StopChargeIntent()
         stopIntent.vehicle = vehicle
         _ = try await stopIntent.perform()
         return .result()
