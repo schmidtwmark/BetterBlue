@@ -107,7 +107,7 @@ struct StartClimateIntent: AppIntent {
                 throw NSError(
                     domain: "com.betterblue.app",
                     code: 0,
-                    userInfo: [NSLocalizedDescriptionKey: "No vehicle or preset provided"],
+                    userInfo: [NSLocalizedDescriptionKey: "No preset provided"],
                 )
             }
 
