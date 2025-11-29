@@ -227,7 +227,11 @@ struct ClimateSettingsContent: View {
                                 savePreset(preset)
                             },
                         ),
-                        position: "left",
+                        cooling: Binding(get: {preset.climateOptions.frontLeftVentilation},
+                                         set: { newValue in
+                                             preset.climateOptions.frontLeftVentilation = newValue
+                                             savePreset(preset)}),
+                        position: "left"
                     )
 
                     Rectangle()
@@ -242,7 +246,13 @@ struct ClimateSettingsContent: View {
                                 savePreset(preset)
                             },
                         ),
-                        position: "right",
+                        cooling: Binding(get: {preset.climateOptions.frontRightVentilation},
+                                         set: { newValue in
+                                             preset.climateOptions.frontRightVentilation = newValue
+                                             savePreset(preset)
+                            
+                        }),
+                        position: "right"
                     )
                 }
                 .listRowInsets(EdgeInsets())
@@ -257,7 +267,12 @@ struct ClimateSettingsContent: View {
                                 savePreset(preset)
                             },
                         ),
-                        position: "left",
+                        cooling: Binding(get: {preset.climateOptions.rearLeftVentilation},
+                                         set: { newValue in
+                                             preset.climateOptions.rearLeftVentilation = newValue
+                                             savePreset(preset)
+                                         }),
+                        position: "left"
                     )
 
                     Rectangle()
@@ -272,7 +287,12 @@ struct ClimateSettingsContent: View {
                                 savePreset(preset)
                             },
                         ),
-                        position: "right",
+                        cooling: Binding(get: {preset.climateOptions.rearRightVentilation},
+                                         set: { newValue in
+                                             preset.climateOptions.rearRightVentilation = newValue
+                                             savePreset(preset)
+                                         }),
+                        position: "right"
                     )
                 }
                 .listRowInsets(EdgeInsets())

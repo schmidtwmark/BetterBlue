@@ -64,7 +64,7 @@ func createSharedModelContainer() throws -> ModelContainer {
         BBVehicle.self,
         BBHTTPLog.self,
         ClimatePreset.self
-    ], version: .init(1, 0, 6))
+    ], version: .init(1, 0, 7))
 
     #if targetEnvironment(simulator)
         let storeURL = getSimulatorStoreURL()
