@@ -11,7 +11,7 @@ import SwiftUI
 
 struct ClimateSettingsContent: View {
     let vehicle: BBVehicle
-    let preset: ClimatePreset
+    @Bindable var preset: ClimatePreset
     @State private var appSettings = AppSettings.shared
     @Environment(\.modelContext) private var modelContext
     @Query private var allClimatePresets: [ClimatePreset]
@@ -64,13 +64,7 @@ struct ClimateSettingsContent: View {
                     }
                 }
                 if vehicle.account?.regionEnum != .usa {
-                    Picker("Climate Duration", selection: Binding(
-                        get: { preset.climateOptions.duration },
-                        set: { newValue in
-                            preset.climateOptions.duration = newValue
-                            savePreset(preset)
-                        }
-                    )) {
+                    Picker("Climate Duration", selection: $preset.climateOptions.duration) {
                         Text("5 minutes").tag(5)
                         Text("10 minutes").tag(10)
                         Text("20 minutes").tag(20)
@@ -92,6 +86,9 @@ struct ClimateSettingsContent: View {
         }
         .navigationTitle("Climate Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: preset.climateOptions) { _, _ in
+            savePreset(preset)
+        }
         .onAppear {
             createDefaultPresetIfNeeded()
         }
@@ -113,20 +110,22 @@ struct ClimateSettingsContent: View {
     var defrostColor: Color {
         preset.climateOptions.defrost ? Color.orange : Color.secondary
     }
+    
+    var rearDefrostIcon: String {
+        preset.climateOptions.hasRearDefrost ? "windshield.rear.and.heat.waves" : "windshield.rear.and.wiper"
+    }
+
+    var rearDefrostColor: Color {
+        preset.climateOptions.hasRearDefrost ? Color.orange : Color.secondary
+    }
 
     @ViewBuilder
     private var climateControlsSection: some View {
         // Temperature Section
         Section("HVAC") {
             TemperatureArcControl(
-                temperature: Binding(
-                    get: { preset.climateOptions.temperature },
-                    set: { newValue in
-                        preset.climateOptions.temperature = newValue
-                        savePreset(preset)
-                    },
-                ),
-                preferredUnit: appSettings.preferredTemperatureUnit,
+                temperature: $preset.climateOptions.temperature,
+                preferredUnit: appSettings.preferredTemperatureUnit
             )
             .frame(height: 250)
             .padding(.bottom, -20)
@@ -150,14 +149,8 @@ struct ClimateSettingsContent: View {
                     }
 
                     Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { preset.climateOptions.defrost },
-                        set: { newValue in
-                            preset.climateOptions.defrost = newValue
-                            savePreset(preset)
-                        },
-                    ))
-                    .labelsHidden()
+                    Toggle("", isOn: $preset.climateOptions.defrost)
+                        .labelsHidden()
                 }
             }
             .padding(.horizontal, 16)
@@ -165,9 +158,43 @@ struct ClimateSettingsContent: View {
             .background(
                 preset.climateOptions.defrost ?
                     Color.orange.opacity(0.1) :
-                    Color.clear,
+                    Color.clear
             )
             .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.defrost)
+            .listRowInsets(EdgeInsets())
+            
+            HStack(spacing: 16) {
+                // Rear defrost icon
+                Image(systemName: rearDefrostIcon)
+                    .font(.title2)
+                    .foregroundColor(rearDefrostColor)
+                    .frame(width: 32)
+
+                // Text and toggle
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Rear Defrost")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Text(preset.climateOptions.hasRearDefrost ? "On" : "Off")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                    Toggle("", isOn: $preset.climateOptions.hasRearDefrost)
+                        .labelsHidden()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                preset.climateOptions.hasRearDefrost ?
+                    Color.orange.opacity(0.1) :
+                    Color.clear
+            )
+            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.hasRearDefrost)
             .listRowInsets(EdgeInsets())
         }
 
@@ -197,10 +224,7 @@ struct ClimateSettingsContent: View {
 
                     Toggle("", isOn: Binding(
                         get: { preset.climateOptions.steeringWheel > 0 },
-                        set: { isOn in
-                            preset.climateOptions.steeringWheel = isOn ? 1 : 0
-                            savePreset(preset)
-                        },
+                        set: { preset.climateOptions.steeringWheel = $0 ? 1 : 0 }
                     ))
                     .labelsHidden()
                 }
@@ -210,7 +234,7 @@ struct ClimateSettingsContent: View {
             .background(
                 preset.climateOptions.steeringWheel > 0 ?
                     Color.orange.opacity(0.1) :
-                    Color.clear,
+                    Color.clear
             )
             .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.steeringWheel)
             .listRowInsets(EdgeInsets())
@@ -220,17 +244,8 @@ struct ClimateSettingsContent: View {
             Section("Front Seats") {
                 HStack(spacing: 0) {
                     SeatHeatControl(
-                        level: Binding(
-                            get: { preset.climateOptions.frontLeftSeat },
-                            set: { newValue in
-                                preset.climateOptions.frontLeftSeat = newValue
-                                savePreset(preset)
-                            },
-                        ),
-                        cooling: Binding(get: {preset.climateOptions.frontLeftVentilation},
-                                         set: { newValue in
-                                             preset.climateOptions.frontLeftVentilation = newValue
-                                             savePreset(preset)}),
+                        level: $preset.climateOptions.frontLeftSeat,
+                        cooling: $preset.climateOptions.hasFrontLeftVentilation,
                         position: "left"
                     )
 
@@ -239,19 +254,8 @@ struct ClimateSettingsContent: View {
                         .frame(width: 0.5)
 
                     SeatHeatControl(
-                        level: Binding(
-                            get: { preset.climateOptions.frontRightSeat },
-                            set: { newValue in
-                                preset.climateOptions.frontRightSeat = newValue
-                                savePreset(preset)
-                            },
-                        ),
-                        cooling: Binding(get: {preset.climateOptions.frontRightVentilation},
-                                         set: { newValue in
-                                             preset.climateOptions.frontRightVentilation = newValue
-                                             savePreset(preset)
-                            
-                        }),
+                        level: $preset.climateOptions.frontRightSeat,
+                        cooling: $preset.climateOptions.hasFrontRightVentilation,
                         position: "right"
                     )
                 }
@@ -260,18 +264,8 @@ struct ClimateSettingsContent: View {
             Section("Rear Seats") {
                 HStack(spacing: 0) {
                     SeatHeatControl(
-                        level: Binding(
-                            get: { preset.climateOptions.rearLeftSeat },
-                            set: { newValue in
-                                preset.climateOptions.rearLeftSeat = newValue
-                                savePreset(preset)
-                            },
-                        ),
-                        cooling: Binding(get: {preset.climateOptions.rearLeftVentilation},
-                                         set: { newValue in
-                                             preset.climateOptions.rearLeftVentilation = newValue
-                                             savePreset(preset)
-                                         }),
+                        level: $preset.climateOptions.rearLeftSeat,
+                        cooling: $preset.climateOptions.hasRearLeftVentilation,
                         position: "left"
                     )
 
@@ -280,18 +274,8 @@ struct ClimateSettingsContent: View {
                         .frame(width: 0.5)
 
                     SeatHeatControl(
-                        level: Binding(
-                            get: { preset.climateOptions.rearRightSeat },
-                            set: { newValue in
-                                preset.climateOptions.rearRightSeat = newValue
-                                savePreset(preset)
-                            },
-                        ),
-                        cooling: Binding(get: {preset.climateOptions.rearRightVentilation},
-                                         set: { newValue in
-                                             preset.climateOptions.rearRightVentilation = newValue
-                                             savePreset(preset)
-                                         }),
+                        level: $preset.climateOptions.rearRightSeat,
+                        cooling: $preset.climateOptions.hasRearRightVentilation,
                         position: "right"
                     )
                 }

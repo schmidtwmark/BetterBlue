@@ -64,13 +64,12 @@ func createSharedModelContainer() throws -> ModelContainer {
         BBVehicle.self,
         BBHTTPLog.self,
         ClimatePreset.self
-    ], version: .init(1, 0, 7))
+    ], version: .init(1, 0, 8))
 
     #if targetEnvironment(simulator)
         let storeURL = getSimulatorStoreURL()
         return try createContainer(storeURL: storeURL, schema: schema)
     #else
-
         let cloudConfig = ModelConfiguration(
             "iCloud.com.markschmidt.BetterBlue",
             cloudKitDatabase: .automatic
