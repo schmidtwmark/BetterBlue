@@ -34,7 +34,7 @@ struct SeatHeatControl: View {
             } label: {
                 HStack(spacing: 16) {
                     Spacer()
-                    
+
                     Image(systemName: iconName)
                         .font(.title)
                         .foregroundColor(level > 0 ? activeColor : .secondary)
@@ -54,7 +54,7 @@ struct SeatHeatControl: View {
                             }
                         }
                     }
-                    
+
                     Spacer()
                 }
             }
@@ -69,7 +69,7 @@ struct SeatHeatControl: View {
             }
             .pickerStyle(.segmented)
             .tint(cooling ? .blue : .orange)
-            
+
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -87,7 +87,7 @@ struct SeatHeatControl: View {
                 cooling: state.binding(\.leftCool),
                 position: "left"
             )
-            
+
             SeatHeatControl(
                 level: state.binding(\.rightLevel),
                 cooling: state.binding(\.rightCool),

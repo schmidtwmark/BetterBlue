@@ -101,7 +101,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
             bbVehicle.climateStatus = VehicleStatus.ClimateStatus(
                 defrostOn: options.defrost,
                 airControlOn: options.climate,
-                steeringWheelHeatingOn: options.heating,
+                steeringWheelHeatingOn: options.steeringWheel != 0,
                 temperature: options.temperature,
             )
         case .stopClimate:

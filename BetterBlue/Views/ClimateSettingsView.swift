@@ -110,7 +110,7 @@ struct ClimateSettingsContent: View {
     var defrostColor: Color {
         preset.climateOptions.defrost ? Color.orange : Color.secondary
     }
-    
+
     var rearDefrostIcon: String {
         preset.climateOptions.hasRearDefrost ? "windshield.rear.and.heat.waves" : "windshield.rear.and.wiper"
     }
@@ -162,7 +162,7 @@ struct ClimateSettingsContent: View {
             )
             .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.defrost)
             .listRowInsets(EdgeInsets())
-            
+
             HStack(spacing: 16) {
                 // Rear defrost icon
                 Image(systemName: rearDefrostIcon)

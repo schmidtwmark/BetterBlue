@@ -112,7 +112,7 @@ struct StartClimateIntent: AppIntent {
             }
 
             try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-                var options: ClimateOptions? = nil
+                var options: ClimateOptions?
                 if let presetId {
                     let predicate = #Predicate<ClimatePreset> { $0.id == presetId }
                     let descriptor = FetchDescriptor(predicate: predicate)
