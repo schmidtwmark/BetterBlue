@@ -111,68 +111,67 @@ struct TemperatureArcControl: View {
                         y: center.y + sin(knobAngle.radians) * radius,
                     )
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !isDragging {
-                            isDragging = true
-                        }
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if !isDragging {
+                                    isDragging = true
+                                }
 
-                        let vector = CGPoint(
-                            x: value.location.x - center.x,
-                            y: value.location.y - center.y,
-                        )
+                                let vector = CGPoint(
+                                    x: value.location.x - center.x,
+                                    y: value.location.y - center.y,
+                                )
 
-                        // Calculate angle from center, starting from right (0°) going clockwise
-                        let angle = atan2(vector.y, vector.x)
-                        var degrees = angle * 180 / .pi
+                                // Calculate angle from center, starting from right (0°) going clockwise
+                                let angle = atan2(vector.y, vector.x)
+                                var degrees = angle * 180 / .pi
 
-                        // Convert to 0-360 range
-                        if degrees < 0 {
-                            degrees += 360
-                        }
+                                // Convert to 0-360 range
+                                if degrees < 0 {
+                                    degrees += 360
+                                }
 
-                        // Our arc visually goes from 135° to 405° (135° + 270°)
-                        // But 405° = 45°, so it wraps around
-                        // The arc covers: 135° -> 180° -> 270° -> 360° -> 45°
+                                // Our arc visually goes from 135° to 405° (135° + 270°)
+                                // But 405° = 45°, so it wraps around
+                                // The arc covers: 135° -> 180° -> 270° -> 360° -> 45°
 
-                        var progress: Double = 0
+                                var progress: Double = 0
 
-                        if degrees >= 135 {
-                            // From 135° to 360° (first part of arc)
-                            progress = (degrees - 135) / 270
-                        } else if degrees <= 45 {
-                            // From 0° to 45° (wrapped part of arc)
-                            progress = (degrees + 225) / 270
-                        } else {
-                            // In the gap (45° to 135°), snap to closest edge
-                            let distToStart = min(abs(degrees - 135), abs(degrees + 225))
-                            let distToEnd = abs(degrees - 45)
+                                if degrees >= 135 {
+                                    // From 135° to 360° (first part of arc)
+                                    progress = (degrees - 135) / 270
+                                } else if degrees <= 45 {
+                                    // From 0° to 45° (wrapped part of arc)
+                                    progress = (degrees + 225) / 270
+                                } else {
+                                    // In the gap (45° to 135°), snap to closest edge
+                                    let distToStart = min(abs(degrees - 135), abs(degrees + 225))
+                                    let distToEnd = abs(degrees - 45)
 
-                            if distToStart < distToEnd {
-                                progress = 0
-                            } else {
-                                progress = 1
+                                    if distToStart < distToEnd {
+                                        progress = 0
+                                    } else {
+                                        progress = 1
+                                    }
+                                }
+
+                                progress = max(0, min(1, progress))
+
+                                let difference = temperatureRange.upperBound - temperatureRange.lowerBound
+
+                                let newTemp = temperatureRange.lowerBound + progress * difference
+                                let roundedTemp = round(newTemp)
+
+                                if roundedTemp != temperature.value {
+                                    temperature.value = roundedTemp
+                                }
                             }
-                        }
-
-                        progress = max(0, min(1, progress))
-
-                        let difference = temperatureRange.upperBound - temperatureRange.lowerBound
-
-                        let newTemp = temperatureRange.lowerBound + progress * difference
-                        let roundedTemp = round(newTemp)
-
-                        if roundedTemp != temperature.value {
-                            temperature.value = roundedTemp
-                        }
-                    }
-                    .onEnded { _ in
-                        isDragging = false
-                    },
-            )
+                            .onEnded { _ in
+                                isDragging = false
+                            }
+                    )
+            }
         }
     }
 }
