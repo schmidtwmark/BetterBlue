@@ -112,11 +112,11 @@ struct ClimateSettingsContent: View {
     }
 
     var rearDefrostIcon: String {
-        preset.climateOptions.hasRearDefrost ? "windshield.rear.and.heat.waves" : "windshield.rear.and.wiper"
+        preset.climateOptions.rearDefrostEnabled ? "windshield.rear.and.heat.waves" : "windshield.rear.and.wiper"
     }
 
     var rearDefrostColor: Color {
-        preset.climateOptions.hasRearDefrost ? Color.orange : Color.secondary
+        preset.climateOptions.rearDefrostEnabled ? Color.orange : Color.secondary
     }
 
     @ViewBuilder
@@ -177,24 +177,24 @@ struct ClimateSettingsContent: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
 
-                        Text(preset.climateOptions.hasRearDefrost ? "On" : "Off")
+                        Text(preset.climateOptions.rearDefrostEnabled ? "On" : "Off")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     Spacer()
-                    Toggle("", isOn: $preset.climateOptions.hasRearDefrost)
+                    Toggle("", isOn: $preset.climateOptions.rearDefrostEnabled)
                         .labelsHidden()
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
-                preset.climateOptions.hasRearDefrost ?
+                preset.climateOptions.rearDefrostEnabled ?
                     Color.orange.opacity(0.1) :
                     Color.clear
             )
-            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.hasRearDefrost)
+            .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.rearDefrostEnabled)
             .listRowInsets(EdgeInsets())
         }
 
@@ -245,7 +245,7 @@ struct ClimateSettingsContent: View {
                 HStack(spacing: 0) {
                     SeatHeatControl(
                         level: $preset.climateOptions.frontLeftSeat,
-                        cooling: $preset.climateOptions.hasFrontLeftVentilation,
+                        cooling: $preset.climateOptions.frontLeftVentilationEnabled,
                         position: "left"
                     )
 
@@ -255,7 +255,7 @@ struct ClimateSettingsContent: View {
 
                     SeatHeatControl(
                         level: $preset.climateOptions.frontRightSeat,
-                        cooling: $preset.climateOptions.hasFrontRightVentilation,
+                        cooling: $preset.climateOptions.frontRightVentilationEnabled,
                         position: "right"
                     )
                 }
@@ -265,7 +265,7 @@ struct ClimateSettingsContent: View {
                 HStack(spacing: 0) {
                     SeatHeatControl(
                         level: $preset.climateOptions.rearLeftSeat,
-                        cooling: $preset.climateOptions.hasRearLeftVentilation,
+                        cooling: $preset.climateOptions.rearLeftVentilationEnabled,
                         position: "left"
                     )
 
@@ -275,7 +275,7 @@ struct ClimateSettingsContent: View {
 
                     SeatHeatControl(
                         level: $preset.climateOptions.rearRightSeat,
-                        cooling: $preset.climateOptions.hasRearRightVentilation,
+                        cooling: $preset.climateOptions.rearRightVentilationEnabled,
                         position: "right"
                     )
                 }
