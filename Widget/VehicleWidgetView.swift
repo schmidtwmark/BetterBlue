@@ -199,17 +199,17 @@ struct VehicleButtonsView: View {
     var buttonData: [VehicleButtonData] {
         [
             VehicleButtonData(label: "Lock", shortLabel: "Lock", icon: "lock.fill", color: .red, intent: {
-                let intent = LockVehicleIntent()
+                let intent = LockVehicleControlIntent()
                 intent.vehicle = vehicle
                 return intent
             }),
             VehicleButtonData(label: "Unlock", shortLabel: "Unlock", icon: "lock.open.fill", color: .green, intent: {
-                let intent = UnlockVehicleIntent()
+                let intent = UnlockVehicleControlIntent()
                 intent.vehicle = vehicle
                 return intent
             }),
             VehicleButtonData(label: "Start Climate", shortLabel: "Start", icon: "fan", color: .blue, intent: {
-                let intent = StartClimateIntent()
+                let intent = StartClimateControlIntent()
                 intent.preset = ClimatePresetEntity(
                     id: vehicle.id,
                     vehicleVin: vehicle.vin,
@@ -219,7 +219,7 @@ struct VehicleButtonsView: View {
                 return intent
             }),
             VehicleButtonData(label: "Stop Climate", shortLabel: "Stop", icon: "fan.slash", color: .gray, intent: {
-                let intent = StopClimateIntent()
+                let intent = StopClimateControlIntent()
                 intent.vehicle = vehicle
                 return intent
             })
