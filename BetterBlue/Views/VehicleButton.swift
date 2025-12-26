@@ -136,6 +136,7 @@ struct VehicleControlButton: View {
             .padding()
             .glassEffect()
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         primaryAction: {
             if inProgressAction != nil {

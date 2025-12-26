@@ -167,6 +167,12 @@ struct MainView: View {
                         }
                     }
                 }
+                .task {
+                    while true {
+                        try? await Task.sleep(for: .seconds(60))
+                        await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
+                    }
+                }
         }
     }
 

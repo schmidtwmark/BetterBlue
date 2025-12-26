@@ -231,7 +231,13 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         var status = VehicleStatus(
             vin: bbVehicle.vin,
             gasRange: bbVehicle.gasRange,
-            evStatus: bbVehicle.evStatus,
+            evStatus: bbVehicle.evStatus?.charging == true ? VehicleStatus.EVStatus(
+                charging: true,
+                chargeSpeed: 50.0,
+                pluggedIn: true,
+                evRange: bbVehicle.evStatus?.evRange ?? VehicleStatus.FuelRange(range: Distance(length: 200, units: .miles), percentage: 80),
+                chargeTime: .seconds(0)
+            ) : bbVehicle.evStatus,
             location: bbVehicle.location ?? VehicleStatus.Location(latitude: 0, longitude: 0),
             lockStatus: bbVehicle.lockStatus ?? .unknown,
             climateStatus: bbVehicle.climateStatus ?? VehicleStatus.ClimateStatus(

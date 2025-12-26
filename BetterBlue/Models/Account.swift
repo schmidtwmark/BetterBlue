@@ -158,8 +158,9 @@ extension BBAccount {
         }
 
         let vehicle = bbVehicle.toVehicle()
+        let status: VehicleStatus
         do {
-            return try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
+            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
         } catch let error as HyundaiKiaAPIError where
             error.errorType == .invalidVehicleSession ||
             error.errorType == .invalidCredentials {
@@ -168,8 +169,10 @@ extension BBAccount {
                 throw HyundaiKiaAPIError.failedRetryLogin()
             }
 
-            return try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
+            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
         }
+        LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
+        return status
     }
 
     @MainActor
@@ -265,6 +268,17 @@ extension BBAccount {
 
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
             print("🔧 [BBAccount] Updated vehicleKey for VIN: \(bbVehicle.vin)")
+        }
+        
+        // Start Live Activity monitoring for long-running commands
+        let activityType: LiveActivityType = switch command {
+        case .startClimate: .climate
+        case .startCharge: .charging
+        default: .none
+        }
+        
+        if activityType != .none {
+            LiveActivityManager.shared.startCommandActivity(for: bbVehicle, type: activityType, modelContext: modelContext)
         }
 
         let vehicle = bbVehicle.toVehicle()

@@ -174,6 +174,7 @@ struct FakeVehicleListView: View {
                 chargeSpeed: config.chargeSpeed,
                 pluggedIn: config.isPluggedIn,
                 evRange: VehicleStatus.FuelRange(range: evRange, percentage: config.batteryPercentage),
+                chargeTime: .seconds(0)
             )
         } else {
             let gasRangeDistance = Distance(length: config.fuelPercentage * 4.0, units: .miles)

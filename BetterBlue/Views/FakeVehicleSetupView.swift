@@ -232,7 +232,8 @@ struct FakeVehicleDetailView: View {
                 charging: isCharging,
                 chargeSpeed: chargeSpeed,
                 pluggedIn: isPluggedIn,
-                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage)
+                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
+                chargeTime: .seconds(0)
             )
             vehicle.gasRange = nil
 
@@ -249,7 +250,8 @@ struct FakeVehicleDetailView: View {
                 charging: isCharging,
                 chargeSpeed: chargeSpeed,
                 pluggedIn: isPluggedIn,
-                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage)
+                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
+                chargeTime: .seconds(0)
             )
         }
 
@@ -263,8 +265,9 @@ struct FakeVehicleDetailView: View {
             charging: isCharging,
             chargeSpeed: isCharging ? chargeSpeed : 0.0,
             pluggedIn: isPluggedIn,
-            evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage)
-        )
+                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
+                chargeTime: .seconds(0)
+            )
         saveChanges()
     }
 

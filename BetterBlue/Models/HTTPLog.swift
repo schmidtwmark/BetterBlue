@@ -14,6 +14,7 @@ enum DeviceType: String, Codable, CaseIterable {
     case mac = "Mac"
     case widget = "Widget"
     case watch = "Watch"
+    case liveActivity = "Live Activity"
 
     var displayName: String {
         switch self {
@@ -22,6 +23,7 @@ enum DeviceType: String, Codable, CaseIterable {
         case .mac: return "Mac"
         case .widget: return "Widget"
         case .watch: return "Watch"
+        case .liveActivity: return "Live Activity"
         }
     }
 }
