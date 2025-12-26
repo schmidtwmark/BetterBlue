@@ -171,7 +171,8 @@ extension BBAccount {
 
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
         }
-        LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
+        // TODO: enable once live activity APNs feature is complete
+//        LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
         return status
     }
 
@@ -269,16 +270,17 @@ extension BBAccount {
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
             print("🔧 [BBAccount] Updated vehicleKey for VIN: \(bbVehicle.vin)")
         }
-        
+
         // Start Live Activity monitoring for long-running commands
         let activityType: LiveActivityType = switch command {
         case .startClimate: .climate
         case .startCharge: .charging
         default: .none
         }
-        
+
         if activityType != .none {
-            LiveActivityManager.shared.startCommandActivity(for: bbVehicle, type: activityType, modelContext: modelContext)
+            // TODO: update this once live activity APNs server is working
+//            LiveActivityManager.shared.startCommandActivity(for: bbVehicle, type: activityType, modelContext: modelContext)
         }
 
         let vehicle = bbVehicle.toVehicle()

@@ -115,12 +115,14 @@ struct VehicleTitleView: View {
             }
             .matchedTransitionSource(id: "account-info", in: transition ?? fallbackTransition)
 
-            Button {
-                showingHTTPLogs = true
-            } label: {
-                Label("HTTP Logs", systemImage: "network")
+            if AppSettings.shared.debugModeEnabled {
+                Button {
+                    showingHTTPLogs = true
+                } label: {
+                    Label("HTTP Logs", systemImage: "network")
+                }
+                .matchedTransitionSource(id: "http-logs", in: transition ?? fallbackTransition)
             }
-            .matchedTransitionSource(id: "http-logs", in: transition ?? fallbackTransition)
 
             if bbVehicle.account?.brandEnum == .fake {
                 Button {

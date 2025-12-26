@@ -83,10 +83,12 @@ struct AccountInfoView: View {
                 Text("Credentials")
             }
 
-            Section {
-                NavigationLink("View HTTP Logs", destination: HTTPLogView(accountId: account.id))
-            } header: {
-                Text("Debugging")
+            if AppSettings.shared.debugModeEnabled {
+                Section {
+                    NavigationLink("View HTTP Logs", destination: HTTPLogView(accountId: account.id))
+                } header: {
+                    Text("Debugging")
+                }
             }
 
             // Fake vehicle management for fake accounts

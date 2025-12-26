@@ -52,6 +52,7 @@ class AppSettings {
     private let temperatureUnitKey = "TemperatureUnit"
     private let notificationsEnabledKey = "NotificationsEnabled"
     private let widgetRefreshIntervalKey = "WidgetRefreshInterval"
+    private let debugModeEnabledKey = "DebugModeEnabled"
 
     var preferredDistanceUnit: Distance.Units {
         didSet {
@@ -84,6 +85,12 @@ class AppSettings {
         }
     }
 
+    var debugModeEnabled: Bool {
+        didSet {
+            userDefaults.set(debugModeEnabled, forKey: debugModeEnabledKey)
+        }
+    }
+
     private init() {
         let savedDistanceUnit = userDefaults
             .string(forKey: distanceUnitKey) ?? Distance.Units.miles.rawValue
@@ -97,6 +104,16 @@ class AppSettings {
 
         let savedRefreshInterval = userDefaults.integer(forKey: widgetRefreshIntervalKey)
         widgetRefreshInterval = WidgetRefreshInterval(rawValue: savedRefreshInterval) ?? .fourHours
+
+        if userDefaults.object(forKey: debugModeEnabledKey) == nil {
+            #if DEBUG
+                debugModeEnabled = true
+            #else
+                debugModeEnabled = false
+            #endif
+        } else {
+            debugModeEnabled = userDefaults.bool(forKey: debugModeEnabledKey)
+        }
     }
 
     private func requestNotificationPermission() async {

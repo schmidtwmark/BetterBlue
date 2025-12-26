@@ -121,29 +121,33 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    #if DEBUG
-                        NavigationLink("Map Centering Debug") {
-                            MapCenteringDebugView()
+                    Toggle("Debug Mode", isOn: $appSettings.debugModeEnabled)
+
+                    if appSettings.debugModeEnabled {
+                        #if DEBUG
+                            NavigationLink("Map Centering Debug") {
+                                MapCenteringDebugView()
+                            }
+                        #endif
+
+                        NavigationLink("HTTP Logs") {
+                            HTTPLogView()
                         }
 
-                    #endif
-                    NavigationLink("HTTP Logs") {
-                        HTTPLogView()
-                    }
+                        NavigationLink("Sync Diagnostics") {
+                            DiagnosticInfoView()
+                        }
 
-                    NavigationLink("Sync Diagnostics") {
-                        DiagnosticInfoView()
-                    }
+                        Button("Clear All Data") {
+                            showingClearDataAlert = true
+                        }
+                        .foregroundColor(.red)
 
-                    Button("Clear All Data") {
-                        showingClearDataAlert = true
-                    }
-                    .foregroundColor(.red)
-
-                    if let result = clearDataResult {
-                        Text(result)
-                            .font(.caption)
-                            .foregroundColor(result.contains("Error") ? .red : .green)
+                        if let result = clearDataResult {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundColor(result.contains("Error") ? .red : .green)
+                        }
                     }
                 } header: {
                     Text("Debug Settings")

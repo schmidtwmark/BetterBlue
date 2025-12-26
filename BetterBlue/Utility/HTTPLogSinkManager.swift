@@ -36,6 +36,9 @@ class HTTPLogSinkManager {
         return { httpLog in
             // Use detached task to prevent crashes if widget is killed
             Task.detached {
+                let debugModeEnabled = await AppSettings.shared.debugModeEnabled
+                guard debugModeEnabled else { return }
+
                 do {
                     // Create a background context to avoid blocking the main thread
                     let context = ModelContext(modelContainer)

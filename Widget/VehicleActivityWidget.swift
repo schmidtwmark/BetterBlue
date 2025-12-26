@@ -59,7 +59,7 @@ struct VehicleActivityWidget: Widget {
             .keylineTint(iconColor(for: context.state.activityType))
         }
     }
-    
+
     func iconName(for type: LiveActivityType) -> String {
         switch type {
         case .charging: "bolt.car.fill"
@@ -67,7 +67,7 @@ struct VehicleActivityWidget: Widget {
         case .none: "car.fill"
         }
     }
-    
+
     func iconColor(for type: LiveActivityType) -> Color {
         switch type {
         case .charging: .green
@@ -186,13 +186,13 @@ struct VehicleActivityContentView: View {
                             .foregroundColor(iconColor(for: context.state.activityType))
                             .font(.title2)
                             .symbolEffect(.pulse, isActive: context.state.activityType != .none)
-                        
+
                         Text(context.attributes.vehicleName)
                             .font(.headline)
                     }
-                    
+
                     Spacer()
-                    
+
                     if let evStatus = context.state.status.evStatus {
                         Text("\(Int(evStatus.evRange.percentage))%")
                             .font(.headline)
@@ -202,7 +202,7 @@ struct VehicleActivityContentView: View {
                     }
                 }
             }
-            
+
             // Progress Bar (if charging)
             if context.state.activityType == .charging, let evStatus = context.state.status.evStatus {
                 GeometryReader { geometry in
@@ -210,7 +210,7 @@ struct VehicleActivityContentView: View {
                         Capsule()
                             .fill(Color.gray.opacity(0.3))
                             .frame(height: 12)
-                        
+
                         Capsule()
                             .fill(Color.green)
                             .frame(width: geometry.size.width * (evStatus.evRange.percentage / 100.0), height: 12)
@@ -218,14 +218,14 @@ struct VehicleActivityContentView: View {
                 }
                 .frame(height: 12)
             }
-            
+
             // Status Row
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(context.state.activityType.message(for: context.state.activityState))
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    
+
                     if context.state.activityType == .charging {
                         if let speed = context.state.status.evStatus?.chargeSpeed {
                             Text(String(format: "%.1f kW", speed))
@@ -239,9 +239,9 @@ struct VehicleActivityContentView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 4) {
                     if let evStatus = context.state.status.evStatus {
                         Text(evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: evStatus.evRange.range.units))
@@ -252,7 +252,7 @@ struct VehicleActivityContentView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     if context.state.activityType == .charging {
                         if let duration = context.state.status.evStatus?.chargeTime {
                             let timeString = duration.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
@@ -263,7 +263,7 @@ struct VehicleActivityContentView: View {
                     }
                 }
             }
-            
+
             // Footer
             HStack {
                 Text("Updated \(context.state.status.lastUpdated, style: .time)")
@@ -276,7 +276,7 @@ struct VehicleActivityContentView: View {
         .activityBackgroundTint(Color.black.opacity(0.8))
         .activitySystemActionForegroundColor(Color.white)
     }
-    
+
     func iconName(for type: LiveActivityType) -> String {
         switch type {
         case .charging: "bolt.car.fill"
@@ -284,7 +284,7 @@ struct VehicleActivityContentView: View {
         case .none: "car.fill"
         }
     }
-    
+
     func iconColor(for type: LiveActivityType) -> Color {
         switch type {
         case .charging: .green
