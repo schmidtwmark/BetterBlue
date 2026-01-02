@@ -109,6 +109,7 @@ struct MainView: View {
                     print(
                         "🖥️ [MapCentering] Screen height initialized: \(Int(screenHeight))px",
                     )
+                    centerOnFirstAvailableVehicle(reason: "initial view appearance")
                     Task {
                         await loadVehiclesForAllAccounts()
                     }
@@ -327,9 +328,10 @@ extension MainView {
     }
 
     private func loadVehiclesForAllAccounts() async {
-        await MainActor.run {
+        let wasEmpty = await MainActor.run {
             isLoading = true
             lastError = nil
+            return displayedVehicles.isEmpty
         }
 
         var hasSuccessfulAccount = false
@@ -364,9 +366,11 @@ extension MainView {
         }
 
         await MainActor.run {
-            centerOnFirstAvailableVehicle(
-                reason: "vehicles loaded with cached data",
-            )
+            if wasEmpty {
+                centerOnFirstAvailableVehicle(
+                    reason: "vehicles loaded (previously empty)",
+                )
+            }
         }
         await loadStatusForAllVehicles()
     }
