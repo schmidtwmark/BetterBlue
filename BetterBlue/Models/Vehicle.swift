@@ -158,7 +158,7 @@ extension BBVehicle {
             try Task.checkCancellation()
 
             guard let account else {
-                throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+                throw APIError(message: "Account not found for vehicle")
             }
 
             let updatedStatus = try await account.fetchVehicleStatus(
@@ -185,7 +185,7 @@ extension BBVehicle {
             }
         }
 
-        throw HyundaiKiaAPIError(
+        throw APIError(
             message: "Status change condition not met after \(maxAttempts) attempts",
         )
     }

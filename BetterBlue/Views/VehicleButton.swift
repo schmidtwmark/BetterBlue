@@ -208,7 +208,7 @@ struct VehicleControlButton: View {
     private func handleActionError(_ error: Error) {
         stopDotsAnimation()
 
-        if let apiError = error as? HyundaiKiaAPIError {
+        if let apiError = error as? APIError {
             switch apiError.errorType {
             case .concurrentRequest:
                 message = .warning(apiError.message)

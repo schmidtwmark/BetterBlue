@@ -10,7 +10,7 @@ import Foundation
 
 @MainActor
 class CachedAPIClient: APIClientProtocol {
-    private let underlyingClient: any APIClientProtocol
+    let underlyingClient: any APIClientProtocol
 
     // Cache for storing responses with timestamps
     private var cache: [CacheKey: CacheEntry] = [:]
@@ -43,7 +43,7 @@ class CachedAPIClient: APIClientProtocol {
         if let ongoingRequest = ongoingRequests[requestKey] {
             print("🟡 [CachedAPIClient] Waiting for ongoing login request")
             guard let token = try await ongoingRequest.waitForCompletion() as? AuthToken else {
-                throw HyundaiKiaAPIError.logError("Error retrieving login token from ongoing request")
+                throw APIError.logError("Error retrieving login token from ongoing request")
             }
             return token
         }
@@ -83,7 +83,7 @@ class CachedAPIClient: APIClientProtocol {
         if let ongoingRequest = ongoingRequests[requestKey] {
             print("🟡 [CachedAPIClient] Waiting for ongoing fetchVehicles request")
             guard let vehicles = try await ongoingRequest.waitForCompletion() as? [Vehicle] else {
-                throw HyundaiKiaAPIError.logError("Error retrieving vehicles from ongoing request")
+                throw APIError.logError("Error retrieving vehicles from ongoing request")
             }
             return vehicles
         }
@@ -123,7 +123,7 @@ class CachedAPIClient: APIClientProtocol {
         if let ongoingRequest = ongoingRequests[requestKey] {
             print("🟡 [CachedAPIClient] Waiting for ongoing fetchVehicleStatus request for VIN: \(vehicle.vin)")
             guard let vehicleStatus = try await ongoingRequest.waitForCompletion() as? VehicleStatus else {
-                throw HyundaiKiaAPIError.logError("Error retrieving vehicles from ongoing request")
+                throw APIError.logError("Error retrieving vehicles from ongoing request")
             }
             return vehicleStatus
         }

@@ -60,7 +60,7 @@ struct LockButton: View {
         statusUpdater: @escaping @Sendable (String) -> Void,
     ) async throws {
         guard let account = bbVehicle.account else {
-            throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+            throw APIError(message: "Account not found for vehicle")
         }
 
         let context = modelContext

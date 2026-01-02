@@ -25,7 +25,7 @@ struct MainView: View {
     @State private var mapCameraPosition: MapCameraPosition?
     @State private var markerMenuPosition = CGPoint.zero
     @State private var isLoading = false
-    @State private var lastError: HyundaiKiaAPIError?
+    @State private var lastError: APIError?
 
     @State private var screenHeight: CGFloat = 0
     @State private var mapRegion = MKCoordinateRegion(
@@ -333,7 +333,7 @@ extension MainView {
         }
 
         var hasSuccessfulAccount = false
-        var latestError: HyundaiKiaAPIError?
+        var latestError: APIError?
 
         for account in accounts {
             do {
@@ -341,13 +341,13 @@ extension MainView {
                 try await account.loadVehicles(modelContext: modelContext)
                 hasSuccessfulAccount = true
             } catch {
-                if let apiError = error as? HyundaiKiaAPIError {
+                if let apiError = error as? APIError {
                     print("⚠️ [MainView] Failed to load vehicles for account '\(account.username)': \(apiError.message)")
                     latestError = apiError
                 } else {
                     print("❌ [MainView] Failed to load vehicles for account '\(account.username)': " +
                         "\(error.localizedDescription)")
-                    latestError = HyundaiKiaAPIError(
+                    latestError = APIError(
                         message: error.localizedDescription,
                     )
                 }

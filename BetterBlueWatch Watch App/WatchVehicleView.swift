@@ -291,7 +291,7 @@ struct WatchVehicleView: View {
 
         do {
             guard let account = currentVehicle.account else {
-                throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+                throw APIError(message: "Account not found for vehicle")
             }
 
             let status = try await account.fetchVehicleStatus(for: currentVehicle, modelContext: modelContext)
@@ -305,7 +305,7 @@ struct WatchVehicleView: View {
 
     private func performLockAction(shouldLock: Bool, statusUpdater: @escaping @Sendable (String) -> Void) async throws {
         guard let account = currentVehicle.account else {
-            throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+            throw APIError(message: "Account not found for vehicle")
         }
 
         if shouldLock {
@@ -326,7 +326,7 @@ struct WatchVehicleView: View {
 
     private func performClimateAction(shouldStart: Bool, statusUpdater: @escaping @Sendable (String) -> Void) async throws {
         guard let account = currentVehicle.account else {
-            throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+            throw APIError(message: "Account not found for vehicle")
         }
 
         if shouldStart {
@@ -346,7 +346,7 @@ struct WatchVehicleView: View {
 
     private func performChargeAction(shouldStart: Bool, statusUpdater: @escaping @Sendable (String) -> Void) async throws {
         guard let account = currentVehicle.account else {
-            throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+            throw APIError(message: "Account not found for vehicle")
         }
 
         if shouldStart {

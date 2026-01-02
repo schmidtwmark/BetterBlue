@@ -77,7 +77,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
 
     public func getVehicleStatus(for vin: String, accountId: UUID) async throws -> VehicleStatus {
         guard let bbVehicle = getBBVehicle(for: vin, accountId: accountId) else {
-            throw HyundaiKiaAPIError.logError("Fake vehicle not found: \(vin)", apiName: "FakeAPI")
+            throw APIError.logError("Fake vehicle not found: \(vin)", apiName: "FakeAPI")
         }
 
         return createVehicleStatus(from: bbVehicle)
@@ -85,7 +85,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
 
     public func executeCommand(_ command: VehicleCommand, for vin: String, accountId: UUID) async throws {
         guard let bbVehicle = getBBVehicle(for: vin, accountId: accountId) else {
-            throw HyundaiKiaAPIError.logError("Fake vehicle not found for command: \(vin)", apiName: "FakeAPI")
+            throw APIError.logError("Fake vehicle not found for command: \(vin)", apiName: "FakeAPI")
         }
 
         // Update the BBVehicle directly based on the command

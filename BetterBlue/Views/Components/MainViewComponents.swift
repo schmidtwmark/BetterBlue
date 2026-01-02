@@ -60,7 +60,7 @@ struct EmptyAccountsView: View {
 
 struct EmptyVehiclesView: View {
     @Binding var isLoading: Bool
-    @Binding var lastError: HyundaiKiaAPIError?
+    @Binding var lastError: APIError?
 
     var body: some View {
         VStack(spacing: 20) {

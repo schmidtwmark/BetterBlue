@@ -18,6 +18,7 @@ class BBAccount {
     var brand: String = "" // Store as string, convert to/from Brand enum
     var region: String = "" // Store as string, convert to/from Region enum
     var dateCreated: Date = Date()
+    var rememberMeToken: String?
 
     @Relationship(deleteRule: .cascade) var vehicles: [BBVehicle]? = []
 
@@ -29,6 +30,8 @@ class BBAccount {
     private var api: (any APIClientProtocol)?
     @Transient
     private var authToken: AuthToken?
+    @Transient
+    private var modelContextForMFA: ModelContext?
 
     init(username: String, password: String, pin: String, brand: Brand, region: Region) {
         id = UUID()
@@ -64,6 +67,8 @@ class BBAccount {
 extension BBAccount {
     @MainActor
     func initialize(modelContext: ModelContext) async throws {
+        self.modelContextForMFA = modelContext
+
         if api == nil {
             let configuration = APIClientFactoryConfiguration(
                 region: regionEnum,
@@ -73,14 +78,79 @@ extension BBAccount {
                 pin: pin,
                 accountId: id,
                 modelContext: modelContext,
-                logSink: HTTPLogSinkManager.shared.createLogSink()
+                logSink: HTTPLogSinkManager.shared.createLogSink(),
+                rememberMeToken: rememberMeToken
             )
             api = createAPIClient(configuration: configuration)
         }
 
         if authToken == nil {
+            // authToken assignment happens after login() returns
+            // If login() throws, api is still set above.
             authToken = try await api!.login()
         }
+    }
+
+    @MainActor
+    func sendMFA(otpKey: String, xid: String, notifyType: String = "SMS") async throws {
+        print("📲 [BBAccount] sendMFA requested for \(username)")
+
+        if api == nil, let modelContext = modelContextForMFA {
+            print("📲 [BBAccount] API nil, attempting re-init with stored context")
+            try? await initialize(modelContext: modelContext)
+        }
+
+        // Handle cached client wrapping
+        let actualApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
+            cached.underlyingClient
+        } else if let api {
+            api
+        } else {
+            print("❌ [BBAccount] API not initialized during MFA request")
+            throw APIError(message: "API not initialized", apiName: "BBAccount")
+        }
+
+        print("📲 [BBAccount] Using API type: \(type(of: actualApi))")
+        guard let kiaApi = actualApi as? KiaAPIClient else {
+            print("❌ [BBAccount] MFA not supported: API is not KiaAPIClient")
+            throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
+        }
+        try await kiaApi.sendOTP(otpKey: otpKey, xid: xid, notifyType: notifyType)
+    }
+
+    @MainActor
+    func verifyMFA(otpKey: String, xid: String, otp: String) async throws {
+        if api == nil, let modelContext = modelContextForMFA {
+            try? await initialize(modelContext: modelContext)
+        }
+
+        let actualApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
+            cached.underlyingClient
+        } else if let api {
+            api
+        } else {
+            throw APIError(message: "API not initialized", apiName: "BBAccount")
+        }
+
+        guard let kiaApi = actualApi as? KiaAPIClient else {
+            throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
+        }
+
+        let (newrememberMeToken, sid) = try await kiaApi.verifyOTP(otpKey: otpKey, xid: xid, otp: otp)
+
+        self.rememberMeToken = newrememberMeToken
+
+        // Re-initialize API with new rememberMeToken
+        self.api = nil
+
+        // However, verifyOTP returned a session ID (sid). We can use that to set authToken directly!
+        let validUntil = Date().addingTimeInterval(3600)
+        self.authToken = AuthToken(
+            accessToken: sid,
+            refreshToken: sid,
+            expiresAt: validUntil,
+            pin: pin
+        )
     }
 
     @MainActor
@@ -93,7 +163,7 @@ extension BBAccount {
         try await initialize(modelContext: modelContext)
 
         guard let api, let authToken else {
-            throw HyundaiKiaAPIError.failedRetryLogin()
+            throw APIError.failedRetryLogin()
         }
         let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
         updateVehicles(vehicles: fetchedVehicles)
@@ -127,10 +197,10 @@ extension BBAccount {
         do {
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
             updateVehicles(vehicles: fetchedVehicles)
-        } catch let error as HyundaiKiaAPIError where error.errorType == .invalidCredentials {
+        } catch let error as APIError where error.errorType == .invalidCredentials {
             try await handleInvalidVehicleSession(modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
-                throw HyundaiKiaAPIError.failedRetryLogin()
+                throw APIError.failedRetryLogin()
             }
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
             updateVehicles(vehicles: fetchedVehicles)
@@ -150,7 +220,7 @@ extension BBAccount {
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
 
             guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
-                throw HyundaiKiaAPIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
+                throw APIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
             }
 
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
@@ -161,12 +231,12 @@ extension BBAccount {
         let status: VehicleStatus
         do {
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
-        } catch let error as HyundaiKiaAPIError where
+        } catch let error as APIError where
             error.errorType == .invalidVehicleSession ||
             error.errorType == .invalidCredentials {
             try await handleInvalidVehicleSession(modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
-                throw HyundaiKiaAPIError.failedRetryLogin()
+                throw APIError.failedRetryLogin()
             }
 
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
@@ -264,7 +334,7 @@ extension BBAccount {
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
 
             guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
-                throw HyundaiKiaAPIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
+                throw APIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
             }
 
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
@@ -286,12 +356,12 @@ extension BBAccount {
         let vehicle = bbVehicle.toVehicle()
         do {
             try await api.sendCommand(for: vehicle, command: command, authToken: authToken)
-        } catch let error as HyundaiKiaAPIError where
+        } catch let error as APIError where
             error.errorType == .invalidVehicleSession ||
             error.errorType == .invalidCredentials {
             try await handleInvalidVehicleSession(modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
-                throw HyundaiKiaAPIError.failedRetryLogin()
+                throw APIError.failedRetryLogin()
             }
             try await api.sendCommand(for: vehicle, command: command, authToken: authToken)
         }

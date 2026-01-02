@@ -23,7 +23,7 @@ struct VehicleCardView: View {
     @State private var isRefreshing = false
     @State private var showRefreshSuccess = false
     @State private var errorMessage: String?
-    @State private var lastAPIError: HyundaiKiaAPIError?
+    @State private var lastAPIError: APIError?
     @State private var showingErrorHTTPLogs = false
     @State private var refreshTask: Task<Void, Never>?
 
@@ -165,7 +165,7 @@ struct VehicleCardView: View {
 
         do {
             guard let account = bbVehicle.account else {
-                throw HyundaiKiaAPIError(message: "Account not found for vehicle")
+                throw APIError(message: "Account not found for vehicle")
             }
 
             try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: modelContext)
@@ -211,7 +211,7 @@ struct VehicleCardView: View {
     }
 
     private func handleError(_ error: Error) {
-        if let apiError = error as? HyundaiKiaAPIError {
+        if let apiError = error as? APIError {
             lastAPIError = apiError
             errorMessage = getUserFriendlyErrorMessage(for: apiError)
         } else {
@@ -221,7 +221,7 @@ struct VehicleCardView: View {
         print("🔍 [VehicleCardView] Detailed error for vehicle \(bbVehicle.vin): \(error)")
     }
 
-    fileprivate func getUserFriendlyErrorMessageForGeneralError(_ error: HyundaiKiaAPIError) -> String {
+    fileprivate func getUserFriendlyErrorMessageForGeneralError(_ error: APIError) -> String {
         // For general errors, provide context based on common scenarios
         if error.message.contains("timeout") || error.message.contains("timed out") {
             "Vehicle not responding - try again later"
@@ -238,7 +238,7 @@ struct VehicleCardView: View {
         }
     }
 
-    private func getUserFriendlyErrorMessage(for error: HyundaiKiaAPIError) -> String {
+    private func getUserFriendlyErrorMessage(for error: APIError) -> String {
         switch error.errorType {
         case .invalidCredentials:
             "Login expired - please check account settings"
@@ -252,6 +252,8 @@ struct VehicleCardView: View {
             "Another request in progress - please wait and try again"
         case .failedRetryLogin:
             "Unable to reconnect - check account settings"
+        case .requiresMFA:
+            "MFA Required - Please re-authenticate in Settings"
         case .general:
             getUserFriendlyErrorMessageForGeneralError(error)
         }

@@ -221,7 +221,7 @@ struct AccountInfoView: View {
 
         } catch {
             await MainActor.run {
-                if let apiError = error as? HyundaiKiaAPIError {
+                if let apiError = error as? APIError {
                     switch apiError.errorType {
                     case .invalidCredentials:
                         errorMessage = "Invalid password. Please check your password and try again."
@@ -275,7 +275,7 @@ struct AccountInfoView: View {
 
         } catch {
             await MainActor.run {
-                if let apiError = error as? HyundaiKiaAPIError {
+                if let apiError = error as? APIError {
                     switch apiError.errorType {
                     case .invalidCredentials:
                         errorMessage = "Invalid PIN. Please check your PIN and try again."
