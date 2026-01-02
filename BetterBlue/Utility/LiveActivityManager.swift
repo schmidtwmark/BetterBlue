@@ -74,9 +74,9 @@ final class LiveActivityManager {
             }
 
             do {
-                for i in 1...3 {
+                for index in 1...3 {
                     try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-                    print("🔄 [LiveActivity] Command refresh attempt \(i)/3")
+                    print("🔄 [LiveActivity] Command refresh attempt \(index)/3")
 
                     guard let account = vehicle.account else { break }
                     try await account.fetchAndUpdateVehicleStatus(for: vehicle, modelContext: modelContext)

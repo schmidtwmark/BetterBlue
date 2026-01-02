@@ -15,7 +15,7 @@ extension Notification.Name {
 }
 
 @main
-struct BetterBlueWatch_Watch_AppApp: App {
+struct BetterBlueWatchApp: App {
     var sharedModelContainer: ModelContainer = {
         do {
             let container = try createSharedModelContainer()
@@ -32,7 +32,7 @@ struct BetterBlueWatch_Watch_AppApp: App {
     }()
 }
 
-extension BetterBlueWatch_Watch_AppApp {
+extension BetterBlueWatchApp {
     var body: some Scene {
         WindowGroup {
             WatchMainView()

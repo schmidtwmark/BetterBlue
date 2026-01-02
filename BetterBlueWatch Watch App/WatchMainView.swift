@@ -10,20 +10,27 @@ import SwiftData
 import SwiftUI
 
 extension Color {
-    var components: (red: Double, green: Double, blue: Double, opacity: Double) {
-        #if canImport(UIKit)
-            var r: CGFloat = 0
-            var g: CGFloat = 0
-            var b: CGFloat = 0
-            var o: CGFloat = 0
+    struct RGBAComponents {
+        let red: Double
+        let green: Double
+        let blue: Double
+        let opacity: Double
+    }
 
-            guard UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &o) else {
-                return (0, 0, 0, 1)
+    var components: RGBAComponents {
+        #if canImport(UIKit)
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var opacity: CGFloat = 0
+
+            guard UIColor(self).getRed(&red, green: &green, blue: &blue, alpha: &opacity) else {
+                return RGBAComponents(red: 0, green: 0, blue: 0, opacity: 1)
             }
 
-            return (Double(r), Double(g), Double(b), Double(o))
+            return RGBAComponents(red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(opacity))
         #else
-            return (0, 0, 0, 1)
+            return RGBAComponents(red: 0, green: 0, blue: 0, opacity: 1)
         #endif
     }
 }

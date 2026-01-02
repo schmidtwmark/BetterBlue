@@ -114,7 +114,13 @@ struct WatchVehicleSettingsView: View {
         ClimatePreset.self
     ])
     let modelConfiguration = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: schema, configurations: [modelConfiguration])
+    let container: ModelContainer = {
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Failed to create ModelContainer for preview: \(error)")
+        }
+    }()
 
     let sampleVehicle = BBVehicle(from: Vehicle(
         vin: "test",

@@ -10,6 +10,43 @@ import SwiftData
 import SwiftUI
 import WidgetKit
 
+struct ErrorBox: View {
+    let headline: String
+    let detail: AttributedString?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title2)
+                .foregroundColor(.orange)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(headline)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.orange.opacity(0.1))
+                .stroke(.orange.opacity(0.3), lineWidth: 1)
+        }
+        .padding(.top, 8)
+    }
+}
+
+// swiftlint:disable:this type_body_length file_length
 struct AddAccountView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -45,154 +82,11 @@ struct AddAccountView: View {
         BetterBlueKit.isTestAccount(username: username, password: password)
     }
 
-    fileprivate func errorBox(headline: String, detail: AttributedString?) -> some View {
-        return HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.title2)
-                .foregroundColor(.orange)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(headline)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                if let detail{
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.orange.opacity(0.1))
-                .stroke(.orange.opacity(0.3), lineWidth: 1)
-        }
-        .padding(.top, 8)
-    }
-    
     var body: some View {
         Form {
-            Section {
-                Picker("Brand", selection: $selectedBrand) {
-                    ForEach(availableBrands, id: \.self) { brand in
-                        Text(brand.displayName).tag(brand)
-                    }
-                }
-                .pickerStyle(MenuPickerStyle())
-                .onChange(of: isTestAccount) { _, newValue in
-                    if newValue, availableBrands.contains(.fake) {
-                        selectedBrand = .fake
-                    } else if !availableBrands.contains(selectedBrand) {
-                        selectedBrand = availableBrands.first ?? .hyundai
-                    }
-                }
-
-                // Only show region picker for non-fake accounts
-                if selectedBrand != .fake {
-                    Picker("Region", selection: $selectedRegion) {
-                        ForEach(Region.allCases, id: \.self) { region in
-                            Text(region.rawValue).tag(region)
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                }
-            } header: {
-                Text("Service Configuration")
-            } footer: {
-                if selectedBrand == .kia {
-                   errorBox(headline: "Kia currently unsupported", detail: try? AttributedString(markdown: "Kia made changes to their API that breaks compatibility with BetterBlueKit and other third-party apps. See [this GitHub issue](https://github.com/schmidtwmark/BetterBlueKit/issues/7) for more details."))
-                }
-                else if selectedBrand != .fake && selectedRegion != .usa {
-                    errorBox(headline: "Regions other than US are untested and are unlikely to work correctly.", detail: try? AttributedString(
-                        markdown: "If you'd like to help bring BetterBlue to your region," +
-                        " please consider [contributing to the open source project]" +
-                        "(https://github.com/schmidtwmark/BetterBlueKit)."))
-                }
-            }
-
-            Section {
-                HStack {
-                    Text("Username")
-                    Spacer()
-                    TextField("", text: $username)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .username)
-                        .submitLabel(.next)
-                        .onSubmit {
-                            focusedField = .password
-                        }
-                }
-
-                HStack {
-                    Text("Password")
-                    Spacer()
-                    SecureField("", text: $password)
-                        .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .password)
-                        .submitLabel(selectedBrand == .hyundai ? .next : .done)
-                        .onSubmit {
-                            if selectedBrand == .hyundai {
-                                focusedField = .pin
-                            } else {
-                                Task {
-                                    await addAccount()
-                                }
-                            }
-                        }
-                }
-
-                if selectedBrand == .hyundai {
-                    HStack {
-                        Text("PIN")
-                        Spacer()
-                        SecureField("", text: $pin)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .pin)
-                            .submitLabel(.done)
-                            .onSubmit {
-                                Task {
-                                    await addAccount()
-                                }
-                            }
-                    }
-                }
-
-            } header: {
-                Text("Account Information")
-            } footer: {
-                if selectedBrand == .fake {
-                    Text("Using test account - fake data will be used")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("BetterBlue requires an active Hyundai BlueLink or Kia Connect subscription.")
-                        Text("BetterBlue stores your credentials securely on your device and in iCloud.")
-
-                        let link = "[GitHub](https://github.com/schmidtwmark/BetterBlue)"
-                        if let openSourceString = try? AttributedString(
-                            markdown: "BetterBlue is fully open source. To view the source code, visit \(link).") {
-                            Text(openSourceString)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                }
-            }
-
-            // Fake Vehicle Configuration Section
-            if selectedBrand == .fake {
-                FakeVehicleListView(vehicles: $fakeVehicles, accountId: nil)
-            }
+            serviceConfigurationSection
+            accountInformationSection
+            fakeVehicleConfigurationSection
 
             if let errorMessage {
                 Section {
@@ -210,12 +104,12 @@ struct AddAccountView: View {
                     }
                 }
                 .disabled(
-                    username.isEmpty ||
-                        password.isEmpty ||
-                        (selectedBrand != .kia &&
-                            selectedBrand != .fake &&
-                            pin.isEmpty) ||
-                        isLoading,
+                    username.isEmpty
+                        || password.isEmpty
+                        || (selectedBrand != .kia
+                            && selectedBrand != .fake
+                            && pin.isEmpty)
+                        || isLoading
                 )
             }
         }
@@ -231,58 +125,198 @@ struct AddAccountView: View {
             }
         }
         .sheet(isPresented: $showingMFA) {
-            NavigationView {
-                Form {
-                    Section {
-                        Text("Please enter the verification code sent to your email or phone.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        TextField("Verification Code", text: $mfaCode)
-                            .keyboardType(.numberPad)
-                            .textContentType(.oneTimeCode)
-                            .focused($focusedField, equals: .mfaCode)
-                            .onSubmit {
-                                Task {
-                                    await verifyMFA()
-                                }
-                            }
-                    } header: {
-                        Text("Verification Required")
-                    }
-
-                    if let errorMessage {
-                        Section {
-                            Text(errorMessage)
-                                .foregroundColor(.red)
-                        }
-                    }
-                }
-                .navigationTitle("Enter Code")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            showingMFA = false
-                            isLoading = false
-                            mfaAccount = nil // Discard pending account
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Verify") {
-                            Task {
-                                await verifyMFA()
-                            }
-                        }
-                        .disabled(mfaCode.isEmpty || isLoading)
-                    }
-                }
-            }
-            .presentationDetents([.medium])
-            .interactiveDismissDisabled()
+            mfaSheet
         }
         .onAppear {
             focusedField = .username
         }
+    }
+
+    // MARK: - Extracted View Sections
+
+    @ViewBuilder
+    private var serviceConfigurationSection: some View {
+        Section {
+            Picker("Brand", selection: $selectedBrand) {
+                ForEach(availableBrands, id: \.self) { brand in
+                    Text(brand.displayName).tag(brand)
+                }
+            }
+            .pickerStyle(MenuPickerStyle())
+            .onChange(of: isTestAccount) { _, newValue in
+                if newValue, availableBrands.contains(.fake) {
+                    selectedBrand = .fake
+                } else if !availableBrands.contains(selectedBrand) {
+                    selectedBrand = availableBrands.first ?? .hyundai
+                }
+            }
+
+            // Only show region picker for non-fake accounts
+            if selectedBrand != .fake {
+                Picker("Region", selection: $selectedRegion) {
+                    ForEach(Region.allCases, id: \.self) { region in
+                        Text(region.rawValue).tag(region)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+            }
+        } header: {
+            Text("Service Configuration")
+                    } footer: {
+                        if selectedBrand == .kia {
+                           let kiaDetail = try? AttributedString(
+                               markdown: "Kia made changes to their API that breaks compatibility with " +
+                                         "BetterBlueKit and other third-party apps. See [this GitHub issue]" +
+                                         "(https://github.com/schmidtwmark/BetterBlueKit/issues/7) for more details."
+                           )
+                           ErrorBox(headline: "Kia currently unsupported", detail: kiaDetail)
+                        } else if selectedBrand != .fake && selectedRegion != .usa {
+                            let regionDetail = try? AttributedString(
+                                markdown: "If you'd like to help bring BetterBlue to your region, " +
+                                          "please consider [contributing to the open source project]\n" +
+                                          "(https://github.com/schmidtwmark/BetterBlueKit)."
+                            )
+                            ErrorBox(headline: "Regions other than US are untested and are unlikely to work correctly.", detail: regionDetail)
+                        }        }
+    }
+
+    @ViewBuilder
+    private var accountInformationSection: some View {
+        Section {
+            HStack {
+                Text("Username")
+                Spacer()
+                TextField("", text: $username)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: .username)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        focusedField = .password
+                    }
+            }
+
+            HStack {
+                Text("Password")
+                Spacer()
+                SecureField("", text: $password)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: .password)
+                    .submitLabel(selectedBrand == .hyundai ? .next : .done)
+                    .onSubmit {
+                        if selectedBrand == .hyundai {
+                            focusedField = .pin
+                        } else {
+                            Task {
+                                await addAccount()
+                            }
+                        }
+                    }
+            }
+
+            if selectedBrand == .hyundai {
+                HStack {
+                    Text("PIN")
+                    Spacer()
+                    SecureField("", text: $pin)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .focused($focusedField, equals: .pin)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            Task {
+                                await addAccount()
+                            }
+                        }
+                }
+            }
+
+        } header: {
+            Text("Account Information")
+        } footer: {
+            if selectedBrand == .fake {
+                Text("Using test account - fake data will be used")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("BetterBlue requires an active Hyundai BlueLink or Kia Connect subscription.")
+                    Text("BetterBlue stores your credentials securely on your device and in iCloud.")
+
+                    let link = "[GitHub](https://github.com/schmidtwmark/BetterBlue)"
+                    if let openSourceString = try? AttributedString(
+                        markdown: "BetterBlue is fully open source. To view the source code, visit \(link).") {
+                        Text(openSourceString)
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var fakeVehicleConfigurationSection: some View {
+        // Fake Vehicle Configuration Section
+        if selectedBrand == .fake {
+            FakeVehicleListView(vehicles: $fakeVehicles, accountId: nil)
+        }
+    }
+
+    @ViewBuilder
+    private var mfaSheet: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Text(
+                        "Please enter the verification code sent to your " +
+                            "email or phone."
+                    )
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    TextField("Verification Code", text: $mfaCode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .focused($focusedField, equals: .mfaCode)
+                        .onSubmit {
+                            Task {
+                                await verifyMFA()
+                            }
+                        }
+                } header: {
+                    Text("Verification Required")
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Enter Code")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        showingMFA = false
+                        isLoading = false
+                        mfaAccount = nil // Discard pending account
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Verify") {
+                        Task {
+                            await verifyMFA()
+                        }
+                    }
+                    .disabled(mfaCode.isEmpty || isLoading)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .interactiveDismissDisabled()
     }
 
     private func addAccount() async {
