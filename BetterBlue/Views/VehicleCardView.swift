@@ -22,7 +22,7 @@ struct VehicleCardView: View {
     @Namespace private var fallbackTransition
     @State private var isRefreshing = false
     @State private var showRefreshSuccess = false
-    @State private var errorMessage: String?
+    @State private var errorMessage: AttributedString?
     @State private var lastAPIError: APIError?
     @State private var showingErrorHTTPLogs = false
     @State private var refreshTask: Task<Void, Never>?
@@ -61,16 +61,28 @@ struct VehicleCardView: View {
         VStack(spacing: 8) {
             // Error message card (only show if there's an error)
             if let errorMessage {
-                Button {
-                    if lastAPIError != nil {
-                        showingErrorHTTPLogs = true
-                    }
-                } label: {
-                    HStack {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                        Spacer()
+                Group {
+                    if AppSettings.shared.debugModeEnabled {
+                        HStack {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .tint(.blue)
+                            Spacer()
+                        }
+                    } else {
+                        Button {
+                            if lastAPIError != nil {
+                                showingErrorHTTPLogs = true
+                            }
+                        } label: {
+                            HStack {
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -213,10 +225,15 @@ struct VehicleCardView: View {
     private func handleError(_ error: Error) {
         if let apiError = error as? APIError {
             lastAPIError = apiError
-            errorMessage = getUserFriendlyErrorMessage(for: apiError)
+            let message = getUserFriendlyErrorMessage(for: apiError)
+            if let attributed = try? AttributedString(markdown: message) {
+                errorMessage = attributed
+            } else {
+                errorMessage = AttributedString(message)
+            }
         } else {
             lastAPIError = nil
-            errorMessage = "Failed to refresh: \(error.localizedDescription)"
+            errorMessage = AttributedString("Failed to refresh: \(error.localizedDescription)")
         }
         print("🔍 [VehicleCardView] Detailed error for vehicle \(bbVehicle.vin): \(error)")
     }
@@ -256,6 +273,8 @@ struct VehicleCardView: View {
             "MFA Required - Please re-authenticate in Settings"
         case .general:
             getUserFriendlyErrorMessageForGeneralError(error)
+        case .kiaInvalidRequest:
+            error.message
         }
     }
 }
