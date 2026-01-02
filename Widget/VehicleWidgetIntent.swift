@@ -42,6 +42,11 @@ struct VehicleEntity: AppEntity {
     var batteryPercentage: Double?
     var backgroundColorName: String
     var timestamp: Date
+    var presets: [ClimatePresetEntity] = []
+    
+    var selectedPreset: ClimatePresetEntity? {
+        presets.first(where: \.isSelected)
+    }
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(displayName)")
@@ -66,6 +71,7 @@ struct VehicleEntity: AppEntity {
         batteryPercentage: Double?,
         timestamp: Date,
         backgroundColorName: String = "default",
+        presets: [ClimatePresetEntity] = []
     ) {
         self.id = id
         self.displayName = displayName
@@ -75,9 +81,10 @@ struct VehicleEntity: AppEntity {
         self.batteryPercentage = batteryPercentage
         self.timestamp = timestamp
         self.backgroundColorName = backgroundColorName
+        self.presets = presets
     }
 
-    init(from bbVehicle: BBVehicle, with unit: Distance.Units) {
+    init(from bbVehicle: BBVehicle, with unit: Distance.Units, allPresets: [ClimatePresetEntity]) {
         id = bbVehicle.id
         displayName = bbVehicle.displayName
         vin = bbVehicle.vin
@@ -113,6 +120,7 @@ struct VehicleEntity: AppEntity {
                 rangeText = "No fuel data"
             }
         }
+        self.presets = allPresets.filter { preset in preset.vehicleVin == vin}
     }
 }
 
@@ -120,7 +128,8 @@ struct VehicleQuery: EntityQuery {
     func entities(
         for identifiers: [UUID],
     ) async throws -> [VehicleEntity] {
-        try await MainActor.run {
+        let presets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
+        return try await MainActor.run {
             let modelContainer = try createSharedModelContainer()
             let context = ModelContext(modelContainer)
 
@@ -129,12 +138,13 @@ struct VehicleQuery: EntityQuery {
 
             return vehicles
                 .filter { identifiers.contains($0.id) }
-                .map { VehicleEntity(from: $0, with: settings.preferredDistanceUnit) }
+                .map { VehicleEntity(from: $0, with: settings.preferredDistanceUnit, allPresets: presets) }
         }
     }
 
     func suggestedEntities() async throws -> [VehicleEntity] {
-        try await MainActor.run {
+        let presets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
+        return try await MainActor.run {
             let modelContainer = try createSharedModelContainer()
             let context = ModelContext(modelContainer)
 
@@ -146,7 +156,7 @@ struct VehicleQuery: EntityQuery {
             let vehicles = try context.fetch(descriptor)
             let settings = AppSettings.shared
 
-            return vehicles.map { VehicleEntity(from: $0, with: settings.preferredDistanceUnit) }
+            return vehicles.map { VehicleEntity(from: $0, with: settings.preferredDistanceUnit, allPresets: presets) }
         }
     }
 }

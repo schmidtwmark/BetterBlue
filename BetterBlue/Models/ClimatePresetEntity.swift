@@ -7,6 +7,7 @@ struct ClimatePresetEntity: AppEntity, Sendable {
     var vehicleVin: String
     var vehicleName: String
     var presetName: String
+    var isSelected: Bool
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Climate Preset"
     static let defaultQuery = ClimatePresetQuery()
@@ -52,7 +53,8 @@ private struct ClimatePresetFetcher {
                             id: vehicle.id,
                             vehicleVin: vehicle.vin,
                             vehicleName: vehicle.displayName,
-                            presetName: "Default"
+                            presetName: "Default",
+                            isSelected: true
                         ))
                     }
                 } else {
@@ -62,7 +64,8 @@ private struct ClimatePresetFetcher {
                                 id: preset.id,
                                 vehicleVin: vehicle.vin,
                                 vehicleName: vehicle.displayName,
-                                presetName: preset.name
+                                presetName: preset.name,
+                                isSelected: preset.isSelected
                             ))
                         }
                     }

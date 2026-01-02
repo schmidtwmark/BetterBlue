@@ -37,7 +37,8 @@ struct RefreshVehicleStatusIntent: AppIntent {
         try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
 
         let unit = AppSettings.shared.preferredDistanceUnit
-        let updatedVehicle = VehicleEntity(from: bbVehicle, with: unit)
+        let allPresets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
+        let updatedVehicle = VehicleEntity(from: bbVehicle, with: unit, allPresets: allPresets)
 
         WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
 

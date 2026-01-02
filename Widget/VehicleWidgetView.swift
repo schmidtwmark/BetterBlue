@@ -210,12 +210,7 @@ struct VehicleButtonsView: View {
             }),
             VehicleButtonData(label: "Start Climate", shortLabel: "Start", icon: "fan", color: .blue, intent: {
                 let intent = StartClimateControlIntent()
-                intent.preset = ClimatePresetEntity(
-                    id: vehicle.id,
-                    vehicleVin: vehicle.vin,
-                    vehicleName: vehicle.displayName,
-                    presetName: "Selected"
-                )
+                intent.preset = vehicle.selectedPreset
                 return intent
             }),
             VehicleButtonData(label: "Stop Climate", shortLabel: "Stop", icon: "fan.slash", color: .gray, intent: {

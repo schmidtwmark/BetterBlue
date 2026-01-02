@@ -116,7 +116,8 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
 
             // Create vehicle entity on the main actor to avoid capture issues
             let unit = await MainActor.run { AppSettings.shared.preferredDistanceUnit }
-            let vehicleEntity = VehicleEntity(from: bbVehicle, with: unit)
+            let allPresets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
+            let vehicleEntity = VehicleEntity(from: bbVehicle, with: unit, allPresets: allPresets)
             return vehicleEntity
 
         } catch {
@@ -163,7 +164,8 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             }
 
             let unit = await MainActor.run { AppSettings.shared.preferredDistanceUnit }
-            let vehicleEntity = VehicleEntity(from: bbVehicle, with: unit)
+            let allPresets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
+            let vehicleEntity = VehicleEntity(from: bbVehicle, with: unit, allPresets: allPresets)
             return vehicleEntity
 
         } catch {
