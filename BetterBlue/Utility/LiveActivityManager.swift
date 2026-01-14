@@ -13,11 +13,86 @@ import Foundation
 import SwiftData
 import UIKit
 
+private let liveActivityBackendURL = "https://phgu023o97.execute-api.us-east-1.amazonaws.com/dev"
+
 @MainActor
 final class LiveActivityManager {
     static let shared = LiveActivityManager()
 
+    private var deviceToken: String?
+    private var isRegisteredWithBackend = false
+
     private init() {}
+
+    func setDeviceToken(_ token: String) {
+        deviceToken = token
+        print("📲 [LiveActivityManager] Device token set: \(token.prefix(20))...")
+
+        // If we have active Live Activities, register with backend now
+        #if canImport(ActivityKit)
+        if let activity = Activity<VehicleActivityAttributes>.activities.first, !isRegisteredWithBackend {
+            let activityType = activity.content.state.activityType
+            Task {
+                await registerWithBackend(activityType: activityType)
+            }
+        }
+        #endif
+    }
+
+    /// Handle a wakeup push from the backend - fetch fresh data and update all Live Activities
+    func handleWakeupPush() async {
+        print("📲 [LiveActivityManager] Handling wakeup push...")
+
+        #if canImport(ActivityKit)
+        let activities = Activity<VehicleActivityAttributes>.activities
+        guard !activities.isEmpty else {
+            print("📲 [LiveActivityManager] No active Live Activities to update")
+            return
+        }
+
+        // Get the model container to fetch vehicle data
+        guard let container = try? createSharedModelContainer() else {
+            print("❌ [LiveActivityManager] Failed to create model container")
+            return
+        }
+
+        let context = container.mainContext
+
+        for activity in activities {
+            let vin = activity.attributes.vin
+            print("📲 [LiveActivityManager] Updating Live Activity for VIN: \(vin.prefix(8))...")
+
+            do {
+                // Fetch the vehicle
+                let predicate = #Predicate<BBVehicle> { $0.vin == vin }
+                var descriptor = FetchDescriptor(predicate: predicate)
+                descriptor.fetchLimit = 1
+
+                guard let vehicle = try context.fetch(descriptor).first,
+                      let account = vehicle.account else {
+                    print("❌ [LiveActivityManager] Vehicle or account not found for VIN: \(vin.prefix(8))...")
+                    continue
+                }
+
+                // Initialize account with Live Activity device type for HTTP logging
+                try await account.initialize(modelContext: context, deviceType: .liveActivity)
+
+                // Fetch fresh status (async call)
+                let status = try await account.fetchVehicleStatus(for: vehicle, modelContext: context)
+
+                // Update vehicle with new status
+                vehicle.updateStatus(with: status)
+
+                // Update the Live Activity with increment wakeup count
+                await refreshActivity(for: vin, status: status, incrementWakeup: true)
+
+                print("✅ [LiveActivityManager] Updated Live Activity for \(vin.prefix(8))...")
+            } catch {
+                print("❌ [LiveActivityManager] Error updating Live Activity for \(vin.prefix(8))...: \(error)")
+            }
+        }
+        #endif
+    }
 
     func updateActivity(for vehicle: BBVehicle, status: VehicleStatus, modelContext: ModelContext) {
         #if canImport(ActivityKit)
@@ -25,94 +100,138 @@ final class LiveActivityManager {
 
         var type: LiveActivityType = .none
 
-        if status.climateStatus.airControlOn {
-            type = .climate
+        if vehicle.debugLiveActivity {
+            type = .debug
         } else if status.evStatus?.charging == true {
             type = .charging
         }
+        // Note: Climate live activity removed due to infrequent updates making it a poor UX
 
         if type != .none {
             startOrUpdateActivity(for: vehicle, status: status, type: type)
-
-            // TODO: send a notification to the APNs server to start receiving pings every N seconds
-            // On receiving a ping, go fetch the vehicle status.
         } else {
             endActivity(for: vehicle)
-            // TODO: stop listening for APNs updates
         }
         #endif
     }
 
-    func startCommandActivity(for vehicle: BBVehicle, type: LiveActivityType, modelContext: ModelContext) {
+    nonisolated func refreshActivity(for vin: String, status: VehicleStatus, incrementWakeup: Bool = false) async {
         #if canImport(ActivityKit)
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-
-        guard let status = createStatusFromVehicle(vehicle) else {
-            print("⚠️ [LiveActivity] Could not create status from vehicle for command activity")
+        guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vin }) else {
             return
         }
 
-        startOrUpdateActivity(for: vehicle, status: status, type: type)
+        let currentState = existingActivity.content.state
+        let updatedState = VehicleActivityAttributes.ContentState(
+            status: status,
+            activityType: currentState.activityType,
+            activityState: currentState.activityState,
+            isRefreshing: false,
+            climatePresetName: currentState.climatePresetName,
+            climatePresetIcon: currentState.climatePresetIcon,
+            wakeupCount: incrementWakeup ? currentState.wakeupCount + 1 : currentState.wakeupCount,
+            lastWakeupTime: incrementWakeup ? Date() : currentState.lastWakeupTime
+        )
 
-        // Start a background task to refresh
+        await existingActivity.update(ActivityContent(state: updatedState, staleDate: nil))
+        #endif
+    }
+
+    nonisolated func setRefreshing(for vin: String, isRefreshing: Bool) async {
+        #if canImport(ActivityKit)
+        guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vin }) else {
+            return
+        }
+
+        let currentState = existingActivity.content.state
+        let updatedState = VehicleActivityAttributes.ContentState(
+            status: currentState.status,
+            activityType: currentState.activityType,
+            activityState: currentState.activityState,
+            isRefreshing: isRefreshing,
+            climatePresetName: currentState.climatePresetName,
+            climatePresetIcon: currentState.climatePresetIcon,
+            wakeupCount: currentState.wakeupCount,
+            lastWakeupTime: currentState.lastWakeupTime
+        )
+
+        await existingActivity.update(ActivityContent(state: updatedState, staleDate: nil))
+        #endif
+    }
+
+    /// Start or stop the debug Live Activity based on the vehicle's debugLiveActivity flag
+    func updateDebugActivity(for vehicle: BBVehicle) {
+        #if canImport(ActivityKit)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        if vehicle.debugLiveActivity {
+            // Start the debug Live Activity
+            guard let status = createStatusFromVehicle(vehicle) else {
+                print("❌ [LiveActivity] Cannot start debug activity: missing vehicle status")
+                return
+            }
+            startOrUpdateActivity(for: vehicle, status: status, type: .debug)
+        } else {
+            // End the debug Live Activity
+            endActivity(for: vehicle)
+        }
+        #endif
+    }
+
+    func startCommandActivity(
+        for vehicle: BBVehicle,
+        type: LiveActivityType,
+        modelContext: ModelContext,
+        climatePresetName: String? = nil,
+        climatePresetIcon: String? = nil
+    ) {
+        #if canImport(ActivityKit)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard let status = createStatusFromVehicle(vehicle) else { return }
+
+        startOrUpdateActivity(
+            for: vehicle,
+            status: status,
+            type: type,
+            climatePresetName: climatePresetName,
+            climatePresetIcon: climatePresetIcon
+        )
+
+        // Poll for state change in background
         Task {
-            // Safely access UIApplication using dynamic dispatch to avoid extension build errors
             var taskId = UIBackgroundTaskIdentifier.invalid
-            var app: UIApplication?
+            if let app = UIApplication.value(forKeyPath: "sharedApplication") as? UIApplication {
+                taskId = app.beginBackgroundTask { }
+            }
 
-            if let cls = NSClassFromString("UIApplication") as? NSObject.Type {
-                let selector = NSSelectorFromString("sharedApplication")
-                if cls.responds(to: selector) {
-                    app = cls.perform(selector)?.takeUnretainedValue() as? UIApplication
+            defer {
+                if let app = UIApplication.value(forKeyPath: "sharedApplication") as? UIApplication, taskId != .invalid {
+                    app.endBackgroundTask(taskId)
                 }
             }
 
-            if let application = app {
-                taskId = application.beginBackgroundTask(withName: "LiveActivityCommandRefresh") {
-                    print("⚠️ [LiveActivity] Background task expired")
+            for _ in 1...3 {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard let account = vehicle.account else { break }
+                try? await account.fetchAndUpdateVehicleStatus(for: vehicle, modelContext: modelContext)
+
+                if (type == .climate && vehicle.climateStatus?.airControlOn == true) ||
+                    (type == .charging && vehicle.evStatus?.charging == true) {
+                    break
                 }
             }
 
-            do {
-                for index in 1...3 {
-                    try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-                    print("🔄 [LiveActivity] Command refresh attempt \(index)/3")
-
-                    guard let account = vehicle.account else { break }
-                    try await account.fetchAndUpdateVehicleStatus(for: vehicle, modelContext: modelContext)
-
-                    // Check if state changed to what we expect
-                    if (type == .climate && vehicle.climateStatus?.airControlOn == true) ||
-                        (type == .charging && vehicle.evStatus?.charging == true) {
-                        print("✅ [LiveActivity] State change detected, stopping command refresh loop")
-                        break
-                    }
-                }
-
-                if (type == .climate && vehicle.climateStatus?.airControlOn != true) ||
-                    (type == .charging && vehicle.evStatus?.charging != true) {
-                    print("❌ [LiveActivity] State did not change after retries")
-                    startOrUpdateActivity(for: vehicle, status: createStatusFromVehicle(vehicle) ?? status, type: type)
-
-                    // Keep it for a bit then kill it?
-                    try await Task.sleep(nanoseconds: 5_000_000_000)
-                    endActivity(for: vehicle)
-                }
-
-            } catch {
-                print("❌ [LiveActivity] Command refresh task failed: \(error)")
-            }
-
-            if let application = app, taskId != .invalid {
-                application.endBackgroundTask(taskId)
+            // If state didn't change, end the activity after a delay
+            if (type == .climate && vehicle.climateStatus?.airControlOn != true) ||
+                (type == .charging && vehicle.evStatus?.charging != true) {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                endActivity(for: vehicle)
             }
         }
         #endif
     }
 
     private func createStatusFromVehicle(_ vehicle: BBVehicle) -> VehicleStatus? {
-        // Helper to reconstruct VehicleStatus from BBVehicle parts
-        // This is a bit duplicative of what might be in BBVehicle or APIClient, but necessary here
         guard let location = vehicle.location,
               let lock = vehicle.lockStatus,
               let climate = vehicle.climateStatus else { return nil }
@@ -133,15 +252,32 @@ final class LiveActivityManager {
         for vehicle: BBVehicle,
         status: VehicleStatus,
         type: LiveActivityType,
+        climatePresetName: String? = nil,
+        climatePresetIcon: String? = nil
     ) {
         #if canImport(ActivityKit)
-
-        let contentState = VehicleActivityAttributes.ContentState(
-            status: status,
-            activityType: type
-        )
-
         let existingActivity = Activity<VehicleActivityAttributes>.activities.first { $0.attributes.vin == vehicle.vin }
+
+        let contentState: VehicleActivityAttributes.ContentState
+        if let activity = existingActivity {
+            let currentState = activity.content.state
+            contentState = VehicleActivityAttributes.ContentState(
+                status: status,
+                activityType: type,
+                activityState: currentState.activityState,
+                climatePresetName: climatePresetName ?? currentState.climatePresetName,
+                climatePresetIcon: climatePresetIcon ?? currentState.climatePresetIcon,
+                wakeupCount: currentState.wakeupCount,
+                lastWakeupTime: currentState.lastWakeupTime
+            )
+        } else {
+            contentState = VehicleActivityAttributes.ContentState(
+                status: status,
+                activityType: type,
+                climatePresetName: climatePresetName,
+                climatePresetIcon: climatePresetIcon
+            )
+        }
 
         if let activity = existingActivity {
             Task {
@@ -157,77 +293,154 @@ final class LiveActivityManager {
                 _ = try Activity.request(
                     attributes: attributes,
                     content: ActivityContent(state: contentState, staleDate: nil),
-                    pushType: nil
+                    pushType: nil // We don't use Live Activity push tokens anymore
                 )
+                // Register with backend for wakeup pushes with the activity type
+                Task {
+                    await registerWithBackend(activityType: type)
+                }
             } catch {
-                print("Error requesting Live Activity: \(error)")
+                print("❌ [LiveActivity] Error requesting activity: \(error)")
             }
         }
         #endif
+    }
+
+    private func registerWithBackend(activityType: LiveActivityType = .charging) async {
+        guard let deviceToken = deviceToken else {
+            print("⚠️ [LiveActivity] No device token available for backend registration")
+            return
+        }
+
+        guard let url = URL(string: "\(liveActivityBackendURL)/wakeup") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "pushToken": deviceToken,
+            "activityType": activityType.rawValue  // "charging" or "debug"
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 200 {
+                    isRegisteredWithBackend = true
+                    print("✅ [LiveActivity] Registered with backend for wakeup pushes")
+                } else {
+                    print("❌ [LiveActivity] Backend registration failed: \(httpResponse.statusCode)")
+                }
+            }
+        } catch {
+            print("❌ [LiveActivity] Backend registration error: \(error)")
+        }
+    }
+
+    private func unregisterFromBackend() async {
+        guard let deviceToken = deviceToken else { return }
+        guard let url = URL(string: "\(liveActivityBackendURL)/wakeup/unregister") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["pushToken": deviceToken]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            _ = try await URLSession.shared.data(for: request)
+            isRegisteredWithBackend = false
+            print("✅ [LiveActivity] Unregistered from backend")
+        } catch {
+            print("❌ [LiveActivity] Backend unregistration error: \(error)")
+        }
     }
 
     private func endActivity(for vehicle: BBVehicle) {
         #if canImport(ActivityKit)
-        let existingActivity = Activity<VehicleActivityAttributes>.activities.first { $0.attributes.vin == vehicle.vin }
-        if let activity = existingActivity {
-            Task {
-                await activity.end(nil, dismissalPolicy: .immediate)
+        guard let activity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vehicle.vin }) else {
+            return
+        }
+
+        Task {
+            await activity.end(nil, dismissalPolicy: .immediate)
+
+            // If no more active Live Activities, unregister from backend
+            if Activity<VehicleActivityAttributes>.activities.count <= 1 {
+                await unregisterFromBackend()
             }
         }
         #endif
     }
 }
 
+// MARK: - Types
+
 public enum LiveActivityState: String, Codable, Hashable, Sendable {
-    case starting
-    case running
-    case failed
+    case starting, running, failed
 }
 
 public enum LiveActivityType: String, Codable, Hashable, Sendable {
-    case climate
-    case charging
-    case none
+    case climate, charging, debug, none
 
     public func message(for state: LiveActivityState) -> String {
         switch (self, state) {
         case (.climate, .starting): return "Starting Climate..."
         case (.climate, .running): return "Climate Active"
         case (.climate, .failed): return "Climate Failed"
-
         case (.charging, .starting): return "Starting Charge..."
         case (.charging, .running): return "Charging"
         case (.charging, .failed): return "Charge Failed"
-
+        case (.debug, .starting): return "Debug Starting..."
+        case (.debug, .running): return "Debug Active"
+        case (.debug, .failed): return "Debug Failed"
         case (.none, .starting): return "Updating..."
         case (.none, .running): return "Updated"
         case (.none, .failed): return "Update Failed"
         }
     }
 
-    public var refreshInterval: TimeInterval {
-        switch self {
-        case .climate: return 120 // 2 minutes
-        case .charging: return 600 // 10 minutes
-        case .none: return 3600 // 1 hour
-        }
+    public var refreshIntervalMinutes: Int {
+        return 1
     }
 }
 
-#if canImport(ActivityKit)
-import ActivityKit
-import BetterBlueKit
+// MARK: - Activity Attributes
 
+#if canImport(ActivityKit)
 public struct VehicleActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable, Sendable {
         public var status: VehicleStatus
         public var activityType: LiveActivityType
         public var activityState: LiveActivityState
+        public var isRefreshing: Bool
+        public var climatePresetName: String?
+        public var climatePresetIcon: String?
+        // Debug fields
+        public var wakeupCount: Int
+        public var lastWakeupTime: Date?
 
-        public init(status: VehicleStatus, activityType: LiveActivityType = .none, activityState: LiveActivityState = .running) {
+        public init(
+            status: VehicleStatus,
+            activityType: LiveActivityType = .none,
+            activityState: LiveActivityState = .running,
+            isRefreshing: Bool = false,
+            climatePresetName: String? = nil,
+            climatePresetIcon: String? = nil,
+            wakeupCount: Int = 0,
+            lastWakeupTime: Date? = nil
+        ) {
             self.status = status
             self.activityType = activityType
             self.activityState = activityState
+            self.isRefreshing = isRefreshing
+            self.climatePresetName = climatePresetName
+            self.climatePresetIcon = climatePresetIcon
+            self.wakeupCount = wakeupCount
+            self.lastWakeupTime = lastWakeupTime
         }
     }
 

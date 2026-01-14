@@ -12,18 +12,18 @@ typealias VehicleButtonAction = @Sendable (@escaping @Sendable (String) -> Void)
 
 protocol VehicleAction {
     var action: VehicleButtonAction { get }
-    var icon: String { get }
+    var icon: Image { get }
     var label: String { get }
     var inProgressLabel: String { get }
 }
 
 struct MenuVehicleAction: VehicleAction {
     var action: VehicleButtonAction
-    var icon: String
+    var icon: Image
     var label: String
     var inProgressLabel: String
 
-    init(action: @escaping VehicleButtonAction, icon: String, label: String, inProgressLabel: String = "") {
+    init(action: @escaping VehicleButtonAction, icon: Image, label: String, inProgressLabel: String = "") {
         self.action = action
         self.icon = icon
         self.label = label
@@ -33,7 +33,7 @@ struct MenuVehicleAction: VehicleAction {
 
 struct MainVehicleAction: VehicleAction {
     var action: VehicleButtonAction
-    var icon: String
+    var icon: Image
     var label: String
     var inProgressLabel: String
     var completedText: String
@@ -41,5 +41,5 @@ struct MainVehicleAction: VehicleAction {
     var additionalText: String = ""
     var shouldPulse: Bool = false
     var shouldRotate: Bool = false
-    var menuIcon: String? // Optional alternative icon for menu items
+    var menuIcon: Image? // Optional alternative icon for menu items
 }

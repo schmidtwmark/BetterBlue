@@ -13,6 +13,7 @@ struct ChargingButton: View {
     let bbVehicle: BBVehicle
     var transition: Namespace.ID?
     @Environment(\.modelContext) private var modelContext
+    @State private var showingChargeLimitSettings = false
 
     var evStatus: VehicleStatus.EVStatus? {
         guard bbVehicle.modelContext != nil else {
@@ -32,11 +33,12 @@ struct ChargingButton: View {
         evStatus?.pluggedIn ?? false
     }
 
-    var additionalText: String {
-        if isCharging, let evStatus, evStatus.chargeSpeed > 0 {
-            return String(format: "%.1f kW", evStatus.chargeSpeed)
-        }
-        return ""
+    nonisolated func showChargeLimitSettings() {
+        Task { @MainActor in showingChargeLimitSettings = true }
+    }
+
+    var plugIcon: Image {
+        bbVehicle.plugIcon(for: evStatus?.plugType)
     }
 
     var body: some View {
@@ -44,31 +46,41 @@ struct ChargingButton: View {
             action: { statusUpdater in
                 try await setCharge(true, statusUpdater: statusUpdater)
             },
-            icon: "bolt.slash",
+            icon: plugIcon,
             label: "Start Charge",
             inProgressLabel: "Starting Charge",
             completedText: "Charging started",
             color: .gray,
+            menuIcon: Image(systemName: "bolt.fill")
         )
         let stopCharging = MainVehicleAction(
             action: { statusUpdater in
                 try await setCharge(false, statusUpdater: statusUpdater)
             },
-            icon: "bolt.fill",
+            icon: plugIcon,
             label: "Stop Charge",
             inProgressLabel: "Stopping Charge",
             completedText: "Charge stopped",
             color: .green,
-            additionalText: additionalText,
             shouldPulse: true,
+            menuIcon: Image(systemName: "bolt.slash")
+        )
+
+        let chargeLimitSettings = MenuVehicleAction(
+            action: { _ in showChargeLimitSettings() },
+            icon: Image(systemName: "battery.100percent"),
+            label: "Charge Limits"
         )
 
         VehicleControlButton(
-            actions: [startCharging, stopCharging],
+            actions: [startCharging, stopCharging, chargeLimitSettings],
             currentActionDeterminant: { isCharging ? stopCharging : startCharging },
             transition: transition,
             bbVehicle: bbVehicle,
         )
+        .sheet(isPresented: $showingChargeLimitSettings) {
+            ChargeLimitSettingsSheet(vehicle: bbVehicle)
+        }
     }
 
     @MainActor
@@ -86,6 +98,14 @@ struct ChargingButton: View {
             try await account.startCharge(bbVehicle, modelContext: context)
         } else {
             try await account.stopCharge(bbVehicle, modelContext: context)
+
+            // Immediately fetch status to update Live Activity
+            // This ensures the Live Activity ends even if waitForStatusChange times out
+            do {
+                try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
+            } catch {
+                print("⚠️ [ChargingButton] Failed to fetch status after stop command: \(error)")
+            }
         }
 
         try await bbVehicle.waitForStatusChange(

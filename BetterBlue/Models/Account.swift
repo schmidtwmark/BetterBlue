@@ -67,9 +67,21 @@ class BBAccount {
 extension BBAccount {
     @MainActor
     func initialize(modelContext: ModelContext) async throws {
+        try await initialize(modelContext: modelContext, deviceType: nil)
+    }
+
+    @MainActor
+    func initialize(modelContext: ModelContext, deviceType: DeviceType?) async throws {
         self.modelContextForMFA = modelContext
 
-        if api == nil {
+        // If a specific device type is requested, always reinitialize the API client
+        if api == nil || deviceType != nil {
+            let logSink = if let deviceType {
+                HTTPLogSinkManager.shared.createLogSink(for: deviceType)
+            } else {
+                HTTPLogSinkManager.shared.createLogSink()
+            }
+
             let configuration = APIClientFactoryConfiguration(
                 region: regionEnum,
                 brand: brandEnum,
@@ -78,7 +90,7 @@ extension BBAccount {
                 pin: pin,
                 accountId: id,
                 modelContext: modelContext,
-                logSink: HTTPLogSinkManager.shared.createLogSink(),
+                logSink: logSink,
                 rememberMeToken: rememberMeToken
             )
             api = createAPIClient(configuration: configuration)
@@ -136,21 +148,35 @@ extension BBAccount {
             throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
         }
 
-        let (newrememberMeToken, sid) = try await kiaApi.verifyOTP(otpKey: otpKey, xid: xid, otp: otp)
+        // Step 1: Verify OTP - returns rmToken and sid
+        let (newRememberMeToken, verifyOTPSid) = try await kiaApi.verifyOTP(otpKey: otpKey, xid: xid, otp: otp)
 
-        self.rememberMeToken = newrememberMeToken
+        // Store the remember me token for future logins
+        self.rememberMeToken = newRememberMeToken
 
-        // Re-initialize API with new rememberMeToken
+        // Step 2: Re-initialize API with new rememberMeToken so the next login call uses it
         self.api = nil
+        if let modelContext = modelContextForMFA {
+            try await initialize(modelContext: modelContext)
+        }
 
-        // However, verifyOTP returned a session ID (sid). We can use that to set authToken directly!
-        let validUntil = Date().addingTimeInterval(3600)
-        self.authToken = AuthToken(
-            accessToken: sid,
-            refreshToken: sid,
-            expiresAt: validUntil,
-            pin: pin
-        )
+        // Get the updated KiaAPI with the new rememberMeToken
+        let updatedApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
+            cached.underlyingClient
+        } else if let api {
+            api
+        } else {
+            throw APIError(message: "API not initialized after MFA", apiName: "BBAccount")
+        }
+
+        guard let updatedKiaApi = updatedApi as? KiaAPIClient else {
+            throw APIError(message: "MFA completion failed", apiName: "BBAccount")
+        }
+
+        // Step 3: Complete login by calling authUser again with rmtoken and sid
+        let finalAuthToken = try await updatedKiaApi.completeLoginWithMFA(sid: verifyOTPSid)
+        self.authToken = finalAuthToken
+        print("✅ [BBAccount] MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
     }
 
     @MainActor
@@ -241,8 +267,7 @@ extension BBAccount {
 
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
         }
-        // TODO: enable once live activity APNs feature is complete
-//        LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
+        LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
         return status
     }
 
@@ -322,10 +347,22 @@ extension BBAccount {
 
 extension BBAccount {
     @MainActor
-    func sendCommand(for bbVehicle: BBVehicle, command: VehicleCommand, modelContext: ModelContext) async throws {
+    func sendCommand(
+        for bbVehicle: BBVehicle,
+        command: VehicleCommand,
+        modelContext: ModelContext,
+        climatePresetName: String? = nil,
+        climatePresetIcon: String? = nil
+    ) async throws {
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
-            return try await sendCommand(for: bbVehicle, command: command, modelContext: modelContext)
+            return try await sendCommand(
+                for: bbVehicle,
+                command: command,
+                modelContext: modelContext,
+                climatePresetName: climatePresetName,
+                climatePresetIcon: climatePresetIcon
+            )
         }
 
         // For Kia vehicles, ensure vehicleKey is populated by refreshing if needed
@@ -349,8 +386,13 @@ extension BBAccount {
         }
 
         if activityType != .none {
-            // TODO: update this once live activity APNs server is working
-//            LiveActivityManager.shared.startCommandActivity(for: bbVehicle, type: activityType, modelContext: modelContext)
+            LiveActivityManager.shared.startCommandActivity(
+                for: bbVehicle,
+                type: activityType,
+                modelContext: modelContext,
+                climatePresetName: climatePresetName,
+                climatePresetIcon: climatePresetIcon
+            )
         }
 
         let vehicle = bbVehicle.toVehicle()
@@ -378,21 +420,41 @@ extension BBAccount {
     }
 
     @MainActor
-    func startClimate(_ vehicle: BBVehicle, options: ClimateOptions? = nil, modelContext: ModelContext) async throws {
-        let climateOptions: ClimateOptions = if let options {
-            options
+    func startClimate(
+        _ vehicle: BBVehicle,
+        options: ClimateOptions? = nil,
+        modelContext: ModelContext,
+        presetName: String? = nil,
+        presetIcon: String? = nil
+    ) async throws {
+        var resolvedPresetName = presetName
+        var resolvedPresetIcon = presetIcon
+        let climateOptions: ClimateOptions
+
+        if let options {
+            climateOptions = options
         } else {
             // Use vehicle's climate presets: selected preset first, then first available preset, then default
             if let selectedPreset = vehicle.safeClimatePresets.first(where: { $0.isSelected }) {
-                selectedPreset.climateOptions
+                climateOptions = selectedPreset.climateOptions
+                resolvedPresetName = resolvedPresetName ?? selectedPreset.name
+                resolvedPresetIcon = resolvedPresetIcon ?? selectedPreset.iconName
             } else if let firstPreset = vehicle.safeClimatePresets.first {
-                firstPreset.climateOptions
+                climateOptions = firstPreset.climateOptions
+                resolvedPresetName = resolvedPresetName ?? firstPreset.name
+                resolvedPresetIcon = resolvedPresetIcon ?? firstPreset.iconName
             } else {
-                ClimateOptions()
+                climateOptions = ClimateOptions()
             }
         }
 
-        try await sendCommand(for: vehicle, command: .startClimate(climateOptions), modelContext: modelContext)
+        try await sendCommand(
+            for: vehicle,
+            command: .startClimate(climateOptions),
+            modelContext: modelContext,
+            climatePresetName: resolvedPresetName,
+            climatePresetIcon: resolvedPresetIcon
+        )
     }
 
     @MainActor
@@ -408,6 +470,11 @@ extension BBAccount {
     @MainActor
     func stopCharge(_ vehicle: BBVehicle, modelContext: ModelContext) async throws {
         try await sendCommand(for: vehicle, command: .stopCharge, modelContext: modelContext)
+    }
+
+    @MainActor
+    func setTargetSOC(_ vehicle: BBVehicle, acLevel: Int, dcLevel: Int, modelContext: ModelContext) async throws {
+        try await sendCommand(for: vehicle, command: .setTargetSOC(acLevel: acLevel, dcLevel: dcLevel), modelContext: modelContext)
     }
 }
 

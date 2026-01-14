@@ -47,6 +47,8 @@ struct BBDebugConfiguration: Codable {
             shouldFailStartCharge
         case .stopCharge:
             shouldFailStopCharge
+        case .setTargetSOC:
+            false
         }
     }
 }
@@ -79,6 +81,11 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         guard let bbVehicle = getBBVehicle(for: vin, accountId: accountId) else {
             throw APIError.logError("Fake vehicle not found: \(vin)", apiName: "FakeAPI")
         }
+
+        // Update lastUpdated to simulate a fresh fetch from the server
+        bbVehicle.lastUpdated = Date()
+        bbVehicle.syncDate = Date()
+        try? modelContext.save()
 
         return createVehicleStatus(from: bbVehicle)
     }
@@ -116,18 +123,47 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
             }
         case .startCharge:
             print("🟢 [FakeAPI] Starting charge for fake vehicle '\(bbVehicle.vin)'")
-            if var evStatus = bbVehicle.evStatus {
-                evStatus.charging = true
-                evStatus.chargeSpeed = 50.0
-                evStatus.pluggedIn = true
-                bbVehicle.evStatus = evStatus
+            if let evStatus = bbVehicle.evStatus {
+                let batteryPercentage = evStatus.evRange.percentage
+                // Calculate reasonable charge time: assume 50 kW charging speed, ~1% per minute
+                let remainingPercentage = 100.0 - batteryPercentage
+                let chargeTimeMinutes = Int64(remainingPercentage * 1.5) // ~1.5 minutes per %
+
+                bbVehicle.evStatus = VehicleStatus.EVStatus(
+                    charging: true,
+                    chargeSpeed: 50.0,
+                    evRange: evStatus.evRange,
+                    plugType: evStatus.plugType != .unplugged ? evStatus.plugType : .acCharger,
+                    chargeTime: .seconds(chargeTimeMinutes * 60),
+                    targetSocAC: evStatus.targetSocAC,
+                    targetSocDC: evStatus.targetSocDC
+                )
             }
         case .stopCharge:
             print("🟢 [FakeAPI] Stopping charge for fake vehicle '\(bbVehicle.vin)'")
-            if var evStatus = bbVehicle.evStatus {
-                evStatus.charging = false
-                evStatus.chargeSpeed = 0.0
-                bbVehicle.evStatus = evStatus
+            if let evStatus = bbVehicle.evStatus {
+                bbVehicle.evStatus = VehicleStatus.EVStatus(
+                    charging: false,
+                    chargeSpeed: 0.0,
+                    evRange: evStatus.evRange,
+                    plugType: evStatus.plugType,
+                    chargeTime: .seconds(0),
+                    targetSocAC: evStatus.targetSocAC,
+                    targetSocDC: evStatus.targetSocDC
+                )
+            }
+        case let .setTargetSOC(acLevel, dcLevel):
+            print("🟢 [FakeAPI] Setting target SOC for fake vehicle '\(bbVehicle.vin)' - AC: \(acLevel)%, DC: \(dcLevel)%")
+            if let evStatus = bbVehicle.evStatus {
+                bbVehicle.evStatus = VehicleStatus.EVStatus(
+                    charging: evStatus.charging,
+                    chargeSpeed: evStatus.chargeSpeed,
+                    evRange: evStatus.evRange,
+                    plugType: evStatus.plugType,
+                    chargeTime: evStatus.chargeTime,
+                    targetSocAC: Double(acLevel),
+                    targetSocDC: Double(dcLevel)
+                )
             }
         }
 
@@ -231,23 +267,17 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         var status = VehicleStatus(
             vin: bbVehicle.vin,
             gasRange: bbVehicle.gasRange,
-            evStatus: bbVehicle.evStatus?.charging == true ? VehicleStatus.EVStatus(
-                charging: true,
-                chargeSpeed: 50.0,
-                pluggedIn: true,
-                evRange: bbVehicle.evStatus?.evRange ?? VehicleStatus.FuelRange(range: Distance(length: 200, units: .miles), percentage: 80),
-                chargeTime: .seconds(0)
-            ) : bbVehicle.evStatus,
+            evStatus: bbVehicle.evStatus,
             location: bbVehicle.location ?? VehicleStatus.Location(latitude: 0, longitude: 0),
             lockStatus: bbVehicle.lockStatus ?? .unknown,
             climateStatus: bbVehicle.climateStatus ?? VehicleStatus.ClimateStatus(
                 defrostOn: false,
                 airControlOn: false,
                 steeringWheelHeatingOn: false,
-                temperature: Temperature(value: 70, units: .fahrenheit),
+                temperature: Temperature(value: 70, units: .fahrenheit)
             ),
             odometer: bbVehicle.odometer,
-            syncDate: bbVehicle.syncDate ?? Date(),
+            syncDate: bbVehicle.syncDate ?? Date()
         )
 
         // Set lastUpdated separately since it's not part of the constructor

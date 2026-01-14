@@ -72,11 +72,11 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performLockAction(shouldLock: true, statusUpdater: statusUpdater)
             },
-            icon: "lock.fill",
+            icon: Image(systemName: "lock.fill"),
             label: "Lock",
             inProgressLabel: "Locking",
             completedText: "Locked",
-            color: .green,
+            color: .green
         )
     }
 
@@ -85,11 +85,11 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performLockAction(shouldLock: false, statusUpdater: statusUpdater)
             },
-            icon: "lock.open.fill",
+            icon: Image(systemName: "lock.open.fill"),
             label: "Unlock",
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
-            color: .red,
+            color: .red
         )
     }
 
@@ -98,11 +98,11 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performClimateAction(shouldStart: true, statusUpdater: statusUpdater)
             },
-            icon: "fan",
+            icon: Image(systemName: "fan"),
             label: "Start Climate",
             inProgressLabel: "Starting",
             completedText: "Started",
-            color: .blue,
+            color: .blue
         )
     }
 
@@ -111,12 +111,12 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performClimateAction(shouldStart: false, statusUpdater: statusUpdater)
             },
-            icon: "fan",
+            icon: Image(systemName: "fan"),
             label: "Stop Climate",
             inProgressLabel: "Stopping",
             completedText: "Stopped",
             color: .blue,
-            shouldRotate: true,
+            shouldRotate: true
         )
     }
 
@@ -125,11 +125,11 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performChargeAction(shouldStart: true, statusUpdater: statusUpdater)
             },
-            icon: "bolt.slash",
+            icon: Image(systemName: "bolt.slash"),
             label: "Start Charge",
             inProgressLabel: "Starting",
             completedText: "Charging",
-            color: .gray,
+            color: .gray
         )
     }
 
@@ -138,7 +138,7 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performChargeAction(shouldStart: false, statusUpdater: statusUpdater)
             },
-            icon: "bolt.fill",
+            icon: Image(systemName: "bolt.fill"),
             label: "Stop Charge",
             inProgressLabel: "Stopping",
             completedText: "Stopped",
@@ -205,7 +205,7 @@ struct WatchVehicleView: View {
                                     .font(.system(size: 12, weight: .medium))
                             }
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.borderedProminent)
                         .frame(width: 30, height: 30)
                         .disabled(isRefreshing)
                     }
@@ -383,7 +383,7 @@ struct WatchVehicleButton: View {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: currentAction.icon)
+                    currentAction.icon
                         .spin(currentAction.shouldRotate)
                         .pulse(currentAction.shouldPulse)
                         .foregroundColor(currentAction.color)
@@ -408,7 +408,8 @@ struct WatchVehicleButton: View {
             }
         }
         .padding()
-        .glassEffect()
+        .background(Color.gray.opacity(0.2))
+        .cornerRadius(12)
         .simultaneousGesture(
             TapGesture()
                 .onEnded { _ in

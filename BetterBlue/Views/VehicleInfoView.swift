@@ -54,10 +54,59 @@ struct VehicleInfoView: View {
                 }
             }
 
+            // EV Settings (only for electric vehicles)
+            if bbVehicle.isElectric {
+                Section("EV Settings") {
+                    Picker("Charge Port Type", selection: Binding(
+                        get: { bbVehicle.chargePortType },
+                        set: { newValue in
+                            bbVehicle.chargePortType = newValue
+                            try? modelContext.save()
+                        }
+                    )) {
+                        ForEach(ChargePortType.allCases, id: \.self) { portType in
+                            Label(portType.displayName, systemImage: portType.dcPlugIcon).tag(portType)
+                        }
+                    }
+
+                    NavigationLink(destination: ChargeLimitSettingsContent(vehicle: bbVehicle)) {
+                        HStack {
+                            Text("Charge Limits")
+                            Spacer()
+                            if let evStatus = bbVehicle.evStatus,
+                               let acTarget = evStatus.targetSocAC,
+                               let dcTarget = evStatus.targetSocDC {
+                                Text("AC: \(Int(acTarget))% / DC: \(Int(dcTarget))%")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Fake Vehicle Configuration (only for fake vehicles)
             if let account = bbVehicle.account, account.brandEnum == .fake {
                 Section("Fake Vehicle Configuration") {
                     NavigationLink("Configure Vehicle", destination: FakeVehicleDetailView(vehicle: bbVehicle))
+                }
+            }
+
+            // Debug section (only when debug mode is enabled)
+            if appSettings.debugModeEnabled {
+                Section {
+                    Toggle("Debug Live Activity", isOn: Binding(
+                        get: { bbVehicle.debugLiveActivity },
+                        set: { newValue in
+                            bbVehicle.debugLiveActivity = newValue
+                            try? modelContext.save()
+                            LiveActivityManager.shared.updateDebugActivity(for: bbVehicle)
+                        }
+                    ))
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("Shows a debug Live Activity that displays wakeup count and timing information for testing push notifications.")
                 }
             }
 

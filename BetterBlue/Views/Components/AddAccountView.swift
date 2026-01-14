@@ -59,11 +59,16 @@ struct AddAccountView: View {
     @State private var errorMessage: String?
 
     // MFA State
+    @State private var showingMFAMethodPicker = false
     @State private var showingMFA = false
     @State private var mfaCode = ""
     @State private var mfaXID: String?
     @State private var mfaOTPKey: String?
     @State private var mfaAccount: BBAccount?
+    @State private var mfaHasEmail = false
+    @State private var mfaHasPhone = false
+    @State private var mfaEmail: String?
+    @State private var mfaPhone: String?
 
     @State private var fakeVehicles: [BBVehicle] = []
 
@@ -123,6 +128,9 @@ struct AddAccountView: View {
                     ))
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isLoading)
             }
+        }
+        .sheet(isPresented: $showingMFAMethodPicker) {
+            mfaMethodPickerSheet
         }
         .sheet(isPresented: $showingMFA) {
             mfaSheet
@@ -265,6 +273,75 @@ struct AddAccountView: View {
     }
 
     @ViewBuilder
+    private var mfaMethodPickerSheet: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Text("Choose how you'd like to receive your verification code.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } header: {
+                    Text("Verification Required")
+                }
+
+                Section {
+                    if mfaHasPhone, let phone = mfaPhone {
+                        Button {
+                            showingMFAMethodPicker = false
+                            sendMFACode(notifyType: "SMS")
+                        } label: {
+                            HStack {
+                                Image(systemName: "message.fill")
+                                    .foregroundColor(.green)
+                                VStack(alignment: .leading) {
+                                    Text("Text Message (SMS)")
+                                        .foregroundColor(.primary)
+                                    Text(phone)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    if mfaHasEmail, let email = mfaEmail {
+                        Button {
+                            showingMFAMethodPicker = false
+                            sendMFACode(notifyType: "EMAIL")
+                        } label: {
+                            HStack {
+                                Image(systemName: "envelope.fill")
+                                    .foregroundColor(.blue)
+                                VStack(alignment: .leading) {
+                                    Text("Email")
+                                        .foregroundColor(.primary)
+                                    Text(email)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Send Code To")
+                }
+            }
+            .navigationTitle("Verify Identity")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        showingMFAMethodPicker = false
+                        isLoading = false
+                        mfaAccount = nil
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .interactiveDismissDisabled()
+    }
+
+    @ViewBuilder
     private var mfaSheet: some View {
         NavigationView {
             Form {
@@ -340,9 +417,29 @@ struct AddAccountView: View {
                 if let apiError = error as? APIError {
                     switch apiError.errorType {
                     case .requiresMFA:
-                        // MFA Required - Trigger flow
-                        if let xid = apiError.userInfo?["xid"] {
-                            initiateMFA(xid: xid, account: bbAccount)
+                        // MFA Required - Extract info and show method picker
+                        if let xid = apiError.userInfo?["xid"],
+                           let otpKey = apiError.userInfo?["otpKey"] {
+                            self.mfaXID = xid
+                            self.mfaOTPKey = otpKey
+                            self.mfaAccount = bbAccount
+                            self.mfaHasEmail = apiError.userInfo?["hasEmail"] == "true"
+                            self.mfaHasPhone = apiError.userInfo?["hasPhone"] == "true"
+                            self.mfaEmail = apiError.userInfo?["email"]
+                            self.mfaPhone = apiError.userInfo?["phone"]
+
+                            // If only one option, use it directly
+                            if mfaHasPhone && !mfaHasEmail {
+                                sendMFACode(notifyType: "SMS")
+                            } else if mfaHasEmail && !mfaHasPhone {
+                                sendMFACode(notifyType: "EMAIL")
+                            } else if mfaHasPhone || mfaHasEmail {
+                                // Show picker
+                                showingMFAMethodPicker = true
+                            } else {
+                                errorMessage = "MFA required but no delivery method available."
+                                isLoading = false
+                            }
                         } else {
                             errorMessage = "MFA required but missing context."
                             isLoading = false
@@ -365,20 +462,20 @@ struct AddAccountView: View {
         }
     }
 
-    private func initiateMFA(xid: String, account: BBAccount) {
-        print("💡 [AddAccountView] initiateMFA called with xid: \(xid)")
+    private func sendMFACode(notifyType: String) {
+        guard let account = mfaAccount, let xid = mfaXID, let otpKey = mfaOTPKey else {
+            errorMessage = "MFA context missing"
+            isLoading = false
+            return
+        }
+
+        print("💡 [AddAccountView] sendMFACode called with notifyType: \(notifyType)")
         Task {
-            let otpKey = UUID().uuidString
-            print("💡 [AddAccountView] Starting MFA Task - otpKey: \(otpKey)")
             do {
-                try await account.sendMFA(otpKey: otpKey, xid: xid)
+                try await account.sendMFA(otpKey: otpKey, xid: xid, notifyType: notifyType)
                 print("💡 [AddAccountView] account.sendMFA successful")
                 await MainActor.run {
-                    self.mfaXID = xid
-                    self.mfaOTPKey = otpKey
-                    self.mfaAccount = account
                     self.showingMFA = true
-                    // Keep loading true while sheet shows
                 }
             } catch {
                 await MainActor.run {

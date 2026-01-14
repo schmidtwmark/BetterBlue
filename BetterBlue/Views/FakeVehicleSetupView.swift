@@ -28,7 +28,10 @@ struct FakeVehicleDetailView: View {
     @State private var temperature: Double = 70
     @State private var isCharging: Bool = false
     @State private var chargeSpeed: Double = 0
-    @State private var isPluggedIn: Bool = true
+    @State private var plugType: VehicleStatus.PlugType = .unplugged
+    @State private var chargeTimeMinutes: Double = 0
+    @State private var targetSocAC: Double = 80
+    @State private var targetSocDC: Double = 90
     @State private var latitude: Double = 37.7749
     @State private var longitude: Double = -122.4194
 
@@ -75,8 +78,12 @@ struct FakeVehicleDetailView: View {
                     Toggle("Charging", isOn: $isCharging)
                         .onChange(of: isCharging) { _, _ in updateEVStatus() }
 
-                    Toggle("Plugged In", isOn: $isPluggedIn)
-                        .onChange(of: isPluggedIn) { _, _ in updateEVStatus() }
+                    Picker("Plug Type", selection: $plugType) {
+                        Text("Unplugged").tag(VehicleStatus.PlugType.unplugged)
+                        Text("AC Charger").tag(VehicleStatus.PlugType.acCharger)
+                        Text("DC Charger").tag(VehicleStatus.PlugType.dcCharger)
+                    }
+                    .onChange(of: plugType) { _, _ in updateEVStatus() }
 
                     if isCharging {
                         HStack {
@@ -87,7 +94,34 @@ struct FakeVehicleDetailView: View {
                         }
                         Slider(value: $chargeSpeed, in: 0 ... 250, step: 1)
                             .onChange(of: chargeSpeed) { _, _ in updateEVStatus() }
+
+                        HStack {
+                            Text("Charge Time Remaining")
+                            Spacer()
+                            Text("\(Int(chargeTimeMinutes)) min")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $chargeTimeMinutes, in: 0 ... 480, step: 5)
+                            .onChange(of: chargeTimeMinutes) { _, _ in updateEVStatus() }
                     }
+
+                    HStack {
+                        Text("Target SOC (AC)")
+                        Spacer()
+                        Text("\(Int(targetSocAC))%")
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $targetSocAC, in: 50 ... 100, step: 5)
+                        .onChange(of: targetSocAC) { _, _ in updateEVStatus() }
+
+                    HStack {
+                        Text("Target SOC (DC)")
+                        Spacer()
+                        Text("\(Int(targetSocDC))%")
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $targetSocDC, in: 50 ... 100, step: 5)
+                        .onChange(of: targetSocDC) { _, _ in updateEVStatus() }
                 }
 
                 if hasGas {
@@ -203,7 +237,10 @@ struct FakeVehicleDetailView: View {
             batteryPercentage = evStatus.evRange.percentage
             isCharging = evStatus.charging
             chargeSpeed = evStatus.chargeSpeed
-            isPluggedIn = evStatus.pluggedIn
+            plugType = evStatus.plugType
+            chargeTimeMinutes = Double(evStatus.chargeTime.components.seconds / 60)
+            targetSocAC = evStatus.targetSocAC ?? 80
+            targetSocDC = evStatus.targetSocDC ?? 90
         }
 
         if let gasRange = vehicle.gasRange {
@@ -231,9 +268,11 @@ struct FakeVehicleDetailView: View {
             vehicle.evStatus = VehicleStatus.EVStatus(
                 charging: isCharging,
                 chargeSpeed: chargeSpeed,
-                pluggedIn: isPluggedIn,
                 evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
-                chargeTime: .seconds(0)
+                plugType: plugType,
+                chargeTime: .seconds(Int64(chargeTimeMinutes * 60)),
+                targetSocAC: targetSocAC,
+                targetSocDC: targetSocDC
             )
             vehicle.gasRange = nil
 
@@ -249,9 +288,11 @@ struct FakeVehicleDetailView: View {
             vehicle.evStatus = VehicleStatus.EVStatus(
                 charging: isCharging,
                 chargeSpeed: chargeSpeed,
-                pluggedIn: isPluggedIn,
                 evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
-                chargeTime: .seconds(0)
+                plugType: plugType,
+                chargeTime: .seconds(Int64(chargeTimeMinutes * 60)),
+                targetSocAC: targetSocAC,
+                targetSocDC: targetSocDC
             )
         }
 
@@ -264,10 +305,12 @@ struct FakeVehicleDetailView: View {
         vehicle.evStatus = VehicleStatus.EVStatus(
             charging: isCharging,
             chargeSpeed: isCharging ? chargeSpeed : 0.0,
-            pluggedIn: isPluggedIn,
-                evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
-                chargeTime: .seconds(0)
-            )
+            evRange: VehicleStatus.FuelRange(range: evRange, percentage: batteryPercentage),
+            plugType: plugType,
+            chargeTime: .seconds(Int64(chargeTimeMinutes * 60)),
+            targetSocAC: targetSocAC,
+            targetSocDC: targetSocDC
+        )
         saveChanges()
     }
 

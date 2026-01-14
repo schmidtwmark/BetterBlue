@@ -31,7 +31,12 @@ class HTTPLogSinkManager {
     }
 
     func createLogSink() -> HTTPLogSink? {
-        guard let modelContainer, let deviceType else { return nil }
+        guard let deviceType else { return nil }
+        return createLogSink(for: deviceType)
+    }
+
+    func createLogSink(for deviceType: DeviceType) -> HTTPLogSink? {
+        guard let modelContainer else { return nil }
 
         return { httpLog in
             // Use detached task to prevent crashes if widget is killed
@@ -48,7 +53,7 @@ class HTTPLogSinkManager {
                     try context.save()
 
                     // Only clean up for non-widget contexts to avoid extended processing
-                    if deviceType != .widget {
+                    if deviceType != .widget && deviceType != .liveActivity {
                         try await self.cleanupOldLogs(context: context)
                     }
                 } catch {
@@ -64,17 +69,18 @@ class HTTPLogSinkManager {
         let allLogs = try context.fetch(logCountDescriptor)
 
         let maxLogs = 100
+        let deleteThreshold = 50
         if allLogs.count > maxLogs {
-            // Sort logs by timestamp (oldest first) and get the excess logs to delete
+            // Sort logs by timestamp (oldest first) and delete oldest 50
             let sortedLogs = allLogs.sorted { $0.log.timestamp < $1.log.timestamp }
-            let logsToDelete = sortedLogs.prefix(allLogs.count - maxLogs)
+            let logsToDelete = sortedLogs.prefix(deleteThreshold)
 
             for logToDelete in logsToDelete {
                 context.delete(logToDelete)
             }
 
             try context.save()
-            print("🧹 [HTTPLog] Cleaned up \(logsToDelete.count) old logs (keeping \(maxLogs) most recent)")
+            print("🧹 [HTTPLog] Cleaned up \(logsToDelete.count) old logs (now have \(allLogs.count - deleteThreshold) logs)")
         }
     }
 

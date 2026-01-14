@@ -43,7 +43,7 @@ struct EVRangeCardView: View {
             }
         }
         .padding()
-        .glassEffect()
+        .vehicleCardGlassEffect()
     }
 }
 
@@ -82,6 +82,6 @@ struct GasRangeCardView: View {
             }
         }
         .padding()
-        .glassEffect()
+        .vehicleCardGlassEffect()
     }
 }

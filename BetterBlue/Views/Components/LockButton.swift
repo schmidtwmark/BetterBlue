@@ -29,21 +29,23 @@ struct LockButton: View {
             action: { statusUpdater in
                 try await setLock(false, statusUpdater: statusUpdater)
             },
-            icon: "lock.fill",
+            icon: Image(systemName: "lock.fill"),
             label: "Unlock",
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
             color: .red,
+            menuIcon: Image(systemName: "lock.open.fill")
         )
         let lock = MainVehicleAction(
             action: { statusUpdater in
                 try await setLock(true, statusUpdater: statusUpdater)
             },
-            icon: "lock.open.fill",
+            icon: Image(systemName: "lock.open.fill"),
             label: "Lock",
             inProgressLabel: "Locking",
             completedText: "Locked",
             color: .green,
+            menuIcon: Image(systemName: "lock.fill")
         )
 
         VehicleControlButton(

@@ -10,6 +10,33 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+/// User preference for charge port type (affects DC plug icon display)
+enum ChargePortType: String, Codable, CaseIterable {
+    case ccs1 = "CCS1"
+    case ccs2 = "CCS2"
+    case nacs = "NACS"
+
+    var displayName: String {
+        rawValue
+    }
+
+    var dcPlugIcon: String {
+        switch self {
+        case .ccs1: return "ev.plug.dc.ccs1"
+        case .ccs2: return "ev.plug.dc.ccs2"
+        case .nacs: return "ev.plug.dc.nacs"
+        }
+    }
+
+    var acPlugIcon: String {
+        switch self {
+        case .ccs1: return "ev.plug.ac.type.1"
+        case .ccs2: return "ev.plug.ac.type.2"
+        case .nacs: return "ev.plug.dc.nacs"
+        }
+    }
+}
+
 @Model
 class BBVehicle {
     var id: UUID = UUID()
@@ -38,7 +65,14 @@ class BBVehicle {
     var sortOrder: Int = 0
     var backgroundColorName: String = "default"
     var watchBackgroundColorName: String = "charcoal"
+    var chargePortTypeRaw: String = ChargePortType.ccs1.rawValue
     var debugConfiguration: BBDebugConfiguration?
+    var debugLiveActivity: Bool = false
+
+    var chargePortType: ChargePortType {
+        get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
+        set { chargePortTypeRaw = newValue.rawValue }
+    }
 
     // Optional vehicle key for Kia vehicles
     @Transient var vehicleKey: String?
@@ -261,5 +295,21 @@ extension BBVehicle {
     var displayName: String {
         customName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ?
             customName! : model
+    }
+
+    /// Returns the appropriate plug icon based on current charging state and user's port type preference
+    func plugIcon(for plugType: VehicleStatus.PlugType?) -> Image {
+        guard let plugType else {
+            return Image("custom.powerplug.portrait.slash")
+        }
+
+        switch plugType {
+        case .unplugged:
+            return Image("custom.powerplug.portrait.slash")
+        case .acCharger:
+            return Image(systemName: chargePortType.acPlugIcon)
+        case .dcCharger:
+            return Image(systemName: chargePortType.dcPlugIcon)
+        }
     }
 }

@@ -1,0 +1,847 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		ED4A2D962E6135720071A54A /* BetterBlueWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ED4A2D762E61356F0071A54A /* BetterBlueWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		ED51C8972E706FCB0072B90D /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = ED51C8952E706FCB0072B90D /* LICENSE */; };
+		ED51C8982E706FCB0072B90D /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = ED51C8962E706FCB0072B90D /* README.md */; };
+		ED7002302E707C5F00C1CEEC /* BetterBlueKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED70022F2E707C5F00C1CEEC /* BetterBlueKit */; };
+		ED7002322E707C6800C1CEEC /* BetterBlueKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED7002312E707C6800C1CEEC /* BetterBlueKit */; };
+		ED7002342E707C6D00C1CEEC /* BetterBlueKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED7002332E707C6D00C1CEEC /* BetterBlueKit */; };
+		ED7054872E61F57000CA7926 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED7054862E61F57000CA7926 /* WidgetKit.framework */; };
+		ED7054892E61F57000CA7926 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED7054882E61F57000CA7926 /* SwiftUI.framework */; };
+		ED7054962E61F57100CA7926 /* WidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = ED7054852E61F57000CA7926 /* WidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		EDA7C77A2E41A8D700C3174B /* Highlight in Frameworks */ = {isa = PBXBuildFile; productRef = EDA7C7792E41A8D700C3174B /* Highlight */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		ED4A2D942E6135720071A54A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ED37F01C2DFB4E4F00C02398 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ED4A2D752E61356F0071A54A;
+			remoteInfo = "BetterBlueWatch Watch App";
+		};
+		ED7054942E61F57100CA7926 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ED37F01C2DFB4E4F00C02398 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ED7054842E61F57000CA7926;
+			remoteInfo = WidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		ED4A2D9A2E6135720071A54A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				ED4A2D962E6135720071A54A /* BetterBlueWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED7054972E61F57100CA7926 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				ED7054962E61F57100CA7926 /* WidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		ED37F0242DFB4E4F00C02398 /* BetterBlue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BetterBlue.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED4A2D762E61356F0071A54A /* BetterBlueWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BetterBlueWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED51C8952E706FCB0072B90D /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		ED51C8962E706FCB0072B90D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		ED7054852E61F57000CA7926 /* WidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED7054862E61F57000CA7926 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		ED7054882E61F57000CA7926 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		ED8110922F08B6F1003BD1FB /* live_activity.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = live_activity.js; sourceTree = "<group>"; };
+		ED8110932F08B730003BD1FB /* serverless.yml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = serverless.yml; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		ED4A2DAC2E6140280071A54A /* Exceptions for "BetterBlue" folder in "BetterBlueWatch Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/Account.swift,
+				Models/ClimatePreset.swift,
+				Models/ClimatePresetEntity.swift,
+				Models/HTTPLog.swift,
+				Models/SharedModelContainer.swift,
+				Models/Vehicle.swift,
+				Models/VehicleButtonAction.swift,
+				Utility/AnimationExtensions.swift,
+				Utility/APIClientFactory.swift,
+				Utility/AppSettings.swift,
+				Utility/Backgrounds.swift,
+				Utility/CachedAPIClient.swift,
+				Utility/Date.swift,
+				Utility/DiagnosticInfo.swift,
+				Utility/HTTPLogSinkManager.swift,
+				Utility/LiveActivityManager.swift,
+				Utility/SwiftDataFakeVehicleProvider.swift,
+				Utility/VehicleUtility.swift,
+			);
+			target = ED4A2D752E61356F0071A54A /* BetterBlueWatch Watch App */;
+		};
+		ED4E60132E6BDE2800F9ED90 /* Exceptions for "BetterBlueWatch Watch App" folder in "BetterBlue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BetterBlueIcon.icon,
+			);
+			target = ED37F0232DFB4E4F00C02398 /* BetterBlue */;
+		};
+		ED4E60142E6BDE2800F9ED90 /* Exceptions for "BetterBlueWatch Watch App" folder in "WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BetterBlueIcon.icon,
+			);
+			target = ED7054842E61F57000CA7926 /* WidgetExtension */;
+		};
+		ED70549B2E61F57100CA7926 /* Exceptions for "Widget" folder in "WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = ED7054842E61F57000CA7926 /* WidgetExtension */;
+		};
+		ED7054AC2E61F5C100CA7926 /* Exceptions for "BetterBlue" folder in "WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/Account.swift,
+				Models/ClimatePreset.swift,
+				Models/ClimatePresetEntity.swift,
+				Models/HTTPLog.swift,
+				Models/SharedModelContainer.swift,
+				Models/Vehicle.swift,
+				Models/VehicleButtonAction.swift,
+				Utility/APIClientFactory.swift,
+				Utility/AppSettings.swift,
+				Utility/Backgrounds.swift,
+				Utility/CachedAPIClient.swift,
+				Utility/Date.swift,
+				Utility/HTTPLogSinkManager.swift,
+				Utility/LiveActivityManager.swift,
+				Utility/SwiftDataFakeVehicleProvider.swift,
+				Utility/VehicleUtility.swift,
+			);
+			target = ED7054842E61F57000CA7926 /* WidgetExtension */;
+		};
+		EDA3DEA62E340CE200E05CFE /* Exceptions for "BetterBlue" folder in "BetterBlue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = ED37F0232DFB4E4F00C02398 /* BetterBlue */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		ED37F0262DFB4E4F00C02398 /* BetterBlue */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EDA3DEA62E340CE200E05CFE /* Exceptions for "BetterBlue" folder in "BetterBlue" target */,
+				ED4A2DAC2E6140280071A54A /* Exceptions for "BetterBlue" folder in "BetterBlueWatch Watch App" target */,
+				ED7054AC2E61F5C100CA7926 /* Exceptions for "BetterBlue" folder in "WidgetExtension" target */,
+			);
+			path = BetterBlue;
+			sourceTree = "<group>";
+		};
+		ED4A2D772E61356F0071A54A /* BetterBlueWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				ED4E60132E6BDE2800F9ED90 /* Exceptions for "BetterBlueWatch Watch App" folder in "BetterBlue" target */,
+				ED4E60142E6BDE2800F9ED90 /* Exceptions for "BetterBlueWatch Watch App" folder in "WidgetExtension" target */,
+			);
+			path = "BetterBlueWatch Watch App";
+			sourceTree = "<group>";
+		};
+		ED70548A2E61F57000CA7926 /* Widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				ED70549B2E61F57100CA7926 /* Exceptions for "Widget" folder in "WidgetExtension" target */,
+			);
+			path = Widget;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		ED37F0212DFB4E4F00C02398 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EDA7C77A2E41A8D700C3174B /* Highlight in Frameworks */,
+				ED7002302E707C5F00C1CEEC /* BetterBlueKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED4A2D732E61356F0071A54A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ED7002322E707C6800C1CEEC /* BetterBlueKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED7054822E61F57000CA7926 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ED7002342E707C6D00C1CEEC /* BetterBlueKit in Frameworks */,
+				ED7054892E61F57000CA7926 /* SwiftUI.framework in Frameworks */,
+				ED7054872E61F57000CA7926 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		ED37F01B2DFB4E4F00C02398 = {
+			isa = PBXGroup;
+			children = (
+				ED8110912F08B6DE003BD1FB /* LiveActivityBackend */,
+				ED51C8952E706FCB0072B90D /* LICENSE */,
+				ED51C8962E706FCB0072B90D /* README.md */,
+				ED37F0262DFB4E4F00C02398 /* BetterBlue */,
+				ED4A2D772E61356F0071A54A /* BetterBlueWatch Watch App */,
+				ED70548A2E61F57000CA7926 /* Widget */,
+				EDC9B1CD2DFC677000C602F4 /* Frameworks */,
+				ED37F0252DFB4E4F00C02398 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		ED37F0252DFB4E4F00C02398 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				ED37F0242DFB4E4F00C02398 /* BetterBlue.app */,
+				ED4A2D762E61356F0071A54A /* BetterBlueWatch Watch App.app */,
+				ED7054852E61F57000CA7926 /* WidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		ED8110912F08B6DE003BD1FB /* LiveActivityBackend */ = {
+			isa = PBXGroup;
+			children = (
+				ED8110922F08B6F1003BD1FB /* live_activity.js */,
+				ED8110932F08B730003BD1FB /* serverless.yml */,
+			);
+			path = LiveActivityBackend;
+			sourceTree = "<group>";
+		};
+		EDC9B1CD2DFC677000C602F4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				ED7054862E61F57000CA7926 /* WidgetKit.framework */,
+				ED7054882E61F57000CA7926 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		ED37F0232DFB4E4F00C02398 /* BetterBlue */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED37F0322DFB4E5100C02398 /* Build configuration list for PBXNativeTarget "BetterBlue" */;
+			buildPhases = (
+				ED37F0202DFB4E4F00C02398 /* Sources */,
+				ED37F0212DFB4E4F00C02398 /* Frameworks */,
+				ED37F0222DFB4E4F00C02398 /* Resources */,
+				ED4A2D9A2E6135720071A54A /* Embed Watch Content */,
+				ED7054972E61F57100CA7926 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				ED4A2D952E6135720071A54A /* PBXTargetDependency */,
+				ED7054952E61F57100CA7926 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				ED37F0262DFB4E4F00C02398 /* BetterBlue */,
+			);
+			name = BetterBlue;
+			packageProductDependencies = (
+				EDA7C7792E41A8D700C3174B /* Highlight */,
+				ED70022F2E707C5F00C1CEEC /* BetterBlueKit */,
+			);
+			productName = BetterBlue;
+			productReference = ED37F0242DFB4E4F00C02398 /* BetterBlue.app */;
+			productType = "com.apple.product-type.application";
+		};
+		ED4A2D752E61356F0071A54A /* BetterBlueWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED4A2D972E6135720071A54A /* Build configuration list for PBXNativeTarget "BetterBlueWatch Watch App" */;
+			buildPhases = (
+				ED4A2D722E61356F0071A54A /* Sources */,
+				ED4A2D732E61356F0071A54A /* Frameworks */,
+				ED4A2D742E61356F0071A54A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				ED4A2D772E61356F0071A54A /* BetterBlueWatch Watch App */,
+			);
+			name = "BetterBlueWatch Watch App";
+			packageProductDependencies = (
+				ED7002312E707C6800C1CEEC /* BetterBlueKit */,
+			);
+			productName = "BetterBlueWatch Watch App";
+			productReference = ED4A2D762E61356F0071A54A /* BetterBlueWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		ED7054842E61F57000CA7926 /* WidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED70549A2E61F57100CA7926 /* Build configuration list for PBXNativeTarget "WidgetExtension" */;
+			buildPhases = (
+				ED7054812E61F57000CA7926 /* Sources */,
+				ED7054822E61F57000CA7926 /* Frameworks */,
+				ED7054832E61F57000CA7926 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				ED70548A2E61F57000CA7926 /* Widget */,
+			);
+			name = WidgetExtension;
+			packageProductDependencies = (
+				ED7002332E707C6D00C1CEEC /* BetterBlueKit */,
+			);
+			productName = WidgetExtension;
+			productReference = ED7054852E61F57000CA7926 /* WidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		ED37F01C2DFB4E4F00C02398 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					ED37F0232DFB4E4F00C02398 = {
+						CreatedOnToolsVersion = 16.1;
+					};
+					ED4A2D752E61356F0071A54A = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					ED7054842E61F57000CA7926 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+				};
+			};
+			buildConfigurationList = ED37F01F2DFB4E4F00C02398 /* Build configuration list for PBXProject "BetterBlue" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = ED37F01B2DFB4E4F00C02398;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EDA7C7782E41A8D700C3174B /* XCRemoteSwiftPackageReference "Highlight" */,
+				ED70022E2E707C5F00C1CEEC /* XCLocalSwiftPackageReference "BetterBlueKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = ED37F0252DFB4E4F00C02398 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				ED37F0232DFB4E4F00C02398 /* BetterBlue */,
+				ED4A2D752E61356F0071A54A /* BetterBlueWatch Watch App */,
+				ED7054842E61F57000CA7926 /* WidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		ED37F0222DFB4E4F00C02398 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ED51C8972E706FCB0072B90D /* LICENSE in Resources */,
+				ED51C8982E706FCB0072B90D /* README.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED4A2D742E61356F0071A54A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED7054832E61F57000CA7926 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		ED37F0202DFB4E4F00C02398 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED4A2D722E61356F0071A54A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ED7054812E61F57000CA7926 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		ED4A2D952E6135720071A54A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ED4A2D752E61356F0071A54A /* BetterBlueWatch Watch App */;
+			targetProxy = ED4A2D942E6135720071A54A /* PBXContainerItemProxy */;
+		};
+		ED7054952E61F57100CA7926 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ED7054842E61F57000CA7926 /* WidgetExtension */;
+			targetProxy = ED7054942E61F57100CA7926 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		ED37F0302DFB4E5100C02398 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C2UW47HS8X;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		ED37F0312DFB4E5100C02398 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = C2UW47HS8X;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		ED37F0332DFB4E5100C02398 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = BetterBlueIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BetterBlue/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = "comgooglemaps waze maps";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ED37F0342DFB4E5100C02398 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = BetterBlueIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BetterBlue/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = "comgooglemaps waze maps";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ED4A2D982E6135720071A54A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = BetterBlueIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markschmidt.BetterBlue;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		ED4A2D992E6135720071A54A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = BetterBlueIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markschmidt.BetterBlue;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		ED7054982E61F57100CA7926 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ED7054992E61F57100CA7926 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2026.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		ED37F01F2DFB4E4F00C02398 /* Build configuration list for PBXProject "BetterBlue" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ED37F0302DFB4E5100C02398 /* Debug */,
+				ED37F0312DFB4E5100C02398 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ED37F0322DFB4E5100C02398 /* Build configuration list for PBXNativeTarget "BetterBlue" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ED37F0332DFB4E5100C02398 /* Debug */,
+				ED37F0342DFB4E5100C02398 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ED4A2D972E6135720071A54A /* Build configuration list for PBXNativeTarget "BetterBlueWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ED4A2D982E6135720071A54A /* Debug */,
+				ED4A2D992E6135720071A54A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ED70549A2E61F57100CA7926 /* Build configuration list for PBXNativeTarget "WidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ED7054982E61F57100CA7926 /* Debug */,
+				ED7054992E61F57100CA7926 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		ED70022E2E707C5F00C1CEEC /* XCLocalSwiftPackageReference "BetterBlueKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = BetterBlueKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EDA7C7782E41A8D700C3174B /* XCRemoteSwiftPackageReference "Highlight" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nkristek/Highlight?tab=readme-ov-file";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		ED70022F2E707C5F00C1CEEC /* BetterBlueKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ED70022E2E707C5F00C1CEEC /* XCLocalSwiftPackageReference "BetterBlueKit" */;
+			productName = BetterBlueKit;
+		};
+		ED7002312E707C6800C1CEEC /* BetterBlueKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ED70022E2E707C5F00C1CEEC /* XCLocalSwiftPackageReference "BetterBlueKit" */;
+			productName = BetterBlueKit;
+		};
+		ED7002332E707C6D00C1CEEC /* BetterBlueKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ED70022E2E707C5F00C1CEEC /* XCLocalSwiftPackageReference "BetterBlueKit" */;
+			productName = BetterBlueKit;
+		};
+		EDA7C7792E41A8D700C3174B /* Highlight */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EDA7C7782E41A8D700C3174B /* XCRemoteSwiftPackageReference "Highlight" */;
+			productName = Highlight;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = ED37F01C2DFB4E4F00C02398 /* Project object */;
+}

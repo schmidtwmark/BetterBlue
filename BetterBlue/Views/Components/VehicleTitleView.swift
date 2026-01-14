@@ -185,7 +185,7 @@ struct VehicleTitleView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showRefreshSuccess)
             }
             .padding()
-            .glassEffect()
+            .vehicleCardGlassEffect()
         } primaryAction: {
             Task {
                 await onRefreshRequested()

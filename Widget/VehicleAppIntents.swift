@@ -5,13 +5,122 @@
 //  Created by Mark Schmidt on 8/29/25.
 //
 
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 import AppIntents
 import BetterBlueKit
 import SwiftData
 import UserNotifications
 import WidgetKit
 
-// MARK: - Siri Shortcut Intents
+// MARK: - AppEnum Conformance for LiveActivityType
+
+extension LiveActivityType: AppEnum {
+    public static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Activity Type")
+    }
+
+    public static var caseDisplayRepresentations: [LiveActivityType: DisplayRepresentation] {
+        [
+            .climate: DisplayRepresentation(title: "Climate"),
+            .charging: DisplayRepresentation(title: "Charging"),
+            .none: DisplayRepresentation(title: "None"),
+        ]
+    }
+
+    public static var allCases: [LiveActivityType] {
+        [.climate, .charging, .none]
+    }
+}
+
+// MARK: - Live Activity Intents
+
+struct StopLiveActivityIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Stop Live Activity"
+    static var description = IntentDescription("Stop the current activity (climate or charging)")
+
+    @Parameter(title: "VIN")
+    var vin: String
+
+    @Parameter(title: "Activity Type")
+    var activityType: LiveActivityType
+
+    init() {
+        vin = ""
+        activityType = .none
+    }
+
+    init(vin: String, activityType: LiveActivityType) {
+        self.vin = vin
+        self.activityType = activityType
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        #if canImport(ActivityKit)
+        print("🛑 [StopLiveActivityIntent] Starting for VIN: \(vin), type: \(activityType)")
+
+        // Find the existing activity
+        let activities = Activity<VehicleActivityAttributes>.activities
+        guard let existingActivity = activities.first(where: { $0.attributes.vin == vin }) else {
+            print("❌ [StopLiveActivityIntent] No activity found for VIN: \(vin)")
+            return .result()
+        }
+
+        // Fetch the vehicle and account
+        let modelContainer = try createSharedModelContainer()
+        let context = ModelContext(modelContainer)
+        let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
+
+        guard let bbVehicle = vehicles.first(where: { $0.vin == vin }),
+              let account = bbVehicle.account
+        else {
+            print("❌ [StopLiveActivityIntent] Vehicle or account not found for VIN: \(vin)")
+            return .result()
+        }
+
+        // Send the appropriate stop command
+        do {
+            switch activityType {
+            case .climate:
+                print("🛑 [StopLiveActivityIntent] Stopping climate...")
+                try await account.stopClimate(bbVehicle, modelContext: context)
+            case .charging:
+                print("🛑 [StopLiveActivityIntent] Stopping charge...")
+                try await account.stopCharge(bbVehicle, modelContext: context)
+            case .debug:
+                print("🛑 [StopLiveActivityIntent] Stopping debug activity...")
+                bbVehicle.debugLiveActivity = false
+                try context.save()
+            case .none:
+                print("⚠️ [StopLiveActivityIntent] Activity type is .none, nothing to stop")
+            }
+
+            // End the Live Activity
+            await existingActivity.end(nil, dismissalPolicy: .immediate)
+            print("✅ [StopLiveActivityIntent] Activity ended successfully")
+
+            // Send notification
+            let actionName: String
+            switch activityType {
+            case .climate: actionName = "Climate"
+            case .charging: actionName = "Charging"
+            case .debug: actionName = "Debug"
+            case .none: actionName = "Activity"
+            }
+            await sendNotification(title: "\(actionName) Stop Sent", body: "Command sent to \(bbVehicle.displayName)")
+
+        } catch {
+            print("❌ [StopLiveActivityIntent] Error: \(error)")
+        }
+
+        return .result()
+        #else
+        return .result()
+        #endif
+    }
+}
 
 struct RefreshVehicleStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Vehicle Status"
@@ -254,49 +363,35 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 struct StartClimateControlIntent: ControlConfigurationIntent {
     static var title: LocalizedStringResource = "Start Climate Control"
     static var description = IntentDescription("Start climate control for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static var openAppWhenRun: Bool = true  // Must open app to start Live Activity
 
     @Parameter(title: "Preset", description: "The climate control preset to use")
     var preset: ClimatePresetEntity?
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let targetVin: String
-        let vehicleName: String
-        let presetId: UUID?
-
-        if let preset {
-            targetVin = preset.vehicleVin
-            vehicleName = preset.vehicleName
-            presetId = preset.id
-        } else {
+    func perform() async throws -> some IntentResult & OpensIntent {
+        guard let preset else {
             throw IntentError.noPresetSelected
         }
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            var options: ClimateOptions?
-            if let presetId {
-                let predicate = #Predicate<ClimatePreset> { $0.id == presetId }
-                let descriptor = FetchDescriptor(predicate: predicate)
-                if let preset = try? context.fetch(descriptor).first {
-                    options = preset.climateOptions
-                }
-            }
-            print("Starting climate from intent, options: \(bbVehicle.safeClimatePresets)")
-            try await account.startClimate(bbVehicle, options: options, modelContext: context)
+        // Build URL with all parameters for the main app to handle
+        // The main app will start the Live Activity and send the command
+        var components = URLComponents()
+        components.scheme = "betterblue"
+        components.host = "startClimate"
+        components.path = "/\(preset.vehicleVin)"
+        components.queryItems = [
+            URLQueryItem(name: "presetId", value: preset.id.uuidString),
+            URLQueryItem(name: "presetName", value: preset.presetName),
+            URLQueryItem(name: "presetIcon", value: preset.presetIcon),
+        ]
+
+        guard let url = components.url else {
+            throw IntentError.vehicleNotFound
         }
 
-        var dialog: IntentDialog
-        if let preset = preset {
-            dialog = "Climate start request sent to \(vehicleName) with preset \(preset.presetName)"
-            await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(vehicleName) with preset \(preset.presetName)")
-        } else {
-            dialog = "Climate start request sent to \(vehicleName)"
-            await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(vehicleName)")
-        }
-
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
-        return .result(dialog: dialog)
+        print("🚗 [StartClimateControlIntent] Opening app with URL: \(url)")
+        return .result(opensIntent: OpenURLIntent(url))
     }
 }
 
@@ -333,7 +428,7 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
 struct StartChargeControlIntent: ControlConfigurationIntent {
     static var title: LocalizedStringResource = "Start Charging"
     static var description = IntentDescription("Start charging for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static var openAppWhenRun: Bool = true  // Must open app to start Live Activity
 
     @Parameter(
         title: "Vehicle",
@@ -342,21 +437,19 @@ struct StartChargeControlIntent: ControlConfigurationIntent {
     var vehicle: VehicleEntity?
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult & OpensIntent {
         guard let vehicle else {
             throw IntentError.noVehicleSelected
         }
-        let targetVin = vehicle.vin
-        let vehicleName = vehicle.displayName
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.startCharge(bbVehicle, modelContext: context)
+        // Build URL for the main app to handle
+        // The main app will start the Live Activity and send the command
+        guard let url = URL(string: "betterblue://startCharge/\(vehicle.vin)") else {
+            throw IntentError.vehicleNotFound
         }
 
-        await sendNotification(title: "Charge Request Sent", body: "Command sent to \(vehicleName)")
-
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
-        return .result(dialog: "Charge request sent to \(vehicleName)")
+        print("🔌 [StartChargeControlIntent] Opening app with URL: \(url)")
+        return .result(opensIntent: OpenURLIntent(url))
     }
 }
 

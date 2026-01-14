@@ -1,0 +1,70 @@
+org: schmidtmark
+app: betterblue-live-activity
+service: betterblue-live-activity
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    TABLE_NAME: betterblue-wakeup-schedules-v4
+    # APNs credentials - set these via environment variables
+    APNS_KEY_ID: ${env:APNS_KEY_ID, 'LRNJLUAH2P'}
+    APNS_TEAM_ID: ${env:APNS_TEAM_ID, 'C2UW47HS8X'}
+    APNS_BUNDLE_ID: ${env:APNS_BUNDLE_ID, 'com.markschmidt.BetterBlue'}
+    APNS_ENVIRONMENT: ${opt:stage, 'dev'}  # 'dev' uses sandbox, 'prod' uses production
+    APNS_KEY: ${ssm:/betterblue/apns-key}  # Stored in AWS SSM Parameter Store
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+            - dynamodb:Query
+          Resource:
+            - Fn::GetAtt: [WakeUpTable, Arn]
+  # Fix for API Gateway CloudWatch role issue
+  logs:
+    restApi: false
+
+functions:
+  registerWakeUp:
+    handler: handler.registerWakeUp
+    events:
+      - http:
+          path: wakeup
+          method: post
+          cors: true
+
+  unregisterWakeUp:
+    handler: handler.unregisterWakeUp
+    events:
+      - http:
+          path: wakeup/unregister
+          method: post
+          cors: true
+
+  sendWakeUps:
+    handler: handler.sendWakeUps
+    events:
+      - schedule: rate(1 minute)
+    timeout: 60
+
+resources:
+  Resources:
+    WakeUpTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: betterblue-wakeup-schedules-v4
+        AttributeDefinitions:
+          - AttributeName: pushToken
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pushToken
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST

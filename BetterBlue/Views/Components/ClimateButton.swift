@@ -70,31 +70,32 @@ struct ClimateButton: View {
             action: { statusUpdater in
                 try await setClimate(true, statusUpdater: statusUpdater)
             },
-            icon: "fan",
+            icon: Image(systemName: "fan"),
             label: "Start Climate",
             inProgressLabel: "Starting Climate",
             completedText: climateStartedText,
             color: .blue,
+            menuIcon: Image(systemName: "fan")
         )
 
         let stopClimate = MainVehicleAction(
             action: { statusUpdater in
                 try await setClimate(false, statusUpdater: statusUpdater)
             },
-            icon: "fan",
+            icon: Image(systemName: "fan"),
             label: "Stop Climate",
             inProgressLabel: "Stopping Climate",
             completedText: "Climate control stopped",
             color: .blue,
             additionalText: climateRunningText,
             shouldRotate: true,
-            menuIcon: "fan.slash",
+            menuIcon: Image(systemName: "fan.slash")
         )
 
         let showClimateSettings = MenuVehicleAction(
             action: { _ in showSettings() },
-            icon: "gearshape.fill",
-            label: "Climate Settings",
+            icon: Image(systemName: "gearshape.fill"),
+            label: "Climate Settings"
         )
 
         let startPresets = filteredPresets.filter { !$0.isSelected }.map { preset in
@@ -107,8 +108,8 @@ struct ClimateButton: View {
                         options: options,
                     )
                 },
-                icon: preset.iconName,
-                label: "Start \(preset.name)",
+                icon: Image(systemName: preset.iconName),
+                label: "Start \(preset.name)"
             )
         }
 
@@ -143,9 +144,19 @@ struct ClimateButton: View {
                 bbVehicle,
                 options: climateOptions,
                 modelContext: context,
+                presetName: effectivePreset?.name,
+                presetIcon: effectivePreset?.iconName
             )
         } else {
             try await account.stopClimate(bbVehicle, modelContext: context)
+
+            // Immediately fetch status to update Live Activity
+            // This ensures the Live Activity ends even if waitForStatusChange times out
+            do {
+                try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
+            } catch {
+                print("⚠️ [ClimateButton] Failed to fetch status after stop command: \(error)")
+            }
         }
 
         try await bbVehicle.waitForStatusChange(

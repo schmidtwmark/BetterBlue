@@ -62,24 +62,22 @@ private struct SingleAnimationModifier: ViewModifier {
     }
 }
 
-public extension View {
-    @ViewBuilder func `if`(_ condition: @autoclosure () -> Bool, transform: (Self) -> some View) -> some View {
-        if condition() {
-            transform(self)
+extension View {
+    @ViewBuilder
+    func spin(_ active: Bool, duration: Double = 2.0) -> some View {
+        if active {
+            modifier(SingleAnimationModifier(kind: .spin, duration: duration))
         } else {
             self
         }
     }
 
-    func spin(_ active: Bool, duration: Double = 2.0) -> some View {
-        self.if(active, transform: { view in
-            view.modifier(SingleAnimationModifier(kind: .spin, duration: duration))
-        })
-    }
-
+    @ViewBuilder
     func pulse(_ active: Bool, duration: Double = 2.0) -> some View {
-        self.if(active, transform: { view in
-            view.modifier(SingleAnimationModifier(kind: .pulse(range: 1.0 ... 1.4), duration: duration))
-        })
+        if active {
+            modifier(SingleAnimationModifier(kind: .pulse(range: 1.0 ... 1.2), duration: duration))
+        } else {
+            self
+        }
     }
 }

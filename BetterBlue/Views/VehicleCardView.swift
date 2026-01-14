@@ -86,7 +86,7 @@ struct VehicleCardView: View {
                     }
                 }
                 .padding()
-                .glassEffect()
+                .vehicleCardGlassEffect()
             }
 
             VehicleTitleView(
@@ -103,13 +103,14 @@ struct VehicleCardView: View {
             )
 
             // Vehicle status info
-            // EV Range Card (if available)
+            // EV Range Display (if available)
             if let evStatus = safeEvStatus {
-                EVRangeCardView(evStatus: evStatus)
+                EVRangeDisplayCard(evStatus: evStatus)
+            }
 
-                if evStatus.pluggedIn {
-                    ChargingButton(bbVehicle: bbVehicle, transition: transition)
-                }
+            // Charging Control Button (if EV)
+            if safeEvStatus != nil {
+                ChargingButton(bbVehicle: bbVehicle, transition: transition)
             }
 
             // Gas Range Card (if available)

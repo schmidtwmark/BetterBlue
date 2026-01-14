@@ -159,6 +159,10 @@ class CachedAPIClient: APIClientProtocol {
             return
         }
 
+        // Invalidate cached status for this vehicle before sending command
+        // This ensures subsequent fetches get fresh data reflecting the command's effect
+        invalidateStatusCache(for: vehicle.vin)
+
         // Create new request task
         let task = Task<Void, any Error> {
             defer {
@@ -171,6 +175,14 @@ class CachedAPIClient: APIClientProtocol {
 
         ongoingRequests[requestKey] = TypedOngoingRequest(task: task)
         try await task.value
+    }
+
+    /// Invalidates the cached status for a specific vehicle
+    func invalidateStatusCache(for vin: String) {
+        let cacheKey = CacheKey.fetchVehicleStatus(vin: vin)
+        if cache.removeValue(forKey: cacheKey) != nil {
+            print("🧹 [CachedAPIClient] Invalidated status cache for VIN: \(vin)")
+        }
     }
 
     // MARK: - Cache Management

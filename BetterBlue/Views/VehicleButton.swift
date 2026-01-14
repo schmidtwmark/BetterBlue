@@ -53,7 +53,11 @@ struct VehicleControlButton: View {
                 }, label: {
                     let iconToUse = (action as? MainVehicleAction)?.menuIcon ??
                         action.icon
-                    Label(action.label, systemImage: iconToUse)
+                    Label {
+                        Text(action.label)
+                    } icon: {
+                        iconToUse
+                    }
                 })
             }
         } label: {
@@ -67,7 +71,7 @@ struct VehicleControlButton: View {
                     .font(.subheadline)
 
                 } else {
-                    Image(systemName: currentAction.icon)
+                    currentAction.icon
                         .foregroundColor(currentAction.color)
                         .spin(currentAction.shouldRotate)
                         .pulse(currentAction.shouldPulse)
@@ -134,7 +138,7 @@ struct VehicleControlButton: View {
                 }
             }
             .padding()
-            .glassEffect()
+            .vehicleCardGlassEffect()
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
