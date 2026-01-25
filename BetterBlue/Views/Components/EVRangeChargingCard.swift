@@ -86,6 +86,7 @@ struct EVRangeChargingCard: View {
             inProgressLabel: "Starting Charge",
             completedText: "Charging started",
             color: .gray,
+            stateLabel: "Plugged In",
             menuIcon: Image(systemName: "bolt.fill")
         )
 
@@ -98,6 +99,7 @@ struct EVRangeChargingCard: View {
             inProgressLabel: "Stopping Charge",
             completedText: "Charge stopped",
             color: .green,
+            stateLabel: "Charging",
             menuIcon: Image(systemName: "bolt.slash")
         )
 

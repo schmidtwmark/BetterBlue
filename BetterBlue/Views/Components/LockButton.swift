@@ -34,6 +34,8 @@ struct LockButton: View {
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
             color: .red,
+            stateLabel: "Locked",
+            quickActionColor: .green,
             menuIcon: Image(systemName: "lock.open.fill")
         )
         let lock = MainVehicleAction(
@@ -45,6 +47,8 @@ struct LockButton: View {
             inProgressLabel: "Locking",
             completedText: "Locked",
             color: .green,
+            stateLabel: "Unlocked",
+            quickActionColor: .red,
             menuIcon: Image(systemName: "lock.fill")
         )
 

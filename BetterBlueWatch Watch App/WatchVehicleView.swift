@@ -72,11 +72,12 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performLockAction(shouldLock: true, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "lock.fill"),
+            icon: Image(systemName: "lock.open.fill"),
             label: "Lock",
             inProgressLabel: "Locking",
             completedText: "Locked",
-            color: .green
+            color: .red,
+            stateLabel: "Unlocked"
         )
     }
 
@@ -85,11 +86,12 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performLockAction(shouldLock: false, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "lock.open.fill"),
+            icon: Image(systemName: "lock.fill"),
             label: "Unlock",
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
-            color: .red
+            color: .green,
+            stateLabel: "Locked"
         )
     }
 
@@ -98,11 +100,12 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performClimateAction(shouldStart: true, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "fan"),
+            icon: Image(systemName: "fan.slash"),
             label: "Start Climate",
             inProgressLabel: "Starting",
             completedText: "Started",
-            color: .blue
+            color: .secondary,
+            stateLabel: "Climate Off"
         )
     }
 
@@ -116,6 +119,7 @@ struct WatchVehicleView: View {
             inProgressLabel: "Stopping",
             completedText: "Stopped",
             color: .blue,
+            stateLabel: "Climate Running",
             shouldRotate: true
         )
     }
@@ -129,7 +133,8 @@ struct WatchVehicleView: View {
             label: "Start Charge",
             inProgressLabel: "Starting",
             completedText: "Charging",
-            color: .gray
+            color: .secondary,
+            stateLabel: "Not Charging"
         )
     }
 
@@ -143,6 +148,7 @@ struct WatchVehicleView: View {
             inProgressLabel: "Stopping",
             completedText: "Stopped",
             color: .green,
+            stateLabel: "Charging",
             shouldPulse: true
         )
     }
@@ -391,7 +397,7 @@ struct WatchVehicleButton: View {
             }
             .frame(width: 24, height: 24)
 
-            Text(inProgressAction?.inProgressLabel ?? currentAction.label)
+            Text(inProgressAction?.inProgressLabel ?? currentAction.stateLabel)
                 .fontWeight(.medium)
                 .lineLimit(1)
             Spacer()

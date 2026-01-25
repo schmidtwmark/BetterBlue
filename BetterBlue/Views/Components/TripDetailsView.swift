@@ -16,6 +16,7 @@ struct TripDetailsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var appSettings = AppSettings.shared
+    @State private var showEnergyBreakdown = false
 
     var body: some View {
         Group {
@@ -82,13 +83,20 @@ struct TripDetailsView: View {
 
     private var tripListView: some View {
         List {
-            // Efficiency chart section
+            // Energy usage chart section
             Section {
-                efficiencyChartView
+                energyUsageChartView
                     .frame(height: 200)
                     .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
             } header: {
-                Text("Efficiency Trend")
+                HStack {
+                    Text("Energy Usage")
+                    Spacer()
+                    Toggle("Breakdown", isOn: $showEnergyBreakdown)
+                        .toggleStyle(.button)
+                        .buttonStyle(.bordered)
+                        .font(.caption)
+                }
             }
 
             // Trip list section
@@ -102,43 +110,132 @@ struct TripDetailsView: View {
         }
     }
 
-    private var efficiencyChartView: some View {
-        Chart(trips.reversed()) { trip in
-            LineMark(
-                x: .value("Time", trip.startDate),
-                y: .value("Efficiency", trip.efficiency)
-            )
-            .foregroundStyle(Color.green.gradient)
-            .interpolationMethod(.catmullRom)
-
-            PointMark(
-                x: .value("Time", trip.startDate),
-                y: .value("Efficiency", trip.efficiency)
-            )
-            .foregroundStyle(Color.green)
+    private var energyUsageChartView: some View {
+        Group {
+            if showEnergyBreakdown {
+                stackedEnergyChart
+            } else {
+                totalEnergyChart
+            }
         }
+        .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
+        .padding(.horizontal)
+    }
+
+    /// Indexed trips for categorical x-axis (oldest first for left-to-right display)
+    private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
+        Array(trips.reversed().enumerated().map { ($0.offset, $0.element) })
+    }
+
+    private func formatTripTime(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute())
+    }
+
+    private var totalEnergyChart: some View {
+        Chart(indexedTrips, id: \.index) { item in
+            BarMark(
+                x: .value("Trip", formatTripTime(item.trip.startDate)),
+                y: .value("Energy", Double(item.trip.totalEnergyUsed) / 1000.0)
+            )
+            .foregroundStyle(by: .value("Category", "Total"))
+            .cornerRadius(4)
+        }
+        .chartForegroundStyleScale([
+            "Total": Color.orange
+        ])
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let efficiency = value.as(Double.self) {
-                        Text(String(format: "%.1f", efficiency))
+                    if let energy = value.as(Double.self) {
+                        Text(String(format: "%.1f", energy))
                     }
                 }
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                AxisGridLine()
+            AxisMarks { value in
                 AxisValueLabel {
-                    if let date = value.as(Date.self) {
-                        Text(date, format: .dateTime.hour().minute())
+                    if let label = value.as(String.self) {
+                        Text(label)
+                            .font(.caption2)
                     }
                 }
             }
         }
-        .chartYAxisLabel("mi/kWh", position: .leading)
-        .padding(.horizontal)
+        .chartYAxisLabel("kWh", position: .leading)
+        .chartLegend(position: .bottom, spacing: 8)
+    }
+
+    private var stackedEnergyChart: some View {
+        Chart(energyBreakdownData) { dataPoint in
+            BarMark(
+                x: .value("Trip", dataPoint.tripLabel),
+                y: .value("Energy", dataPoint.energy)
+            )
+            .foregroundStyle(by: .value("Category", dataPoint.category))
+            .cornerRadius(4)
+        }
+        .chartForegroundStyleScale([
+            "Drivetrain": Color.orange,
+            "Climate": Color.blue,
+            "Accessories": Color.purple,
+            "Battery Care": Color.cyan
+        ])
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let energy = value.as(Double.self) {
+                        Text(String(format: "%.1f", energy))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { value in
+                AxisValueLabel {
+                    if let label = value.as(String.self) {
+                        Text(label)
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .chartYAxisLabel("kWh", position: .leading)
+        .chartLegend(position: .bottom, spacing: 8)
+    }
+
+    /// Data points for the stacked energy breakdown chart
+    private var energyBreakdownData: [EnergyDataPoint] {
+        indexedTrips.flatMap { item -> [EnergyDataPoint] in
+            let tripLabel = formatTripTime(item.trip.startDate)
+            var points: [EnergyDataPoint] = [
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Drivetrain",
+                    energy: Double(item.trip.drivetrainEnergy) / 1000.0
+                ),
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Climate",
+                    energy: Double(item.trip.climateEnergy) / 1000.0
+                ),
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Accessories",
+                    energy: Double(item.trip.accessoriesEnergy) / 1000.0
+                )
+            ]
+            if item.trip.batteryCareEnergy > 0 {
+                points.append(EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Battery Care",
+                    energy: Double(item.trip.batteryCareEnergy) / 1000.0
+                ))
+            }
+            return points
+        }
     }
 
     private func loadTripDetails() async {
@@ -164,6 +261,16 @@ struct TripDetailsView: View {
 
         isLoading = false
     }
+}
+
+// MARK: - Energy Data Point
+
+/// Data point for the stacked energy breakdown chart
+struct EnergyDataPoint: Identifiable {
+    let id = UUID()
+    let tripLabel: String
+    let category: String
+    let energy: Double
 }
 
 // MARK: - Trip Detail Row
@@ -409,6 +516,7 @@ private struct TripDetailsPreviewContent: View {
     let isLoading: Bool
     let errorMessage: String?
     @State private var appSettings = AppSettings.shared
+    @State private var showEnergyBreakdown = false
 
     var body: some View {
         Group {
@@ -449,46 +557,26 @@ private struct TripDetailsPreviewContent: View {
             } else {
                 List {
                     Section {
-                        Chart(trips.reversed()) { trip in
-                            LineMark(
-                                x: .value("Time", trip.startDate),
-                                y: .value("Efficiency", trip.efficiency)
-                            )
-                            .foregroundStyle(Color.green.gradient)
-                            .interpolationMethod(.catmullRom)
-
-                            PointMark(
-                                x: .value("Time", trip.startDate),
-                                y: .value("Efficiency", trip.efficiency)
-                            )
-                            .foregroundStyle(Color.green)
-                        }
-                        .chartYAxis {
-                            AxisMarks(position: .leading) { value in
-                                AxisGridLine()
-                                AxisValueLabel {
-                                    if let efficiency = value.as(Double.self) {
-                                        Text(String(format: "%.1f", efficiency))
-                                    }
-                                }
+                        Group {
+                            if showEnergyBreakdown {
+                                stackedEnergyChart
+                            } else {
+                                totalEnergyChart
                             }
                         }
-                        .chartXAxis {
-                            AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                                AxisGridLine()
-                                AxisValueLabel {
-                                    if let date = value.as(Date.self) {
-                                        Text(date, format: .dateTime.hour().minute())
-                                    }
-                                }
-                            }
-                        }
-                        .chartYAxisLabel("mi/kWh", position: .leading)
+                        .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
                         .padding(.horizontal)
                         .frame(height: 200)
                         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
                     } header: {
-                        Text("Efficiency Trend")
+                        HStack {
+                            Text("Energy Usage")
+                            Spacer()
+                            Toggle("Breakdown", isOn: $showEnergyBreakdown)
+                                .toggleStyle(.button)
+                                .buttonStyle(.bordered)
+                                .font(.caption)
+                        }
                     }
 
                     Section {
@@ -500,6 +588,120 @@ private struct TripDetailsPreviewContent: View {
                     }
                 }
             }
+        }
+    }
+
+    private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
+        Array(trips.reversed().enumerated().map { ($0.offset, $0.element) })
+    }
+
+    private func formatTripTime(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute())
+    }
+
+    private var totalEnergyChart: some View {
+        Chart(indexedTrips, id: \.index) { item in
+            BarMark(
+                x: .value("Trip", formatTripTime(item.trip.startDate)),
+                y: .value("Energy", Double(item.trip.totalEnergyUsed) / 1000.0)
+            )
+            .foregroundStyle(by: .value("Category", "Total"))
+            .cornerRadius(4)
+        }
+        .chartForegroundStyleScale([
+            "Total": Color.orange
+        ])
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let energy = value.as(Double.self) {
+                        Text(String(format: "%.1f", energy))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { value in
+                AxisValueLabel {
+                    if let label = value.as(String.self) {
+                        Text(label)
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .chartYAxisLabel("kWh", position: .leading)
+        .chartLegend(position: .bottom, spacing: 8)
+    }
+
+    private var stackedEnergyChart: some View {
+        Chart(energyBreakdownData) { dataPoint in
+            BarMark(
+                x: .value("Trip", dataPoint.tripLabel),
+                y: .value("Energy", dataPoint.energy)
+            )
+            .foregroundStyle(by: .value("Category", dataPoint.category))
+            .cornerRadius(4)
+        }
+        .chartForegroundStyleScale([
+            "Drivetrain": Color.orange,
+            "Climate": Color.blue,
+            "Accessories": Color.purple,
+            "Battery Care": Color.cyan
+        ])
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let energy = value.as(Double.self) {
+                        Text(String(format: "%.1f", energy))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { value in
+                AxisValueLabel {
+                    if let label = value.as(String.self) {
+                        Text(label)
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .chartYAxisLabel("kWh", position: .leading)
+        .chartLegend(position: .bottom, spacing: 8)
+    }
+
+    private var energyBreakdownData: [EnergyDataPoint] {
+        indexedTrips.flatMap { item -> [EnergyDataPoint] in
+            let tripLabel = formatTripTime(item.trip.startDate)
+            var points: [EnergyDataPoint] = [
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Drivetrain",
+                    energy: Double(item.trip.drivetrainEnergy) / 1000.0
+                ),
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Climate",
+                    energy: Double(item.trip.climateEnergy) / 1000.0
+                ),
+                EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Accessories",
+                    energy: Double(item.trip.accessoriesEnergy) / 1000.0
+                )
+            ]
+            if item.trip.batteryCareEnergy > 0 {
+                points.append(EnergyDataPoint(
+                    tripLabel: tripLabel,
+                    category: "Battery Care",
+                    energy: Double(item.trip.batteryCareEnergy) / 1000.0
+                ))
+            }
+            return points
         }
     }
 }

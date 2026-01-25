@@ -68,11 +68,13 @@ struct ClimateButton: View {
             action: { statusUpdater in
                 try await setClimate(true, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "fan"),
+            icon: Image(systemName: "fan.slash"),
             label: "Start Climate",
             inProgressLabel: "Starting Climate",
             completedText: climateStartedText,
-            color: .blue,
+            color: .secondary,
+            stateLabel: "Climate Off",
+            quickActionColor: .blue,
             menuIcon: Image(systemName: "fan")
         )
 
@@ -85,7 +87,8 @@ struct ClimateButton: View {
             inProgressLabel: "Stopping Climate",
             completedText: "Climate control stopped",
             color: .blue,
-            additionalText: climateRunningText,
+            stateLabel: climateRunningText.isEmpty ? "Climate Running" : climateRunningText,
+            quickActionColor: .secondary,
             shouldRotate: true,
             menuIcon: Image(systemName: "fan.slash")
         )

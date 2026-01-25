@@ -39,6 +39,14 @@ struct ChargingButton: View {
         bbVehicle.plugIcon(for: evStatus?.plugType)
     }
 
+    var notChargingStateLabel: String {
+        if isPluggedIn {
+            "Ready to Charge"
+        } else {
+            "Unplugged"
+        }
+    }
+
     var body: some View {
         let startCharging = MainVehicleAction(
             action: { statusUpdater in
@@ -48,18 +56,22 @@ struct ChargingButton: View {
             label: "Start Charge",
             inProgressLabel: "Starting Charge",
             completedText: "Charging started",
-            color: .gray,
+            color: isPluggedIn ? .blue : .secondary,
+            stateLabel: notChargingStateLabel,
+            quickActionColor: .green,
             menuIcon: Image(systemName: "bolt.fill")
         )
         let stopCharging = MainVehicleAction(
             action: { statusUpdater in
                 try await setCharge(false, statusUpdater: statusUpdater)
             },
-            icon: plugIcon,
+            icon: Image(systemName: "bolt.fill"),
             label: "Stop Charge",
             inProgressLabel: "Stopping Charge",
             completedText: "Charge stopped",
             color: .green,
+            stateLabel: "Charging",
+            quickActionColor: .secondary,
             shouldPulse: true,
             menuIcon: Image(systemName: "bolt.slash")
         )

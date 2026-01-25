@@ -33,13 +33,15 @@ struct MenuVehicleAction: VehicleAction {
 
 struct MainVehicleAction: VehicleAction {
     var action: VehicleButtonAction
-    var icon: Image
-    var label: String
+    var icon: Image // Icon showing current state when this is the primary action
+    var label: String // Action label (e.g., "Unlock")
     var inProgressLabel: String
     var completedText: String
-    var color: Color
+    var color: Color // Color for the state icon
+    var stateLabel: String // Label showing current state (e.g., "Locked")
+    var quickActionColor: Color = .accentColor // Color for the quick action button icon
     var additionalText: String = ""
     var shouldPulse: Bool = false
     var shouldRotate: Bool = false
-    var menuIcon: Image? // Optional alternative icon for menu items
+    var menuIcon: Image? // Alternative icon for menu items and quick action button
 }

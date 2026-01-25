@@ -43,104 +43,78 @@ struct VehicleControlButton: View {
         currentActionDeterminant()
     }
 
+    /// The icon to use for the quick action button
+    private var quickActionIcon: Image {
+        currentAction.menuIcon ?? currentAction.icon
+    }
+
+    /// Fixed height for both the status section and quick action button
+    private let buttonHeight: CGFloat = 52
+
+    /// Fixed width for status icons to ensure text alignment
+    private let statusIconWidth: CGFloat = 24
+
     var body: some View {
+        HStack(spacing: 8) {
+            // Left side: Status display with context menu
+            statusButton
+
+            // Right side: Quick action button
+            quickActionButton
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - Status Button (Left Side)
+
+    @ViewBuilder
+    private var statusButton: some View {
         Menu {
-            ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
-                Button(action: {
-                    currentTask = Task {
-                        await performAction(action: action)
-                    }
-                }, label: {
-                    let iconToUse = (action as? MainVehicleAction)?.menuIcon ??
-                        action.icon
-                    Label {
-                        Text(action.label)
-                    } icon: {
-                        iconToUse
-                    }
-                })
-            }
+            actionMenuContent
         } label: {
-            HStack {
-                if let inProgressAction {
-                    ProgressView()
-                    Text(
-                        "\(inProgressAction.inProgressLabel)\(animatedDots)",
-                    )
+            statusButtonLabel
+        }
+    }
+
+    @ViewBuilder
+    private var statusButtonLabel: some View {
+        HStack {
+            // State icon and label
+            if let inProgressAction {
+                Text("\(inProgressAction.inProgressLabel)\(animatedDots)")
                     .foregroundColor(.primary)
                     .font(.subheadline)
-
-                } else {
-                    currentAction.icon
-                        .foregroundColor(currentAction.color)
-                        .spin(currentAction.shouldRotate)
-                        .pulse(currentAction.shouldPulse)
-                    Text(currentAction.label)
-                        .foregroundColor(.primary)
-                        .font(.subheadline)
-                }
-
-                Spacer()
-
-                switch message {
-                case let .error(errorMessage):
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                        Text(errorMessage)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.red)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(6)
-                case let .warning(warningMessage):
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text(warningMessage)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.orange)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(6)
-                case let .loading(loadingMessage):
-                    Text(loadingMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                case let .normal(normalMessage):
-                    Text(normalMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                case .empty:
-                    Text(currentAction.additionalText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if inProgressAction != nil {
-                    ZStack {
-                        Circle()
-                            .fill(Color.red.opacity(0.2))
-                            .frame(width: 24, height: 24)
-
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.red)
-                    }
-                }
+            } else {
+                currentAction.icon
+                    .foregroundColor(currentAction.color)
+                    .spin(currentAction.shouldRotate)
+                    .pulse(currentAction.shouldPulse)
+                    .frame(width: statusIconWidth)
+                Text(currentAction.stateLabel)
+                    .foregroundColor(.primary)
+                    .font(.subheadline)
             }
-            .padding()
-            .vehicleCardGlassEffect()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+
+            Spacer()
+
+            // Message display
+            messageView
+        }
+        .padding()
+        .frame(height: buttonHeight)
+        .vehicleCardGlassEffect()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Quick Action Button (Right Side)
+
+    @ViewBuilder
+    private var quickActionButton: some View {
+        Menu {
+            actionMenuContent
+        } label: {
+            quickActionButtonLabel
         }
         primaryAction: {
             if inProgressAction != nil {
@@ -149,6 +123,92 @@ struct VehicleControlButton: View {
                 currentTask = Task {
                     await performAction(action: currentAction)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var quickActionButtonLabel: some View {
+        Group {
+            if inProgressAction != nil {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                quickActionIcon
+                    .foregroundColor(currentAction.quickActionColor)
+            }
+        }
+        .frame(width: buttonHeight, height: buttonHeight)
+        .vehicleCardGlassEffect()
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Shared Menu Content
+
+    @ViewBuilder
+    private var actionMenuContent: some View {
+        ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
+            Button(action: {
+                currentTask = Task {
+                    await performAction(action: action)
+                }
+            }, label: {
+                let iconToUse = (action as? MainVehicleAction)?.menuIcon ?? action.icon
+                Label {
+                    Text(action.label)
+                } icon: {
+                    iconToUse
+                }
+            })
+        }
+    }
+
+    // MARK: - Message View
+
+    @ViewBuilder
+    private var messageView: some View {
+        switch message {
+        case let .error(errorMessage):
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                Text(errorMessage)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.red)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(6)
+        case let .warning(warningMessage):
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                Text(warningMessage)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.orange)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(6)
+        case let .loading(loadingMessage):
+            Text(loadingMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case let .normal(normalMessage):
+            Text(normalMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case .empty:
+            if !currentAction.additionalText.isEmpty {
+                Text(currentAction.additionalText)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
     }
