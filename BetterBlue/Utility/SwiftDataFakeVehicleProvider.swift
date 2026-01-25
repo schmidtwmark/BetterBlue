@@ -61,7 +61,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
 
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
-        print("🔧 [SwiftDataFakeVehicleProvider] Initialized with SwiftData context")
+        BBLogger.info(.fakeAPI, "SwiftDataFakeVehicleProvider: Initialized with SwiftData context")
     }
 
     public func getFakeVehicles(for _: String, accountId: UUID) async throws -> [Vehicle] {
@@ -73,7 +73,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         let descriptor = FetchDescriptor<BBVehicle>(predicate: accountPredicate)
         let existingVehicles = try modelContext.fetch(descriptor)
 
-        print("🔍 [SwiftDataFakeVehicleProvider] Found \(existingVehicles.count) existing fake vehicles for account")
+        BBLogger.debug(.fakeAPI, "SwiftDataFakeVehicleProvider: Found \(existingVehicles.count) existing fake vehicles for account")
         return existingVehicles.map { $0.toVehicle() }
     }
 
@@ -98,13 +98,13 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         // Update the BBVehicle directly based on the command
         switch command {
         case .lock:
-            print("🟢 [FakeAPI] Locking fake vehicle '\(bbVehicle.vin)'")
+            BBLogger.info(.fakeAPI, "FakeAPI: Locking fake vehicle '\(bbVehicle.vin)'")
             bbVehicle.lockStatus = .locked
         case .unlock:
-            print("🟢 [FakeAPI] Unlocking fake vehicle '\(bbVehicle.vin)'")
+            BBLogger.info(.fakeAPI, "FakeAPI: Unlocking fake vehicle '\(bbVehicle.vin)'")
             bbVehicle.lockStatus = .unlocked
         case let .startClimate(options):
-            print("🟢 [FakeAPI] Starting climate for fake vehicle '\(bbVehicle.vin)' at \(options.temperature.value)°")
+            BBLogger.info(.fakeAPI, "FakeAPI: Starting climate for fake vehicle '\(bbVehicle.vin)' at \(options.temperature.value)°")
             bbVehicle.climateStatus = VehicleStatus.ClimateStatus(
                 defrostOn: options.defrost,
                 airControlOn: options.climate,
@@ -112,7 +112,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                 temperature: options.temperature,
             )
         case .stopClimate:
-            print("🟢 [FakeAPI] Stopping climate for fake vehicle '\(bbVehicle.vin)'")
+            BBLogger.info(.fakeAPI, "FakeAPI: Stopping climate for fake vehicle '\(bbVehicle.vin)'")
             if let currentClimate = bbVehicle.climateStatus {
                 bbVehicle.climateStatus = VehicleStatus.ClimateStatus(
                     defrostOn: false,
@@ -122,7 +122,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                 )
             }
         case .startCharge:
-            print("🟢 [FakeAPI] Starting charge for fake vehicle '\(bbVehicle.vin)'")
+            BBLogger.info(.fakeAPI, "FakeAPI: Starting charge for fake vehicle '\(bbVehicle.vin)'")
             if let evStatus = bbVehicle.evStatus {
                 let batteryPercentage = evStatus.evRange.percentage
                 // Calculate reasonable charge time: assume 50 kW charging speed, ~1% per minute
@@ -140,7 +140,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                 )
             }
         case .stopCharge:
-            print("🟢 [FakeAPI] Stopping charge for fake vehicle '\(bbVehicle.vin)'")
+            BBLogger.info(.fakeAPI, "FakeAPI: Stopping charge for fake vehicle '\(bbVehicle.vin)'")
             if let evStatus = bbVehicle.evStatus {
                 bbVehicle.evStatus = VehicleStatus.EVStatus(
                     charging: false,
@@ -153,7 +153,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                 )
             }
         case let .setTargetSOC(acLevel, dcLevel):
-            print("🟢 [FakeAPI] Setting target SOC for fake vehicle '\(bbVehicle.vin)' - AC: \(acLevel)%, DC: \(dcLevel)%")
+            BBLogger.info(.fakeAPI, "FakeAPI: Setting target SOC for fake vehicle '\(bbVehicle.vin)' - AC: \(acLevel)%, DC: \(dcLevel)%")
             if let evStatus = bbVehicle.evStatus {
                 bbVehicle.evStatus = VehicleStatus.EVStatus(
                     charging: evStatus.charging,
@@ -171,7 +171,7 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
 
         // Save changes to SwiftData
         try modelContext.save()
-        print("💾 [SwiftDataFakeVehicleProvider] Saved vehicle status changes to SwiftData")
+        BBLogger.debug(.fakeAPI, "SwiftDataFakeVehicleProvider: Saved vehicle status changes to SwiftData")
     }
 
     public func shouldFailCredentialValidation(accountId: UUID) async throws -> Bool {
@@ -277,7 +277,12 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                 temperature: Temperature(value: 70, units: .fahrenheit)
             ),
             odometer: bbVehicle.odometer,
-            syncDate: bbVehicle.syncDate ?? Date()
+            syncDate: bbVehicle.syncDate ?? Date(),
+            battery12V: bbVehicle.battery12V,
+            doorOpen: bbVehicle.doorOpen,
+            trunkOpen: bbVehicle.trunkOpen,
+            hoodOpen: bbVehicle.hoodOpen,
+            tirePressureWarning: bbVehicle.tirePressureWarning
         )
 
         // Set lastUpdated separately since it's not part of the constructor

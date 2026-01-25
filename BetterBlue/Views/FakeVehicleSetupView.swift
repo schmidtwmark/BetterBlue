@@ -35,6 +35,19 @@ struct FakeVehicleDetailView: View {
     @State private var latitude: Double = 37.7749
     @State private var longitude: Double = -122.4194
 
+    // Additional status fields
+    @State private var battery12V: Double = 80
+    @State private var frontLeftDoorOpen: Bool = false
+    @State private var frontRightDoorOpen: Bool = false
+    @State private var backLeftDoorOpen: Bool = false
+    @State private var backRightDoorOpen: Bool = false
+    @State private var trunkOpen: Bool = false
+    @State private var hoodOpen: Bool = false
+    @State private var tirePressureWarningFL: Bool = false
+    @State private var tirePressureWarningFR: Bool = false
+    @State private var tirePressureWarningRL: Bool = false
+    @State private var tirePressureWarningRR: Bool = false
+
     private var hasElectric: Bool {
         vehicleType == .electric || vehicleType == .pluginHybrid
     }
@@ -198,6 +211,55 @@ struct FakeVehicleDetailView: View {
             } header: {
                 Text("Status")
             }
+
+            Section {
+                HStack {
+                    Text("12V Battery")
+                    Spacer()
+                    Text("\(Int(battery12V))%")
+                        .foregroundColor(battery12V < 50 ? .orange : .secondary)
+                }
+                Slider(value: $battery12V, in: 0 ... 100, step: 1)
+                    .onChange(of: battery12V) { _, _ in updateAdditionalStatus() }
+            } header: {
+                Text("12V Battery")
+            }
+
+            Section {
+                Toggle("Front Left", isOn: $frontLeftDoorOpen)
+                    .onChange(of: frontLeftDoorOpen) { _, _ in updateDoorStatus() }
+                Toggle("Front Right", isOn: $frontRightDoorOpen)
+                    .onChange(of: frontRightDoorOpen) { _, _ in updateDoorStatus() }
+                Toggle("Back Left", isOn: $backLeftDoorOpen)
+                    .onChange(of: backLeftDoorOpen) { _, _ in updateDoorStatus() }
+                Toggle("Back Right", isOn: $backRightDoorOpen)
+                    .onChange(of: backRightDoorOpen) { _, _ in updateDoorStatus() }
+                Toggle("Trunk", isOn: $trunkOpen)
+                    .onChange(of: trunkOpen) { _, newValue in
+                        vehicle.trunkOpen = newValue
+                        saveChanges()
+                    }
+                Toggle("Hood", isOn: $hoodOpen)
+                    .onChange(of: hoodOpen) { _, newValue in
+                        vehicle.hoodOpen = newValue
+                        saveChanges()
+                    }
+            } header: {
+                Text("Doors & Openings")
+            }
+
+            Section {
+                Toggle("Front Left", isOn: $tirePressureWarningFL)
+                    .onChange(of: tirePressureWarningFL) { _, _ in updateTirePressure() }
+                Toggle("Front Right", isOn: $tirePressureWarningFR)
+                    .onChange(of: tirePressureWarningFR) { _, _ in updateTirePressure() }
+                Toggle("Rear Left", isOn: $tirePressureWarningRL)
+                    .onChange(of: tirePressureWarningRL) { _, _ in updateTirePressure() }
+                Toggle("Rear Right", isOn: $tirePressureWarningRR)
+                    .onChange(of: tirePressureWarningRR) { _, _ in updateTirePressure() }
+            } header: {
+                Text("Tire Pressure Warnings")
+            }
         }
         .navigationTitle("Vehicle Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -245,6 +307,26 @@ struct FakeVehicleDetailView: View {
 
         if let gasRange = vehicle.gasRange {
             fuelPercentage = gasRange.percentage
+        }
+
+        // Load additional status fields
+        battery12V = Double(vehicle.battery12V ?? 80)
+
+        if let doorOpen = vehicle.doorOpen {
+            frontLeftDoorOpen = doorOpen.frontLeft
+            frontRightDoorOpen = doorOpen.frontRight
+            backLeftDoorOpen = doorOpen.backLeft
+            backRightDoorOpen = doorOpen.backRight
+        }
+
+        trunkOpen = vehicle.trunkOpen ?? false
+        hoodOpen = vehicle.hoodOpen ?? false
+
+        if let tirePressure = vehicle.tirePressureWarning {
+            tirePressureWarningFL = tirePressure.frontLeft
+            tirePressureWarningFR = tirePressure.frontRight
+            tirePressureWarningRL = tirePressure.rearLeft
+            tirePressureWarningRR = tirePressure.rearRight
         }
     }
 
@@ -334,7 +416,33 @@ struct FakeVehicleDetailView: View {
             defrostOn: climateOn,
             airControlOn: climateOn,
             steeringWheelHeatingOn: false,
-            temperature: Temperature(value: temperature, units: .fahrenheit),
+            temperature: Temperature(value: temperature, units: .fahrenheit)
+        )
+        saveChanges()
+    }
+
+    private func updateAdditionalStatus() {
+        vehicle.battery12V = Int(battery12V)
+        saveChanges()
+    }
+
+    private func updateDoorStatus() {
+        vehicle.doorOpen = VehicleStatus.DoorStatus(
+            frontLeft: frontLeftDoorOpen,
+            frontRight: frontRightDoorOpen,
+            backLeft: backLeftDoorOpen,
+            backRight: backRightDoorOpen
+        )
+        saveChanges()
+    }
+
+    private func updateTirePressure() {
+        vehicle.tirePressureWarning = VehicleStatus.TirePressureWarning(
+            frontLeft: tirePressureWarningFL,
+            frontRight: tirePressureWarningFR,
+            rearLeft: tirePressureWarningRL,
+            rearRight: tirePressureWarningRR,
+            all: false
         )
         saveChanges()
     }
@@ -344,7 +452,7 @@ struct FakeVehicleDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to save vehicle changes: \(error)")
+            BBLogger.error(.app, "Failed to save vehicle changes: \(error)")
         }
     }
 }

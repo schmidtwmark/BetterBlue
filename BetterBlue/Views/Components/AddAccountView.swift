@@ -181,10 +181,10 @@ struct AddAccountView: View {
                         } else if selectedBrand != .fake && selectedRegion != .usa {
                             let regionDetail = try? AttributedString(
                                 markdown: "If you'd like to help bring BetterBlue to your region, " +
-                                          "please consider [contributing to the open source project]\n" +
+                                          "please consider [contributing to the open source project]" +
                                           "(https://github.com/schmidtwmark/BetterBlueKit)."
                             )
-                            ErrorBox(headline: "Regions other than US are untested and are unlikely to work correctly.", detail: regionDetail)
+                            ErrorBox(headline: "Regions other than US are unsupported.", detail: regionDetail)
                         }        }
     }
 
@@ -469,11 +469,11 @@ struct AddAccountView: View {
             return
         }
 
-        print("💡 [AddAccountView] sendMFACode called with notifyType: \(notifyType)")
+        BBLogger.debug(.app, "AddAccountView: sendMFACode called with notifyType: \(notifyType)")
         Task {
             do {
                 try await account.sendMFA(otpKey: otpKey, xid: xid, notifyType: notifyType)
-                print("💡 [AddAccountView] account.sendMFA successful")
+                BBLogger.debug(.app, "AddAccountView: account.sendMFA successful")
                 await MainActor.run {
                     self.showingMFA = true
                 }
@@ -515,7 +515,7 @@ struct AddAccountView: View {
 
             for fakeVehicle in fakeVehicles {
                 fakeVehicle.accountId = account.id
-                print("Inserting vehicle \(fakeVehicle.vin)")
+                BBLogger.debug(.app, "AddAccountView: Inserting vehicle \(fakeVehicle.vin)")
                 modelContext.insert(fakeVehicle)
                 account.vehicles?.append(fakeVehicle)
             }

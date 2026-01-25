@@ -5,6 +5,7 @@
 //  Created by Mark Schmidt on 8/25/25.
 //
 
+import BetterBlueKit
 import SwiftData
 import SwiftUI
 import WidgetKit
@@ -24,7 +25,7 @@ struct BackgroundSelectionView: View {
                         // Force widget timeline refresh to update background
                         WidgetCenter.shared.reloadAllTimelines()
                     } catch {
-                        print("Failed to save background color: \(error)")
+                        BBLogger.error(.app, "BackgroundSelectionView: Failed to save background color: \(error)")
                     }
                 } label: {
                     VStack(spacing: 12) {

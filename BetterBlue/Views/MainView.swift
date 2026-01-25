@@ -26,6 +26,8 @@ struct MainView: View {
     @State private var markerMenuPosition = CGPoint.zero
     @State private var isLoading = false
     @State private var lastError: APIError?
+    @State private var isRefreshing = false
+    @State private var showRefreshSuccess = false
 
     @State private var screenHeight: CGFloat = 0
     @State private var mapRegion = MKCoordinateRegion(
@@ -106,9 +108,7 @@ struct MainView: View {
             mainContent
                 .onAppear {
                     screenHeight = geometry.size.height
-                    print(
-                        "🖥️ [MapCentering] Screen height initialized: \(Int(screenHeight))px",
-                    )
+                    BBLogger.debug(.app, "MapCentering: Screen height initialized: \(Int(screenHeight))px")
                     centerOnFirstAvailableVehicle(reason: "initial view appearance")
                     Task {
                         await loadVehiclesForAllAccounts()
@@ -143,9 +143,7 @@ struct MainView: View {
                                 reason: "vehicles removed, recentering (onChange)",
                             )
                         } else {
-                            print(
-                                "🗺️ [MapCentering] Vehicles added, but keeping current position",
-                            )
+                            BBLogger.debug(.app, "MapCentering: Vehicles added, but keeping current position")
                         }
                     }
                 }
@@ -220,7 +218,30 @@ struct MainView: View {
                     )
             }
             .toolbar {
-                ToolbarItem {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            await refreshCurrentVehicle()
+                        }
+                    } label: {
+                        Group {
+                            if isRefreshing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else if showRefreshSuccess {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                        }
+                    }
+                    .disabled(isRefreshing || currentVehicle == nil)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isRefreshing)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showRefreshSuccess)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape.fill") {
                         showingSettings = true
                     }.labelStyle(.iconOnly)
@@ -238,19 +259,15 @@ extension MainView {
     private func updateMapRegion(
         reason: String = "unknown",
     ) {
-        print(
-            "🗺️ [MapCentering] updateMapRegion called - \(reason)",
-        )
+        BBLogger.debug(.app, "MapCentering: updateMapRegion called - \(reason)")
 
         guard let vehicle = currentVehicle else {
-            print("❌ [MapCentering] No current vehicle selected")
+            BBLogger.error(.app, "MapCentering: No current vehicle selected")
             return
         }
 
         guard vehicle.coordinate != nil else {
-            print(
-                "❌ [MapCentering] Vehicle \(vehicle.displayName) has no coordinate",
-            )
+            BBLogger.error(.app, "MapCentering: Vehicle \(vehicle.displayName) has no coordinate")
             return
         }
 
@@ -266,9 +283,7 @@ extension MainView {
             span: MapCenteringConfig.defaultSpan,
         )
 
-        print(
-            "🗺️ [MapCentering] Updating map region for \(vehicle.displayName)",
-        )
+        BBLogger.debug(.app, "MapCentering: Updating map region for \(vehicle.displayName)")
 
         withAnimation(
             .easeInOut(duration: MapCenteringConfig.animationDuration),
@@ -281,9 +296,7 @@ extension MainView {
     private func centerOnFirstAvailableVehicle(
         reason: String = "initial load",
     ) {
-        print(
-            "🗺️ [MapCentering] centerOnFirstAvailableVehicle called - \(reason)",
-        )
+        BBLogger.debug(.app, "MapCentering: centerOnFirstAvailableVehicle called - \(reason)")
 
         // Find first vehicle with location data
         if let firstVehicleWithLocation = displayedVehicles.first(where: {
@@ -295,9 +308,7 @@ extension MainView {
                 reason: "centering on \(firstVehicleWithLocation.displayName)",
             )
         } else {
-            print(
-                "❌ [MapCentering] No vehicles with location data found",
-            )
+            BBLogger.error(.app, "MapCentering: No vehicles with location data found")
         }
     }
 }
@@ -307,10 +318,9 @@ extension MainView {
 extension MainView {
     /// Initialize the view from SwiftData (no separate cache needed)
     private func initializeFromSwiftData() {
-        print("🗺️ [MapCentering] Available vehicles: \(displayedVehicles.count)")
+        BBLogger.debug(.app, "MapCentering: Available vehicles: \(displayedVehicles.count)")
         for (index, vehicle) in displayedVehicles.enumerated() {
-            print("🗺️ [MapCentering]   Vehicle \(index): \(vehicle.displayName) - " +
-                "has coordinate: \(vehicle.coordinate != nil)")
+            BBLogger.debug(.app, "MapCentering: Vehicle \(index): \(vehicle.displayName) - has coordinate: \(vehicle.coordinate != nil)")
         }
         if let firstVehicleWithLocation = displayedVehicles.first(where: {
             $0.coordinate != nil
@@ -344,11 +354,10 @@ extension MainView {
                 hasSuccessfulAccount = true
             } catch {
                 if let apiError = error as? APIError {
-                    print("⚠️ [MainView] Failed to load vehicles for account '\(account.username)': \(apiError.message)")
+                    BBLogger.warning(.app, "MainView: Failed to load vehicles for account '\(account.username)': \(apiError.message)")
                     latestError = apiError
                 } else {
-                    print("❌ [MainView] Failed to load vehicles for account '\(account.username)': " +
-                        "\(error.localizedDescription)")
+                    BBLogger.error(.app, "MainView: Failed to load vehicles for account '\(account.username)': \(error.localizedDescription)")
                     latestError = APIError(
                         message: error.localizedDescription,
                     )
@@ -398,7 +407,46 @@ extension MainView {
                 }
 
             } catch {
-                print("⚠️ [MainView] Failed to load status for vehicle \(bbVehicle.vin): \(error)")
+                BBLogger.warning(.app, "MainView: Failed to load status for vehicle \(bbVehicle.vin): \(error)")
+            }
+        }
+    }
+
+    private func refreshCurrentVehicle() async {
+        guard let vehicle = currentVehicle else { return }
+
+        await MainActor.run {
+            isRefreshing = true
+            showRefreshSuccess = false
+        }
+
+        do {
+            guard let account = vehicle.account else {
+                throw APIError(message: "Account not found for vehicle")
+            }
+
+            try await account.fetchAndUpdateVehicleStatus(for: vehicle, modelContext: modelContext)
+
+            await MainActor.run {
+                isRefreshing = false
+                showRefreshSuccess = true
+                lastError = nil
+
+                WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+
+                // Hide success indicator after 2 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        showRefreshSuccess = false
+                    }
+                }
+            }
+        } catch {
+            await MainActor.run {
+                isRefreshing = false
+                showRefreshSuccess = false
+                BBLogger.error(.app, "MainView: Error refreshing vehicle \(vehicle.vin): \(error)")
             }
         }
     }

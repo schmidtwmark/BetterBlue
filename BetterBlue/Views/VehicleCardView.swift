@@ -31,7 +31,7 @@ struct VehicleCardView: View {
     private var safeEvStatus: VehicleStatus.EVStatus? {
         // Check if the vehicle is properly attached to a context before accessing properties
         guard bbVehicle.modelContext != nil else {
-            print("⚠️ [VehicleCardView] BBVehicle \(bbVehicle.vin) is detached from context")
+            BBLogger.warning(.app, "VehicleCardView: BBVehicle \(bbVehicle.vin) is detached from context")
             return nil
         }
         return bbVehicle.evStatus
@@ -41,7 +41,7 @@ struct VehicleCardView: View {
     private var safeGasRange: VehicleStatus.FuelRange? {
         // Check if the vehicle is properly attached to a context before accessing properties
         guard bbVehicle.modelContext != nil else {
-            print("⚠️ [VehicleCardView] BBVehicle \(bbVehicle.vin) is detached from context")
+            BBLogger.warning(.app, "VehicleCardView: BBVehicle \(bbVehicle.vin) is detached from context")
             return nil
         }
         return bbVehicle.gasRange
@@ -51,7 +51,7 @@ struct VehicleCardView: View {
     private var safeLocation: VehicleStatus.Location? {
         // Check if the vehicle is properly attached to a context before accessing properties
         guard bbVehicle.modelContext != nil else {
-            print("⚠️ [VehicleCardView] BBVehicle \(bbVehicle.vin) is detached from context")
+            BBLogger.warning(.app, "VehicleCardView: BBVehicle \(bbVehicle.vin) is detached from context")
             return nil
         }
         return bbVehicle.location
@@ -92,14 +92,9 @@ struct VehicleCardView: View {
             VehicleTitleView(
                 bbVehicle: bbVehicle,
                 bbVehicles: bbVehicles,
-                isRefreshing: isRefreshing,
-                showRefreshSuccess: showRefreshSuccess,
                 onVehicleSelected: onVehicleSelected,
                 accounts: accounts,
-                onRefreshRequested: {
-                    await refreshStatus()
-                },
-                transition: transition,
+                transition: transition
             )
 
             // Vehicle status info
@@ -216,7 +211,7 @@ struct VehicleCardView: View {
 
                 // Only show error if it's not a cancellation
                 if !Task.isCancelled, !(error is CancellationError) {
-                    print("❌ [VehicleCardView] Error fetching vehicle status for \(bbVehicle.vin): \(error)")
+                    BBLogger.error(.app, "VehicleCardView: Error fetching vehicle status for \(bbVehicle.vin): \(error)")
                     handleError(error)
                 }
             }
@@ -236,7 +231,7 @@ struct VehicleCardView: View {
             lastAPIError = nil
             errorMessage = AttributedString("Failed to refresh: \(error.localizedDescription)")
         }
-        print("🔍 [VehicleCardView] Detailed error for vehicle \(bbVehicle.vin): \(error)")
+        BBLogger.debug(.app, "VehicleCardView: Detailed error for vehicle \(bbVehicle.vin): \(error)")
     }
 
     fileprivate func getUserFriendlyErrorMessageForGeneralError(_ error: APIError) -> String {

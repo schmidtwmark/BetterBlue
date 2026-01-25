@@ -20,11 +20,11 @@ extension MainView {
         // Check if status is older than 5 minutes
         if let lastUpdated = vehicle.lastUpdated,
            lastUpdated > Date().addingTimeInterval(-300) {
-            print("🔄 [MainView] Vehicle \(vehicle.displayName) status is fresh, skipping refresh")
+            BBLogger.info(.app, "MainView: Vehicle \(vehicle.displayName) status is fresh, skipping refresh")
             return
         }
 
-        print("🔄 [MainView] Refreshing status for selected vehicle: \(vehicle.displayName)")
+        BBLogger.info(.app, "MainView: Refreshing status for selected vehicle: \(vehicle.displayName)")
 
         do {
             if let account = vehicle.account {
@@ -38,10 +38,10 @@ extension MainView {
                     WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
                 }
 
-                print("✅ [MainView] Successfully refreshed \(vehicle.displayName)")
+                BBLogger.info(.app, "MainView: Successfully refreshed \(vehicle.displayName)")
             }
         } catch {
-            print("❌ [MainView] Failed to refresh vehicle \(vehicle.displayName): \(error)")
+            BBLogger.error(.app, "MainView: Failed to refresh vehicle \(vehicle.displayName): \(error)")
         }
     }
 }

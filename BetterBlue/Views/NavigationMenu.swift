@@ -5,6 +5,7 @@
 //  Navigation utilities for launching different mapping applications
 //
 
+import BetterBlueKit
 import CoreLocation
 import SwiftUI
 import UIKit
@@ -91,21 +92,21 @@ enum NavigationHelper {
         destinationName: String? = nil,
     ) {
         guard let url = app.navigationURL(to: coordinate, destinationName: destinationName) else {
-            print("❌ [NavigationHelper] Could not create URL for \(app.rawValue)")
+            BBLogger.error(.app, "NavigationHelper: Could not create URL for \(app.rawValue)")
             return
         }
 
-        print("🗺️ [NavigationHelper] Opening \(app.rawValue) with URL: \(url.absoluteString)")
+        BBLogger.debug(.app, "NavigationHelper: Opening \(app.rawValue) with URL: \(url.absoluteString)")
 
         UIApplication.shared.open(url) { success in
             if success {
-                print("✅ [NavigationHelper] Successfully opened \(app.rawValue)")
+                BBLogger.info(.app, "NavigationHelper: Successfully opened \(app.rawValue)")
             } else {
-                print("❌ [NavigationHelper] Failed to open \(app.rawValue) with URL: \(url.absoluteString)")
+                BBLogger.error(.app, "NavigationHelper: Failed to open \(app.rawValue) with URL: \(url.absoluteString)")
 
                 // If the app failed to open and it's not Apple Maps, try to open in Apple Maps as fallback
                 if app != .appleMaps {
-                    print("🔄 [NavigationHelper] Falling back to Apple Maps...")
+                    BBLogger.info(.app, "NavigationHelper: Falling back to Apple Maps...")
                     if let appleUrl = MapApp.appleMaps.navigationURL(to: coordinate, destinationName: destinationName) {
                         UIApplication.shared.open(appleUrl)
                     }

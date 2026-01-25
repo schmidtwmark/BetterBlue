@@ -117,7 +117,7 @@ struct AccountInfoView: View {
                                 do {
                                     try modelContext.save()
                                 } catch {
-                                    print("Failed to show vehicle: \(error)")
+                                    BBLogger.error(.app, "Failed to show vehicle: \(error)")
                                 }
                             }
                             .buttonStyle(.borderless)

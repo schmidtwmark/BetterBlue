@@ -47,7 +47,7 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
 
     switch effectiveBrand {
     case .hyundai:
-        print("🏗️ [APIClientFactory] Creating Hyundai API client")
+        BBLogger.info(.api, "APIClientFactory: Creating Hyundai API client")
         let endpointProvider = HyundaiAPIEndpointProvider(configuration: configuration.apiConfiguration)
         let underlyingClient = HyundaiAPIClient(
             configuration: configuration.apiConfiguration,
@@ -55,7 +55,7 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         )
         return CachedAPIClient(underlyingClient: underlyingClient)
     case .kia:
-        print("🏗️ [APIClientFactory] Creating Kia API client")
+        BBLogger.info(.api, "APIClientFactory: Creating Kia API client")
         let endpointProvider = KiaAPIEndpointProvider(configuration: configuration.apiConfiguration)
         let underlyingClient = KiaAPIClient(
             configuration: configuration.apiConfiguration,
@@ -63,7 +63,7 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         )
         return CachedAPIClient(underlyingClient: underlyingClient)
     case .fake:
-        print("🏗️ [APIClientFactory] Creating SwiftData-based Fake API client")
+        BBLogger.info(.api, "APIClientFactory: Creating SwiftData-based Fake API client")
         let vehicleProvider = SwiftDataFakeVehicleProvider(modelContext: configuration.modelContext)
         let underlyingClient = FakeAPIClient(
             configuration: configuration.apiConfiguration,

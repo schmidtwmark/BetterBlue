@@ -1,4 +1,5 @@
 import AppIntents
+import BetterBlueKit
 import SwiftData
 
 struct ClimatePresetEntity: AppEntity, Sendable {
@@ -77,7 +78,7 @@ private struct ClimatePresetFetcher {
 
             return entities
         } catch {
-            print("Failed to fetch presets: \(error)")
+            BBLogger.error(.app, "Failed to fetch presets: \(error)")
             return []
         }
     }

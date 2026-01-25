@@ -106,7 +106,7 @@ struct FakeVehicleListView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to save vehicle changes: \(error)")
+            BBLogger.error(.app, "Failed to save vehicle changes: \(error)")
         }
     }
 

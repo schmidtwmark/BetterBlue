@@ -295,7 +295,7 @@ private extension DateFormatter {
             do {
                 try context.save()
             } catch {
-                print("Failed to save preview context: \(error)")
+                BBLogger.error(.app, "Failed to save preview context: \(error)")
             }
 
             return NavigationView {

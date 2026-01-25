@@ -31,9 +31,7 @@ struct ClimateButton: View {
 
     var isClimateOn: Bool {
         guard bbVehicle.modelContext != nil else {
-            print(
-                "⚠️ [ClimateButton] BBVehicle \(bbVehicle.vin) is detached from context",
-            )
+            BBLogger.warning(.app, "ClimateButton: BBVehicle \(bbVehicle.vin) is detached from context")
             return false
         }
         return bbVehicle.climateStatus?.airControlOn ?? false
@@ -155,7 +153,7 @@ struct ClimateButton: View {
             do {
                 try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
             } catch {
-                print("⚠️ [ClimateButton] Failed to fetch status after stop command: \(error)")
+                BBLogger.warning(.app, "ClimateButton: Failed to fetch status after stop command: \(error)")
             }
         }
 

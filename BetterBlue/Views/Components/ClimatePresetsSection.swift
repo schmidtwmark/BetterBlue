@@ -70,7 +70,7 @@ struct ClimatePresetsSection: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to update preset order: \(error)")
+            BBLogger.error(.app, "ClimatePresetsSection: Failed to update preset order: \(error)")
         }
     }
 
@@ -92,7 +92,7 @@ struct ClimatePresetsSection: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to delete preset: \(error)")
+            BBLogger.error(.app, "ClimatePresetsSection: Failed to delete preset: \(error)")
         }
     }
 
@@ -111,7 +111,7 @@ struct ClimatePresetsSection: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to create preset: \(error)")
+            BBLogger.error(.app, "ClimatePresetsSection: Failed to create preset: \(error)")
         }
     }
 
@@ -124,7 +124,7 @@ struct ClimatePresetsSection: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to select preset: \(error)")
+            BBLogger.error(.app, "ClimatePresetsSection: Failed to select preset: \(error)")
         }
     }
 }

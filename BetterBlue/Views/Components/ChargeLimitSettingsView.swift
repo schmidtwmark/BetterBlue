@@ -19,7 +19,7 @@ struct ChargeLimitSettingsSheet: View {
             ChargeLimitSettingsContent(vehicle: vehicle, onSave: { dismiss() })
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
+                        Button("Done") {
                             dismiss()
                         }
                     }

@@ -213,14 +213,16 @@ struct DynamicIslandExpandedContentView: View {
 
                 Spacer()
 
-                // Stop button
-                Button(intent: StopLiveActivityIntent(vin: context.attributes.vin, activityType: context.state.activityType)) {
-                    Image(systemName: context.state.activityType == .climate ? "power" : "stop.fill")
-                        .font(.caption2)
-                        .foregroundColor(.red)
+                // Stop button (only for climate and debug, not charging)
+                if context.state.activityType != .charging {
+                    Button(intent: StopLiveActivityIntent(vin: context.attributes.vin, activityType: context.state.activityType)) {
+                        Image(systemName: context.state.activityType == .climate ? "power" : "stop.fill")
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(context.state.isRefreshing)
                 }
-                .buttonStyle(.plain)
-                .disabled(context.state.isRefreshing)
             }
         }
     }
@@ -244,7 +246,7 @@ struct DynamicIslandExpandedContentView: View {
                 // Target SOC indicator (dashed line)
                 if let targetSOC = evStatus?.currentTargetSOC {
                     Line()
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
                         .foregroundColor(.white)
                         .frame(width: 2, height: 32)
                         .offset(x: geometry.size.width * (targetSOC / 100.0) - 1)
@@ -542,17 +544,19 @@ struct VehicleActivityContentView: View {
 
                 Spacer()
 
-                // Stop button
-                Button(intent: StopLiveActivityIntent(vin: context.attributes.vin, activityType: context.state.activityType)) {
-                    HStack(spacing: 4) {
-                        Image(systemName: context.state.activityType == .climate ? "power" : "stop.fill")
-                        Text("Stop")
+                // Stop button (only for climate and debug, not charging)
+                if context.state.activityType != .charging {
+                    Button(intent: StopLiveActivityIntent(vin: context.attributes.vin, activityType: context.state.activityType)) {
+                        HStack(spacing: 4) {
+                            Image(systemName: context.state.activityType == .climate ? "power" : "stop.fill")
+                            Text("Stop")
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.red)
                     }
-                    .font(.caption2)
-                    .foregroundColor(.red)
+                    .buttonStyle(.plain)
+                    .disabled(context.state.isRefreshing)
                 }
-                .buttonStyle(.plain)
-                .disabled(context.state.isRefreshing)
             }
         }
         .padding(isLockScreen ? 16 : 0)

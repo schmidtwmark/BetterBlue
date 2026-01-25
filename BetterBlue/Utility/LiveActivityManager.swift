@@ -10,6 +10,7 @@ import ActivityKit
 #endif
 import BetterBlueKit
 import Foundation
+import OSLog
 import SwiftData
 import UIKit
 
@@ -26,7 +27,7 @@ final class LiveActivityManager {
 
     func setDeviceToken(_ token: String) {
         deviceToken = token
-        print("📲 [LiveActivityManager] Device token set: \(token.prefix(20))...")
+        AppLogger.liveActivity.info("Device token set: \(token.prefix(20), privacy: .public)...")
 
         // If we have active Live Activities, register with backend now
         #if canImport(ActivityKit)
@@ -41,18 +42,18 @@ final class LiveActivityManager {
 
     /// Handle a wakeup push from the backend - fetch fresh data and update all Live Activities
     func handleWakeupPush() async {
-        print("📲 [LiveActivityManager] Handling wakeup push...")
+        AppLogger.liveActivity.info("Handling wakeup push...")
 
         #if canImport(ActivityKit)
         let activities = Activity<VehicleActivityAttributes>.activities
         guard !activities.isEmpty else {
-            print("📲 [LiveActivityManager] No active Live Activities to update")
+            AppLogger.liveActivity.info("No active Live Activities to update")
             return
         }
 
         // Get the model container to fetch vehicle data
         guard let container = try? createSharedModelContainer() else {
-            print("❌ [LiveActivityManager] Failed to create model container")
+            AppLogger.liveActivity.error("Failed to create model container")
             return
         }
 
@@ -60,7 +61,7 @@ final class LiveActivityManager {
 
         for activity in activities {
             let vin = activity.attributes.vin
-            print("📲 [LiveActivityManager] Updating Live Activity for VIN: \(vin.prefix(8))...")
+            AppLogger.liveActivity.info("Updating Live Activity for VIN: \(vin.prefix(8), privacy: .public)...")
 
             do {
                 // Fetch the vehicle
@@ -70,7 +71,7 @@ final class LiveActivityManager {
 
                 guard let vehicle = try context.fetch(descriptor).first,
                       let account = vehicle.account else {
-                    print("❌ [LiveActivityManager] Vehicle or account not found for VIN: \(vin.prefix(8))...")
+                    AppLogger.liveActivity.error("Vehicle or account not found for VIN: \(vin.prefix(8), privacy: .public)")
                     continue
                 }
 
@@ -86,9 +87,9 @@ final class LiveActivityManager {
                 // Update the Live Activity with increment wakeup count
                 await refreshActivity(for: vin, status: status, incrementWakeup: true)
 
-                print("✅ [LiveActivityManager] Updated Live Activity for \(vin.prefix(8))...")
+                AppLogger.liveActivity.info("Updated Live Activity for \(vin.prefix(8), privacy: .public)")
             } catch {
-                print("❌ [LiveActivityManager] Error updating Live Activity for \(vin.prefix(8))...: \(error)")
+                AppLogger.liveActivity.error("Error updating Live Activity for \(vin.prefix(8), privacy: .public): \(error)")
             }
         }
         #endif
@@ -167,7 +168,7 @@ final class LiveActivityManager {
         if vehicle.debugLiveActivity {
             // Start the debug Live Activity
             guard let status = createStatusFromVehicle(vehicle) else {
-                print("❌ [LiveActivity] Cannot start debug activity: missing vehicle status")
+                AppLogger.liveActivity.error("Cannot start debug activity: missing vehicle status")
                 return
             }
             startOrUpdateActivity(for: vehicle, status: status, type: .debug)
@@ -300,7 +301,7 @@ final class LiveActivityManager {
                     await registerWithBackend(activityType: type)
                 }
             } catch {
-                print("❌ [LiveActivity] Error requesting activity: \(error)")
+                AppLogger.liveActivity.error("Error requesting activity: \(error)")
             }
         }
         #endif
@@ -308,7 +309,7 @@ final class LiveActivityManager {
 
     private func registerWithBackend(activityType: LiveActivityType = .charging) async {
         guard let deviceToken = deviceToken else {
-            print("⚠️ [LiveActivity] No device token available for backend registration")
+            AppLogger.liveActivity.warning("No device token available for backend registration")
             return
         }
 
@@ -329,13 +330,13 @@ final class LiveActivityManager {
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
                     isRegisteredWithBackend = true
-                    print("✅ [LiveActivity] Registered with backend for wakeup pushes")
+                    AppLogger.liveActivity.info("Registered with backend for wakeup pushes (type: \(activityType.rawValue, privacy: .public))")
                 } else {
-                    print("❌ [LiveActivity] Backend registration failed: \(httpResponse.statusCode)")
+                    AppLogger.liveActivity.error("Backend registration failed: \(httpResponse.statusCode)")
                 }
             }
         } catch {
-            print("❌ [LiveActivity] Backend registration error: \(error)")
+            AppLogger.liveActivity.error("Backend registration error: \(error)")
         }
     }
 
@@ -353,9 +354,9 @@ final class LiveActivityManager {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             _ = try await URLSession.shared.data(for: request)
             isRegisteredWithBackend = false
-            print("✅ [LiveActivity] Unregistered from backend")
+            AppLogger.liveActivity.info("Unregistered from backend")
         } catch {
-            print("❌ [LiveActivity] Backend unregistration error: \(error)")
+            AppLogger.liveActivity.error("Backend unregistration error: \(error)")
         }
     }
 

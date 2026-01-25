@@ -59,6 +59,13 @@ class BBVehicle {
     var lockStatus: VehicleStatus.LockStatus?
     var climateStatus: VehicleStatus.ClimateStatus?
 
+    // Additional status fields
+    var battery12V: Int?
+    var doorOpen: VehicleStatus.DoorStatus?
+    var trunkOpen: Bool?
+    var hoodOpen: Bool?
+    var tirePressureWarning: VehicleStatus.TirePressureWarning?
+
     // Custom name and visibility (kept separate for easier queries)
     var customName: String?
     var isHidden: Bool = false
@@ -102,6 +109,11 @@ class BBVehicle {
         location = nil
         lockStatus = nil
         climateStatus = nil
+        battery12V = nil
+        doorOpen = nil
+        trunkOpen = nil
+        hoodOpen = nil
+        tirePressureWarning = nil
 
         customName = nil
         isHidden = false
@@ -140,6 +152,13 @@ extension BBVehicle {
         if let odometer = status.odometer {
             self.odometer = odometer
         }
+
+        // Update additional status fields
+        battery12V = status.battery12V
+        doorOpen = status.doorOpen
+        trunkOpen = status.trunkOpen
+        hoodOpen = status.hoodOpen
+        tirePressureWarning = status.tirePressureWarning
     }
 
     // MARK: - Status Change Waiting

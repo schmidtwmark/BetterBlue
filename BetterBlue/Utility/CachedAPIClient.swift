@@ -35,13 +35,13 @@ class CachedAPIClient: APIClientProtocol {
         if let cachedEntry = cache[cacheKey],
            Date().timeIntervalSince(cachedEntry.timestamp) < cacheTTL,
            let cachedToken = cachedEntry.response as? AuthToken {
-            print("🟢 [CachedAPIClient] Using cached login response")
+            BBLogger.debug(.api, "CachedAPIClient:Using cached login response")
             return cachedToken
         }
 
         // Check if there's already an ongoing request of this type
         if let ongoingRequest = ongoingRequests[requestKey] {
-            print("🟡 [CachedAPIClient] Waiting for ongoing login request")
+            BBLogger.debug(.api, "CachedAPIClient:Waiting for ongoing login request")
             guard let token = try await ongoingRequest.waitForCompletion() as? AuthToken else {
                 throw APIError.logError("Error retrieving login token from ongoing request")
             }
@@ -54,7 +54,7 @@ class CachedAPIClient: APIClientProtocol {
                 ongoingRequests.removeValue(forKey: requestKey)
             }
 
-            print("🔵 [CachedAPIClient] Performing new login request")
+            BBLogger.debug(.api, "CachedAPIClient:Performing new login request")
             let result = try await underlyingClient.login()
 
             // Cache successful response
@@ -75,13 +75,13 @@ class CachedAPIClient: APIClientProtocol {
         if let cachedEntry = cache[cacheKey],
            Date().timeIntervalSince(cachedEntry.timestamp) < cacheTTL,
            let cachedVehicles = cachedEntry.response as? [Vehicle] {
-            print("🟢 [CachedAPIClient] Using cached fetchVehicles response")
+            BBLogger.debug(.api, "CachedAPIClient:Using cached fetchVehicles response")
             return cachedVehicles
         }
 
         // Check if there's already an ongoing request of this type
         if let ongoingRequest = ongoingRequests[requestKey] {
-            print("🟡 [CachedAPIClient] Waiting for ongoing fetchVehicles request")
+            BBLogger.debug(.api, "CachedAPIClient:Waiting for ongoing fetchVehicles request")
             guard let vehicles = try await ongoingRequest.waitForCompletion() as? [Vehicle] else {
                 throw APIError.logError("Error retrieving vehicles from ongoing request")
             }
@@ -94,7 +94,7 @@ class CachedAPIClient: APIClientProtocol {
                 ongoingRequests.removeValue(forKey: requestKey)
             }
 
-            print("🔵 [CachedAPIClient] Performing new fetchVehicles request")
+            BBLogger.debug(.api, "CachedAPIClient:Performing new fetchVehicles request")
             let result = try await underlyingClient.fetchVehicles(authToken: authToken)
 
             // Cache successful response
@@ -115,13 +115,13 @@ class CachedAPIClient: APIClientProtocol {
         if let cachedEntry = cache[cacheKey],
            Date().timeIntervalSince(cachedEntry.timestamp) < cacheTTL,
            let cachedStatus = cachedEntry.response as? VehicleStatus {
-            print("🟢 [CachedAPIClient] Using cached fetchVehicleStatus response for VIN: \(vehicle.vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Using cached fetchVehicleStatus response for VIN: \(vehicle.vin)")
             return cachedStatus
         }
 
         // Check if there's already an ongoing request of this type
         if let ongoingRequest = ongoingRequests[requestKey] {
-            print("🟡 [CachedAPIClient] Waiting for ongoing fetchVehicleStatus request for VIN: \(vehicle.vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Waiting for ongoing fetchVehicleStatus request for VIN: \(vehicle.vin)")
             guard let vehicleStatus = try await ongoingRequest.waitForCompletion() as? VehicleStatus else {
                 throw APIError.logError("Error retrieving vehicles from ongoing request")
             }
@@ -134,7 +134,7 @@ class CachedAPIClient: APIClientProtocol {
                 ongoingRequests.removeValue(forKey: requestKey)
             }
 
-            print("🔵 [CachedAPIClient] Performing new fetchVehicleStatus request for VIN: \(vehicle.vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Performing new fetchVehicleStatus request for VIN: \(vehicle.vin)")
             let result = try await underlyingClient.fetchVehicleStatus(for: vehicle, authToken: authToken)
 
             // Cache successful response
@@ -154,7 +154,7 @@ class CachedAPIClient: APIClientProtocol {
 
         // Check if there's already an ongoing command of this type for this vehicle
         if let ongoingRequest = ongoingRequests[requestKey] {
-            print("🟡 [CachedAPIClient] Waiting for ongoing sendCommand request for VIN: \(vehicle.vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Waiting for ongoing sendCommand request for VIN: \(vehicle.vin)")
             _ = try await ongoingRequest.waitForCompletion()
             return
         }
@@ -169,7 +169,7 @@ class CachedAPIClient: APIClientProtocol {
                 ongoingRequests.removeValue(forKey: requestKey)
             }
 
-            print("🔵 [CachedAPIClient] Performing new sendCommand request for VIN: \(vehicle.vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Performing new sendCommand request for VIN: \(vehicle.vin)")
             try await underlyingClient.sendCommand(for: vehicle, command: command, authToken: authToken)
         }
 
@@ -177,11 +177,17 @@ class CachedAPIClient: APIClientProtocol {
         try await task.value
     }
 
+    func fetchEVTripDetails(for vehicle: Vehicle, authToken: AuthToken) async throws -> [EVTripDetail]? {
+        // Trip details are not cached - forward directly to underlying client
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchEVTripDetails request for VIN: \(vehicle.vin)")
+        return try await underlyingClient.fetchEVTripDetails(for: vehicle, authToken: authToken)
+    }
+
     /// Invalidates the cached status for a specific vehicle
     func invalidateStatusCache(for vin: String) {
         let cacheKey = CacheKey.fetchVehicleStatus(vin: vin)
         if cache.removeValue(forKey: cacheKey) != nil {
-            print("🧹 [CachedAPIClient] Invalidated status cache for VIN: \(vin)")
+            BBLogger.debug(.api, "CachedAPIClient:Invalidated status cache for VIN: \(vin)")
         }
     }
 
@@ -189,7 +195,7 @@ class CachedAPIClient: APIClientProtocol {
 
     func clearCache() {
         cache.removeAll()
-        print("🧹 [CachedAPIClient] Cache cleared")
+        BBLogger.debug(.api, "CachedAPIClient:Cache cleared")
     }
 
     func clearExpiredCache() {
@@ -203,7 +209,7 @@ class CachedAPIClient: APIClientProtocol {
         }
 
         if !expiredKeys.isEmpty {
-            print("🧹 [CachedAPIClient] Cleared \(expiredKeys.count) expired cache entries")
+            BBLogger.debug(.api, "CachedAPIClient:Cleared \(expiredKeys.count) expired cache entries")
         }
     }
 

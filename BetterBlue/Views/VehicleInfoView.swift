@@ -39,7 +39,7 @@ struct VehicleInfoView: View {
                         do {
                             try modelContext.save()
                         } catch {
-                            print("Failed to save custom name: \(error)")
+                            BBLogger.error(.app, "Failed to save custom name: \(error)")
                         }
                     }
             }
@@ -160,7 +160,7 @@ struct VehicleInfoView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("Failed to create default preset: \(error)")
+                BBLogger.error(.app, "Failed to create default preset: \(error)")
             }
         }
     }

@@ -238,7 +238,7 @@ struct SettingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Failed to update vehicle order: \(error)")
+            BBLogger.error(.app, "SettingsView: Failed to update vehicle order: \(error)")
         }
     }
 
@@ -249,7 +249,7 @@ struct SettingsView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("Failed to hide vehicle: \(error)")
+                BBLogger.error(.app, "SettingsView: Failed to hide vehicle: \(error)")
             }
         }
     }
@@ -271,7 +271,7 @@ struct SettingsView: View {
             try modelContext.save()
 
             clearDataResult = "✅ All data cleared successfully"
-            print("🧹 [SettingsView] Successfully cleared all SwiftData storage")
+            BBLogger.info(.app, "SettingsView: Successfully cleared all SwiftData storage")
 
             // Clear the result message after 3 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
@@ -279,7 +279,7 @@ struct SettingsView: View {
             }
         } catch {
             clearDataResult = "❌ Error: \(error.localizedDescription)"
-            print("🔴 [SettingsView] Failed to clear data: \(error)")
+            BBLogger.error(.app, "SettingsView: Failed to clear data: \(error)")
 
             // Clear the error message after 5 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {

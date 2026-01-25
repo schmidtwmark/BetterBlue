@@ -1,0 +1,587 @@
+//
+//  TripDetailsView.swift
+//  BetterBlue
+//
+//  View for displaying EV trip details and efficiency chart
+//
+
+import BetterBlueKit
+import Charts
+import SwiftUI
+
+struct TripDetailsView: View {
+    let bbVehicle: BBVehicle
+    @Environment(\.modelContext) private var modelContext
+    @State private var trips: [EVTripDetail] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var appSettings = AppSettings.shared
+
+    var body: some View {
+        Group {
+            if isLoading {
+                loadingView
+            } else if let error = errorMessage {
+                errorView(error)
+            } else if trips.isEmpty {
+                emptyView
+            } else {
+                tripListView
+            }
+        }
+        .navigationTitle("Trip History")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadTripDetails()
+        }
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+            Text("Loading trip details...")
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundColor(.orange)
+            Text("Failed to load trips")
+                .font(.headline)
+            Text(error)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Try Again") {
+                Task {
+                    await loadTripDetails()
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+    }
+
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "car.fill")
+                .font(.largeTitle)
+                .foregroundColor(.secondary)
+            Text("No Recent Trips")
+                .font(.headline)
+            Text("Trip history will appear here after you drive your vehicle.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+
+    private var tripListView: some View {
+        List {
+            // Efficiency chart section
+            Section {
+                efficiencyChartView
+                    .frame(height: 200)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
+            } header: {
+                Text("Efficiency Trend")
+            }
+
+            // Trip list section
+            Section {
+                ForEach(trips) { trip in
+                    TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit)
+                }
+            } header: {
+                Text("Recent Trips")
+            }
+        }
+    }
+
+    private var efficiencyChartView: some View {
+        Chart(trips.reversed()) { trip in
+            LineMark(
+                x: .value("Time", trip.startDate),
+                y: .value("Efficiency", trip.efficiency)
+            )
+            .foregroundStyle(Color.green.gradient)
+            .interpolationMethod(.catmullRom)
+
+            PointMark(
+                x: .value("Time", trip.startDate),
+                y: .value("Efficiency", trip.efficiency)
+            )
+            .foregroundStyle(Color.green)
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let efficiency = value.as(Double.self) {
+                        Text(String(format: "%.1f", efficiency))
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(date, format: .dateTime.hour().minute())
+                    }
+                }
+            }
+        }
+        .chartYAxisLabel("mi/kWh", position: .leading)
+        .padding(.horizontal)
+    }
+
+    private func loadTripDetails() async {
+        isLoading = true
+        errorMessage = nil
+
+        guard let account = bbVehicle.account else {
+            errorMessage = "Vehicle account not found"
+            isLoading = false
+            return
+        }
+
+        do {
+            if let fetchedTrips = try await account.fetchEVTripDetails(for: bbVehicle, modelContext: modelContext) {
+                trips = fetchedTrips
+            } else {
+                errorMessage = "Trip details not available for this vehicle"
+            }
+        } catch {
+            BBLogger.error(.api, "TripDetailsView: Failed to fetch trip details: \(error)")
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+}
+
+// MARK: - Trip Detail Row
+
+struct TripDetailRow: View {
+    let trip: EVTripDetail
+    let distanceUnit: Distance.Units
+    @State private var isExpanded = false
+
+    private var formattedDistance: String {
+        Distance.Units.miles.format(trip.distance, to: distanceUnit)
+    }
+
+    private var formattedEfficiency: String {
+        String(format: "%.1f mi/kWh", trip.efficiency)
+    }
+
+    private var formattedTotalEnergy: String {
+        if trip.totalEnergyUsed >= 1000 {
+            return String(format: "%.1f kWh", Double(trip.totalEnergyUsed) / 1000.0)
+        } else {
+            return "\(trip.totalEnergyUsed) Wh"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header row with date and distance (never animates)
+            HStack {
+                Text(
+                    trip.startDate,
+                    format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
+                )
+                .font(.subheadline)
+                .fontWeight(.medium)
+                Spacer()
+                Text(formattedDistance)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+            .animation(nil, value: isExpanded)
+
+            // Summary row (never animates except chevron)
+            HStack {
+                Text(trip.formattedDuration)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Text("•")
+                    .foregroundColor(.secondary)
+
+                Text(formattedTotalEnergy)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+
+                Text("•")
+                    .foregroundColor(.secondary)
+
+                Text(formattedEfficiency)
+                    .font(.caption)
+                    .foregroundColor(.green)
+
+                Spacer()
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .animation(.easeInOut(duration: 0.2), value: isExpanded)
+            }
+            .animation(nil, value: isExpanded)
+
+            // Expanded energy breakdown
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    if trip.batteryCareEnergy > 0 {
+                        // Two rows when battery care is present
+                        HStack(spacing: 8) {
+                            EnergyBreakdownPill(
+                                label: "Drivetrain",
+                                value: trip.drivetrainEnergy,
+                                color: .orange
+                            )
+                            EnergyBreakdownPill(
+                                label: "Regen",
+                                value: trip.regenEnergy,
+                                color: .green
+                            )
+                            EnergyBreakdownPill(
+                                label: "Climate",
+                                value: trip.climateEnergy,
+                                color: .blue
+                            )
+                        }
+                        HStack(spacing: 8) {
+                            EnergyBreakdownPill(
+                                label: "Accessories",
+                                value: trip.accessoriesEnergy,
+                                color: .purple
+                            )
+                            EnergyBreakdownPill(
+                                label: "Batt Care",
+                                value: trip.batteryCareEnergy,
+                                color: .cyan
+                            )
+                            Spacer()
+                        }
+                    } else {
+                        // Single row when no battery care
+                        HStack(spacing: 8) {
+                            EnergyBreakdownPill(
+                                label: "Drivetrain",
+                                value: trip.drivetrainEnergy,
+                                color: .orange
+                            )
+                            EnergyBreakdownPill(
+                                label: "Regen",
+                                value: trip.regenEnergy,
+                                color: .green
+                            )
+                            EnergyBreakdownPill(
+                                label: "Climate",
+                                value: trip.climateEnergy,
+                                color: .blue
+                            )
+                            EnergyBreakdownPill(
+                                label: "Accessories",
+                                value: trip.accessoriesEnergy,
+                                color: .purple
+                            )
+                        }
+                    }
+
+                    // Speed info
+                    HStack {
+                        Text("Avg: \(Int(trip.avgSpeed)) mph")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        Text("Max: \(Int(trip.maxSpeed)) mph")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+}
+
+// MARK: - Energy Breakdown Pill
+
+struct EnergyBreakdownPill: View {
+    let label: String
+    let value: Int
+    let color: Color
+
+    private var formattedValue: String {
+        if value >= 1000 {
+            return String(format: "%.1f kWh", Double(value) / 1000.0)
+        } else {
+            return "\(value) Wh"
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Text(formattedValue)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(color)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Previews
+
+#Preview("Trip Details - With Data") {
+    NavigationView {
+        TripDetailsPreviewWrapper(trips: EVTripDetail.sampleTrips)
+    }
+}
+
+#Preview("Trip Details - Loading") {
+    NavigationView {
+        TripDetailsPreviewWrapper(trips: nil, isLoading: true)
+    }
+}
+
+#Preview("Trip Details - Empty") {
+    NavigationView {
+        TripDetailsPreviewWrapper(trips: [])
+    }
+}
+
+#Preview("Trip Details - Error") {
+    NavigationView {
+        TripDetailsPreviewWrapper(trips: nil, errorMessage: "Failed to connect to server")
+    }
+}
+
+#Preview("Trip Row") {
+    List {
+        TripDetailRow(
+            trip: .sample,
+            distanceUnit: .miles
+        )
+    }
+}
+
+// MARK: - Preview Helpers
+
+private struct TripDetailsPreviewWrapper: View {
+    let trips: [EVTripDetail]?
+    var isLoading: Bool = false
+    var errorMessage: String? = nil
+
+    var body: some View {
+        TripDetailsPreviewContent(
+            trips: trips ?? [],
+            isLoading: isLoading,
+            errorMessage: errorMessage
+        )
+        .navigationTitle("Trip History")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct TripDetailsPreviewContent: View {
+    let trips: [EVTripDetail]
+    let isLoading: Bool
+    let errorMessage: String?
+    @State private var appSettings = AppSettings.shared
+
+    var body: some View {
+        Group {
+            if isLoading {
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("Loading trip details...")
+                        .foregroundColor(.secondary)
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text("Failed to load trips")
+                        .font(.headline)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Try Again") {}
+                        .buttonStyle(.bordered)
+                }
+                .padding()
+            } else if trips.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "car.fill")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No Recent Trips")
+                        .font(.headline)
+                    Text("Trip history will appear here after you drive your vehicle.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+            } else {
+                List {
+                    Section {
+                        Chart(trips.reversed()) { trip in
+                            LineMark(
+                                x: .value("Time", trip.startDate),
+                                y: .value("Efficiency", trip.efficiency)
+                            )
+                            .foregroundStyle(Color.green.gradient)
+                            .interpolationMethod(.catmullRom)
+
+                            PointMark(
+                                x: .value("Time", trip.startDate),
+                                y: .value("Efficiency", trip.efficiency)
+                            )
+                            .foregroundStyle(Color.green)
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading) { value in
+                                AxisGridLine()
+                                AxisValueLabel {
+                                    if let efficiency = value.as(Double.self) {
+                                        Text(String(format: "%.1f", efficiency))
+                                    }
+                                }
+                            }
+                        }
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                                AxisGridLine()
+                                AxisValueLabel {
+                                    if let date = value.as(Date.self) {
+                                        Text(date, format: .dateTime.hour().minute())
+                                    }
+                                }
+                            }
+                        }
+                        .chartYAxisLabel("mi/kWh", position: .leading)
+                        .padding(.horizontal)
+                        .frame(height: 200)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
+                    } header: {
+                        Text("Efficiency Trend")
+                    }
+
+                    Section {
+                        ForEach(trips) { trip in
+                            TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit)
+                        }
+                    } header: {
+                        Text("Recent Trips")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Sample Data
+
+extension EVTripDetail {
+    static var sample: EVTripDetail {
+        EVTripDetail(
+            distance: 7,
+            odometer: 14214.1,
+            accessoriesEnergy: 220,
+            totalEnergyUsed: 3090,
+            regenEnergy: 966,
+            climateEnergy: 1235,
+            drivetrainEnergy: 1635,
+            batteryCareEnergy: 0,
+            startDate: Date().addingTimeInterval(-3600),
+            durationSeconds: 1268,
+            avgSpeed: 27.0,
+            maxSpeed: 41.0
+        )
+    }
+
+    static var sampleTrips: [EVTripDetail] {
+        [
+            EVTripDetail(
+                distance: 7,
+                odometer: 14214.1,
+                accessoriesEnergy: 220,
+                totalEnergyUsed: 3090,
+                regenEnergy: 966,
+                climateEnergy: 1235,
+                drivetrainEnergy: 1635,
+                batteryCareEnergy: 0,
+                startDate: Date().addingTimeInterval(-3600),
+                durationSeconds: 1268,
+                avgSpeed: 27.0,
+                maxSpeed: 41.0
+            ),
+            EVTripDetail(
+                distance: 4,
+                odometer: 14206.1,
+                accessoriesEnergy: 160,
+                totalEnergyUsed: 2677,
+                regenEnergy: 446,
+                climateEnergy: 908,
+                drivetrainEnergy: 1409,
+                batteryCareEnergy: 200,
+                startDate: Date().addingTimeInterval(-7200),
+                durationSeconds: 932,
+                avgSpeed: 24.0,
+                maxSpeed: 42.0
+            ),
+            EVTripDetail(
+                distance: 4,
+                odometer: 14200.9,
+                accessoriesEnergy: 70,
+                totalEnergyUsed: 2116,
+                regenEnergy: 364,
+                climateEnergy: 569,
+                drivetrainEnergy: 1177,
+                batteryCareEnergy: 300,
+                startDate: Date().addingTimeInterval(-10800),
+                durationSeconds: 526,
+                avgSpeed: 34.0,
+                maxSpeed: 59.0
+            ),
+            EVTripDetail(
+                distance: 6,
+                odometer: 14196.5,
+                accessoriesEnergy: 90,
+                totalEnergyUsed: 2583,
+                regenEnergy: 1334,
+                climateEnergy: 769,
+                drivetrainEnergy: 1524,
+                batteryCareEnergy: 200,
+                startDate: Date().addingTimeInterval(-14400),
+                durationSeconds: 752,
+                avgSpeed: 32.0,
+                maxSpeed: 51.0
+            )
+        ]
+    }
+}

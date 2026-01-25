@@ -17,7 +17,7 @@ struct EVRangeChargingCard: View {
 
     var evStatus: VehicleStatus.EVStatus? {
         guard bbVehicle.modelContext != nil else {
-            print("⚠️ [EVRangeChargingCard] BBVehicle \(bbVehicle.vin) is detached from context")
+            BBLogger.warning(.app, "EVRangeChargingCard: BBVehicle \(bbVehicle.vin) is detached from context")
             return nil
         }
         return bbVehicle.evStatus
@@ -380,7 +380,7 @@ struct EVRangeChargingCard: View {
             do {
                 try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
             } catch {
-                print("⚠️ [EVRangeChargingCard] Failed to fetch status after stop command: \(error)")
+                BBLogger.warning(.app, "EVRangeChargingCard: Failed to fetch status after stop command: \(error)")
             }
         }
 

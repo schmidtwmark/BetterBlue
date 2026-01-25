@@ -5,6 +5,7 @@
 //  Created by Mark Schmidt on 9/4/25.
 //
 
+import BetterBlueKit
 import Foundation
 import SwiftData
 
@@ -24,7 +25,7 @@ func getAppGroupStoreURL() throws -> URL {
     if let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
         return appGroupURL.appendingPathComponent("BetterBlue.sqlite")
     } else {
-        print("⚠️ [BetterBlue] App Group container not accessible from current context")
+        BBLogger.warning(.app, "BetterBlue: App Group container not accessible from current context")
         throw NSError(
             domain: "BetterBlue",
             code: 1001,
@@ -43,7 +44,7 @@ func createContainer(storeURL: URL, schema: Schema) throws -> ModelContainer {
         let modelConfiguration = ModelConfiguration(url: storeURL, cloudKitDatabase: .automatic)
         return try ModelContainer(for: schema, configurations: [modelConfiguration])
     } catch {
-        print("❌ [BetterBlue] Failed to create ModelContainer: \(error)")
+        BBLogger.error(.app, "BetterBlue: Failed to create ModelContainer: \(error)")
         throw NSError(
             domain: "BetterBlue",
             code: 1002,

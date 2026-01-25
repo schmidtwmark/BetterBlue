@@ -58,7 +58,7 @@ class HTTPLogSinkManager {
                     }
                 } catch {
                     // Silently fail for widgets to prevent crashes
-                    print("🔴 [HTTPLog] Failed to save HTTP log: \(error)")
+                    BBLogger.error(.app, "HTTPLog: Failed to save HTTP log: \(error)")
                 }
             }
         }
@@ -80,7 +80,7 @@ class HTTPLogSinkManager {
             }
 
             try context.save()
-            print("🧹 [HTTPLog] Cleaned up \(logsToDelete.count) old logs (now have \(allLogs.count - deleteThreshold) logs)")
+            BBLogger.info(.app, "HTTPLog: Cleaned up \(logsToDelete.count) old logs (now have \(allLogs.count - deleteThreshold) logs)")
         }
     }
 

@@ -122,15 +122,15 @@ class AppSettings {
                 let granted = try await UNUserNotificationCenter.current()
                     .requestAuthorization(options: [.alert, .sound, .badge])
                 if granted {
-                    print("✅ [Notifications] Permission granted")
+                    BBLogger.info(.push, "Notifications: Permission granted")
                 } else {
-                    print("❌ [Notifications] Permission denied")
+                    BBLogger.warning(.push, "Notifications: Permission denied")
                     await MainActor.run {
                         notificationsEnabled = false
                     }
                 }
             } catch {
-                print("❌ [Notifications] Permission request failed: \(error)")
+                BBLogger.error(.push, "Notifications: Permission request failed: \(error)")
                 await MainActor.run {
                     notificationsEnabled = false
                 }

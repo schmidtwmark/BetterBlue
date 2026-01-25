@@ -17,9 +17,7 @@ struct ChargingButton: View {
 
     var evStatus: VehicleStatus.EVStatus? {
         guard bbVehicle.modelContext != nil else {
-            print(
-                "⚠️ [ChargingButton] BBVehicle \(bbVehicle.vin) is detached from context",
-            )
+            BBLogger.warning(.app, "ChargingButton: BBVehicle \(bbVehicle.vin) is detached from context")
             return nil
         }
         return bbVehicle.evStatus
@@ -104,7 +102,7 @@ struct ChargingButton: View {
             do {
                 try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
             } catch {
-                print("⚠️ [ChargingButton] Failed to fetch status after stop command: \(error)")
+                BBLogger.warning(.app, "ChargingButton: Failed to fetch status after stop command: \(error)")
             }
         }
 

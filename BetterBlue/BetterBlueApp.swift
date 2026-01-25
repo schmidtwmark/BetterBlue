@@ -21,6 +21,9 @@ struct BetterBlueApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var sharedModelContainer: ModelContainer = {
+        // Configure BetterBlueKit to use OSLog via AppLogger
+        BBLogger.sink = OSLogSink.shared
+
         do {
             let container = try createSharedModelContainer()
 
@@ -30,7 +33,7 @@ struct BetterBlueApp: App {
 
             return container
         } catch {
-            print("💥 [MainApp] Failed to create ModelContainer: \(error)")
+            BBLogger.error(.app, "Failed to create ModelContainer: \(error)")
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
@@ -82,7 +85,7 @@ struct BetterBlueApp: App {
 
                 guard let vehicle = try? context.fetch(descriptor).first,
                       let account = vehicle.account else {
-                    print("❌ [DeepLink] Vehicle not found for startClimate: \(vin)")
+                    AppLogger.app.error("DeepLink: Vehicle not found for startClimate: \(vin)")
                     return
                 }
 
@@ -96,7 +99,7 @@ struct BetterBlueApp: App {
                     }
                 }
 
-                print("🚗 [DeepLink] Starting climate for \(vehicle.displayName) with preset: \(presetName ?? "default")")
+                AppLogger.app.info("DeepLink: Starting climate for \(vehicle.displayName) with preset: \(presetName ?? "default")")
                 try await account.startClimate(
                     vehicle,
                     options: options,
@@ -105,7 +108,7 @@ struct BetterBlueApp: App {
                     presetIcon: presetIcon
                 )
             } catch {
-                print("❌ [DeepLink] Failed to start climate: \(error)")
+                AppLogger.app.error("DeepLink: Failed to start climate: \(error)")
             }
         }
     }
@@ -120,14 +123,14 @@ struct BetterBlueApp: App {
 
                 guard let vehicle = try? context.fetch(descriptor).first,
                       let account = vehicle.account else {
-                    print("❌ [DeepLink] Vehicle not found for startCharge: \(vin)")
+                    AppLogger.app.error("DeepLink: Vehicle not found for startCharge: \(vin)")
                     return
                 }
 
-                print("🔌 [DeepLink] Starting charge for \(vehicle.displayName)")
+                AppLogger.app.info("DeepLink: Starting charge for \(vehicle.displayName)")
                 try await account.startCharge(vehicle, modelContext: context)
             } catch {
-                print("❌ [DeepLink] Failed to start charge: \(error)")
+                AppLogger.app.error("DeepLink: Failed to start charge: \(error)")
             }
         }
     }
@@ -142,7 +145,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // Request notification permissions and register for remote notifications
         Task {
             let granted = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-            print("📲 [AppDelegate] Notification permissions granted: \(granted ?? false)")
+            AppLogger.push.info("AppDelegate: Notification permissions granted: \(granted ?? false)")
 
             // Register for remote notifications to receive background wakeups
             application.registerForRemoteNotifications()
@@ -153,12 +156,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        print("📲 [AppDelegate] Received device token: \(tokenString.prefix(20))...")
+        AppLogger.push.info("Received device token: \(tokenString.prefix(20), privacy: .public)...")
         LiveActivityManager.shared.setDeviceToken(tokenString)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("❌ [AppDelegate] Failed to register for remote notifications: \(error)")
+        AppLogger.push.error("Failed to register for remote notifications: \(error)")
     }
 
     // Handle background push notifications for Live Activity wakeup
@@ -167,10 +170,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        print("📲 [AppDelegate] Received remote notification: \(userInfo)")
+        AppLogger.push.info("Received remote notification: \(userInfo, privacy: .public)")
 
         // Check if this is a Live Activity wakeup
         if userInfo["liveActivityWakeup"] != nil {
+            AppLogger.push.info("Processing Live Activity wakeup push")
             Task {
                 await LiveActivityManager.shared.handleWakeupPush()
                 completionHandler(.newData)

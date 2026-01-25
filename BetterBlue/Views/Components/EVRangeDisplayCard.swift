@@ -100,7 +100,7 @@ struct EVRangeDisplayCard: View {
                         // Target SOC indicator (dashed line)
                         if let targetSOC = evStatus.currentTargetSOC {
                             Line()
-                                .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+                                .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
                                 .foregroundColor(.white)
                                 .frame(width: 2, height: 32)
                                 .offset(x: geometry.size.width * (targetSOC / 100.0) - 1)

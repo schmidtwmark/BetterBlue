@@ -105,10 +105,10 @@ extension BBAccount {
 
     @MainActor
     func sendMFA(otpKey: String, xid: String, notifyType: String = "SMS") async throws {
-        print("📲 [BBAccount] sendMFA requested for \(username)")
+        BBLogger.info(.mfa, "BBAccount: sendMFA requested for \(username)")
 
         if api == nil, let modelContext = modelContextForMFA {
-            print("📲 [BBAccount] API nil, attempting re-init with stored context")
+            BBLogger.info(.mfa, "BBAccount: API nil, attempting re-init with stored context")
             try? await initialize(modelContext: modelContext)
         }
 
@@ -118,13 +118,13 @@ extension BBAccount {
         } else if let api {
             api
         } else {
-            print("❌ [BBAccount] API not initialized during MFA request")
+            BBLogger.error(.api, "BBAccount: API not initialized during MFA request")
             throw APIError(message: "API not initialized", apiName: "BBAccount")
         }
 
-        print("📲 [BBAccount] Using API type: \(type(of: actualApi))")
+        BBLogger.info(.mfa, "BBAccount: Using API type: \(type(of: actualApi))")
         guard let kiaApi = actualApi as? KiaAPIClient else {
-            print("❌ [BBAccount] MFA not supported: API is not KiaAPIClient")
+            BBLogger.error(.api, "BBAccount: MFA not supported: API is not KiaAPIClient")
             throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
         }
         try await kiaApi.sendOTP(otpKey: otpKey, xid: xid, notifyType: notifyType)
@@ -176,12 +176,12 @@ extension BBAccount {
         // Step 3: Complete login by calling authUser again with rmtoken and sid
         let finalAuthToken = try await updatedKiaApi.completeLoginWithMFA(sid: verifyOTPSid)
         self.authToken = finalAuthToken
-        print("✅ [BBAccount] MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
+        BBLogger.info(.api, "BBAccount: MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
     }
 
     @MainActor
     private func handleInvalidVehicleSession(modelContext: ModelContext) async throws {
-        print("🔄 [BBAccount] Invalid session/credentials detected, performing full re-initialization...")
+        BBLogger.info(.api, "BBAccount: Invalid session/credentials detected, performing full re-initialization...")
 
         clearAPICache()
         self.api = nil
@@ -194,7 +194,7 @@ extension BBAccount {
         let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
         updateVehicles(vehicles: fetchedVehicles)
 
-        print("✅ [BBAccount] Re-initialization complete")
+        BBLogger.info(.api, "BBAccount: Re-initialization complete")
     }
 
     @MainActor
@@ -242,7 +242,7 @@ extension BBAccount {
 
         // For Kia vehicles, ensure vehicleKey is populated by refreshing if needed
         if brandEnum == .kia && bbVehicle.vehicleKey == nil {
-            print("🔧 [BBAccount] Kia vehicle missing vehicleKey, fetching fresh data...")
+            BBLogger.debug(.api, "BBAccount: Kia vehicle missing vehicleKey, fetching fresh data...")
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
 
             guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
@@ -250,7 +250,7 @@ extension BBAccount {
             }
 
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
-            print("🔧 [BBAccount] Updated vehicleKey for VIN: \(bbVehicle.vin)")
+            BBLogger.debug(.api, "BBAccount: Updated vehicleKey for VIN: \(bbVehicle.vin)")
         }
 
         let vehicle = bbVehicle.toVehicle()
@@ -280,7 +280,7 @@ extension BBAccount {
     @MainActor
     func updateVehicles(vehicles: [Vehicle]) {
         guard let modelContext else {
-            print("🔴 [BBAccount] Model context not available for updating vehicles")
+            BBLogger.error(.api, "BBAccount: Model context not available for updating vehicles")
             return
         }
 
@@ -338,7 +338,7 @@ extension BBAccount {
         do {
             try modelContext.save()
         } catch {
-            print("🔴 [BBAccount] Failed to update vehicles in SwiftData: \(error)")
+            BBLogger.error(.api, "BBAccount: Failed to update vehicles in SwiftData: \(error)")
         }
     }
 }
@@ -367,7 +367,7 @@ extension BBAccount {
 
         // For Kia vehicles, ensure vehicleKey is populated by refreshing if needed
         if brandEnum == .kia && bbVehicle.vehicleKey == nil {
-            print("🔧 [BBAccount] Kia vehicle missing vehicleKey, fetching fresh data...")
+            BBLogger.debug(.api, "BBAccount: Kia vehicle missing vehicleKey, fetching fresh data...")
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
 
             guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
@@ -375,7 +375,7 @@ extension BBAccount {
             }
 
             bbVehicle.vehicleKey = matchingVehicle.vehicleKey
-            print("🔧 [BBAccount] Updated vehicleKey for VIN: \(bbVehicle.vin)")
+            BBLogger.debug(.api, "BBAccount: Updated vehicleKey for VIN: \(bbVehicle.vin)")
         }
 
         // Start Live Activity monitoring for long-running commands
@@ -474,7 +474,44 @@ extension BBAccount {
 
     @MainActor
     func setTargetSOC(_ vehicle: BBVehicle, acLevel: Int, dcLevel: Int, modelContext: ModelContext) async throws {
-        try await sendCommand(for: vehicle, command: .setTargetSOC(acLevel: acLevel, dcLevel: dcLevel), modelContext: modelContext)
+        try await sendCommand(
+            for: vehicle,
+            command: .setTargetSOC(acLevel: acLevel, dcLevel: dcLevel),
+            modelContext: modelContext
+        )
+    }
+}
+
+// MARK: - EV Trip Details
+
+extension BBAccount {
+    /// Fetches EV trip details for a vehicle. Returns nil if the API doesn't support this feature.
+    @MainActor
+    func fetchEVTripDetails(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws -> [EVTripDetail]? {
+        guard let api, let authToken else {
+            try await initialize(modelContext: modelContext)
+            return try await fetchEVTripDetails(for: bbVehicle, modelContext: modelContext)
+        }
+
+        let vehicle = bbVehicle.toVehicle()
+
+        do {
+            return try await api.fetchEVTripDetails(for: vehicle, authToken: authToken)
+        } catch let error as APIError where
+            error.errorType == .invalidVehicleSession ||
+            error.errorType == .invalidCredentials {
+            try await handleInvalidVehicleSession(modelContext: modelContext)
+            guard let api = self.api, let authToken = self.authToken else {
+                throw APIError.failedRetryLogin()
+            }
+            return try await api.fetchEVTripDetails(for: vehicle, authToken: authToken)
+        }
+    }
+
+    /// Returns true if the account's API supports EV trip details
+    var supportsEVTripDetails: Bool {
+        // Currently only Hyundai USA supports trip details
+        brandEnum == .hyundai && regionEnum == .usa
     }
 }
 
@@ -487,9 +524,9 @@ extension BBAccount {
 
         do {
             try modelContext.save()
-            print("🟢 [BBAccount] Removed account from SwiftData")
+            BBLogger.info(.api, "BBAccount: Removed account from SwiftData")
         } catch {
-            print("🔴 [BBAccount] Failed to remove account from SwiftData: \(error)")
+            BBLogger.error(.api, "BBAccount: Failed to remove account from SwiftData: \(error)")
         }
     }
 
@@ -500,9 +537,9 @@ extension BBAccount {
 
         do {
             try modelContext.save()
-            print("🟢 [BBAccount] Updated account in SwiftData")
+            BBLogger.info(.api, "BBAccount: Updated account in SwiftData")
         } catch {
-            print("🔴 [BBAccount] Failed to update account in SwiftData: \(error)")
+            BBLogger.error(.api, "BBAccount: Failed to update account in SwiftData: \(error)")
         }
     }
 
@@ -514,9 +551,9 @@ extension BBAccount {
 
         do {
             try modelContext.save()
-            print("🟢 [BBAccount] Updated vehicle sort orders")
+            BBLogger.info(.api, "BBAccount: Updated vehicle sort orders")
         } catch {
-            print("🔴 [BBAccount] Failed to update vehicle sort orders: \(error)")
+            BBLogger.error(.api, "BBAccount: Failed to update vehicle sort orders: \(error)")
         }
     }
 }

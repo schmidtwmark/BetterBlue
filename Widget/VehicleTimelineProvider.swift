@@ -94,7 +94,7 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             guard let bbVehicle = targetVehicle,
                   let account = bbVehicle.account
             else {
-                print("🔄 [Widget] No vehicle or account found for refresh")
+                BBLogger.info(.app, "Widget: No vehicle or account found for refresh")
                 return await getVehicleEntityFromContext(for: configuration, context: context)
             }
 
@@ -104,14 +104,14 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             let thirtyMinutesInSeconds: TimeInterval = 30 * 60
 
             if timeSinceLastUpdate < thirtyMinutesInSeconds {
-                print("📱 [Widget] Using fresh data for \(vehicleName) (updated \(Int(timeSinceLastUpdate / 60))m ago)")
+                BBLogger.info(.app, "Widget: Using fresh data for \(vehicleName) (updated \(Int(timeSinceLastUpdate / 60))m ago)")
             } else {
-                print("🔄 [Widget] Refreshing stale vehicle status for \(vehicleName) (last updated \(Int(timeSinceLastUpdate / 60))m ago)")
+                BBLogger.info(.app, "Widget: Refreshing stale vehicle status for \(vehicleName) (last updated \(Int(timeSinceLastUpdate / 60))m ago)")
 
                 // Refresh vehicle status only if data is stale
                 try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
 
-                print("✅ [Widget] Successfully refreshed \(vehicleName)")
+                BBLogger.info(.app, "Widget: Successfully refreshed \(vehicleName)")
             }
 
             // Create vehicle entity on the main actor to avoid capture issues
@@ -121,7 +121,7 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             return vehicleEntity
 
         } catch {
-            print("❌ [Widget] Failed to refresh vehicle data: \(error)")
+            BBLogger.error(.app, "Widget: Failed to refresh vehicle data: \(error)")
 
             // Fall back to cached data
             do {
@@ -135,7 +135,7 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
                 let context = ModelContext(modelContainer)
                 return await getVehicleEntityFromContext(for: configuration, context: context)
             } catch {
-                print("❌ [Widget] Failed to get cached vehicle data: \(error)")
+                BBLogger.error(.app, "Widget: Failed to get cached vehicle data: \(error)")
                 return nil
             }
         }
@@ -169,7 +169,7 @@ struct VehicleTimelineProvider: AppIntentTimelineProvider {
             return vehicleEntity
 
         } catch {
-            print("❌ [Widget] Failed to fetch vehicles from context: \(error)")
+            BBLogger.error(.app, "Widget: Failed to fetch vehicles from context: \(error)")
             return nil
         }
     }
