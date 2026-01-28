@@ -11,9 +11,7 @@ import SwiftUI
 
 struct VehicleBasicInfoSection: View {
     let bbVehicle: BBVehicle
-    @State private var appSettings = AppSettings.shared
     @Binding var showingCopiedMessage: Bool
-    @Binding var showingCopiedMileageMessage: Bool
 
     var body: some View {
         Section("Basic Information") {
@@ -44,32 +42,6 @@ struct VehicleBasicInfoSection: View {
             .onTapGesture {
                 copyVINToClipboard()
             }
-
-            HStack {
-                Text("Mileage")
-                Spacer()
-                Text(bbVehicle.odometer.units.format(
-                    bbVehicle.odometer.length,
-                    to: appSettings.preferredDistanceUnit,
-                ))
-                .foregroundColor(.secondary)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                copyMileageToClipboard()
-            }
-
-            HStack {
-                Text("Last Sync")
-                Spacer()
-                if let syncDate = bbVehicle.syncDate {
-                    Text(formatSyncDate(syncDate))
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Unknown")
-                        .foregroundColor(.secondary)
-                }
-            }
         }
     }
 
@@ -84,41 +56,6 @@ struct VehicleBasicInfoSection: View {
             withAnimation(.easeInOut(duration: 0.3)) {
                 showingCopiedMessage = false
             }
-        }
-    }
-
-    private func copyMileageToClipboard() {
-        let mileage = Int(bbVehicle.odometer.units.convert(
-            bbVehicle.odometer.length,
-            to: appSettings.preferredDistanceUnit,
-        ))
-        UIPasteboard.general.string = String(mileage)
-
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showingCopiedMileageMessage = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showingCopiedMileageMessage = false
-            }
-        }
-    }
-
-    private func formatSyncDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let timeFormatter = DateFormatter()
-        timeFormatter.timeStyle = .short
-
-        if calendar.isDateInToday(date) {
-            return "Today at \(timeFormatter.string(from: date))"
-        } else if calendar.isDateInYesterday(date) {
-            return "Yesterday at \(timeFormatter.string(from: date))"
-        } else {
-            let dayFormatter = DateFormatter()
-            dayFormatter.dateStyle = .medium
-            dayFormatter.timeStyle = .short
-            return dayFormatter.string(from: date)
         }
     }
 }

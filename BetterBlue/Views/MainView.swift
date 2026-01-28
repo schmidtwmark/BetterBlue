@@ -26,8 +26,6 @@ struct MainView: View {
     @State private var markerMenuPosition = CGPoint.zero
     @State private var isLoading = false
     @State private var lastError: APIError?
-    @State private var isRefreshing = false
-    @State private var showRefreshSuccess = false
 
     @State private var screenHeight: CGFloat = 0
     @State private var mapRegion = MKCoordinateRegion(
@@ -218,29 +216,6 @@ struct MainView: View {
                     )
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task {
-                            await refreshCurrentVehicle()
-                        }
-                    } label: {
-                        Group {
-                            if isRefreshing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else if showRefreshSuccess {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
-                    }
-                    .disabled(isRefreshing || currentVehicle == nil)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isRefreshing)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showRefreshSuccess)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape.fill") {
                         showingSettings = true
@@ -412,44 +387,6 @@ extension MainView {
         }
     }
 
-    private func refreshCurrentVehicle() async {
-        guard let vehicle = currentVehicle else { return }
-
-        await MainActor.run {
-            isRefreshing = true
-            showRefreshSuccess = false
-        }
-
-        do {
-            guard let account = vehicle.account else {
-                throw APIError(message: "Account not found for vehicle")
-            }
-
-            try await account.fetchAndUpdateVehicleStatus(for: vehicle, modelContext: modelContext)
-
-            await MainActor.run {
-                isRefreshing = false
-                showRefreshSuccess = true
-                lastError = nil
-
-                WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
-
-                // Hide success indicator after 2 seconds
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        showRefreshSuccess = false
-                    }
-                }
-            }
-        } catch {
-            await MainActor.run {
-                isRefreshing = false
-                showRefreshSuccess = false
-                BBLogger.error(.app, "MainView: Error refreshing vehicle \(vehicle.vin): \(error)")
-            }
-        }
-    }
 }
 
 #Preview {

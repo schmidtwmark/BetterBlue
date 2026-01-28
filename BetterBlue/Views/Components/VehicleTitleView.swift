@@ -9,6 +9,7 @@ import BetterBlueKit
 import CoreLocation
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 struct VehicleTitleView: View {
     let bbVehicle: BBVehicle
@@ -16,10 +17,13 @@ struct VehicleTitleView: View {
     let onVehicleSelected: (BBVehicle) -> Void
     let accounts: [BBAccount]
     var transition: Namespace.ID?
+    var onRefresh: (() async -> Void)?
     @Environment(\.modelContext) private var modelContext
     @State private var appSettings = AppSettings.shared
 
     @State private var isExpanded = false
+    @State private var isRefreshing = false
+    @State private var showRefreshSuccess = false
     @State private var showingVehicleInfo = false
     @State private var showingAccountInfo = false
     @State private var showingHTTPLogs = false
@@ -27,6 +31,9 @@ struct VehicleTitleView: View {
     @State private var showingTripDetails = false
     @State private var customVehicleName = ""
     @Namespace private var fallbackTransition
+
+    /// Fixed height for the quick action button
+    private let buttonHeight: CGFloat = 52
 
     private var vehicleAccount: BBAccount? {
         bbVehicle.account
@@ -41,78 +48,35 @@ struct VehicleTitleView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row (never animates)
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(bbVehicle.displayName)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
+        HStack(alignment: .bottom, spacing: 8) {
+            // Left side: Title card with expandable content
+            titleCard
 
-                    if let lastUpdated = bbVehicle.lastUpdated {
-                        let timeString = formatLastUpdated(lastUpdated)
-                        if timeString != "" {
-                            Text(timeString)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                    .animation(.easeInOut(duration: 0.2), value: isExpanded)
-            }
-            .animation(nil, value: isExpanded)
-
-            // Expanded content
-            if isExpanded {
-                expandedContent
-            }
-        }
-        .padding()
-        .vehicleCardGlassEffect()
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExpanded.toggle()
-            }
+            // Right side: Refresh button (stays at bottom)
+            refreshButton
         }
         .contextMenu {
             contextMenuContent
         }
         .sheet(isPresented: $showingVehicleInfo) {
             NavigationView {
-                VehicleInfoView(
-                    bbVehicle: bbVehicle,
-                )
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Done") {
-                            showingVehicleInfo = false
+                VehicleInfoView(bbVehicle: bbVehicle)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") { showingVehicleInfo = false }
                         }
                     }
-                }
             }
         }
         .sheet(isPresented: $showingAccountInfo) {
             if let account = vehicleAccount {
                 NavigationView {
-                    AccountInfoView(
-                        account: account,
-                    )
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Done") {
-                                showingAccountInfo = false
+                    AccountInfoView(account: account)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") { showingAccountInfo = false }
                             }
                         }
-                    }
                 }
             }
         }
@@ -122,9 +86,7 @@ struct VehicleTitleView: View {
                     HTTPLogView(accountId: account.id, transition: transition)
                         .toolbar {
                             ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Done") {
-                                    showingHTTPLogs = false
-                                }
+                                Button("Done") { showingHTTPLogs = false }
                             }
                         }
                 }
@@ -138,9 +100,7 @@ struct VehicleTitleView: View {
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Done") {
-                                    showingVehicleConfiguration = false
-                                }
+                                Button("Done") { showingVehicleConfiguration = false }
                             }
                         }
                 }
@@ -151,11 +111,131 @@ struct VehicleTitleView: View {
                 TripDetailsView(bbVehicle: bbVehicle)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Done") {
-                                showingTripDetails = false
-                            }
+                            Button("Done") { showingTripDetails = false }
                         }
                     }
+            }
+        }
+    }
+
+    // MARK: - Title Card (Left Side)
+
+    @ViewBuilder
+    private var titleCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header row - fixed height when collapsed
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bbVehicle.displayName)
+                        .font(isExpanded ? .title2 : .headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+
+                    // VIN only shown when expanded
+                    if isExpanded {
+                        Text(bbVehicle.vin)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Last update time shown in header when collapsed
+                if !isExpanded, let lastUpdated = bbVehicle.lastUpdated {
+                    Text(compactLastUpdated(lastUpdated))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+            }
+            .padding()
+            .frame(height: isExpanded ? nil : buttonHeight, alignment: .leading)
+            .frame(minHeight: buttonHeight)
+
+            // Expanded content
+            if isExpanded {
+                expandedContent
+            }
+        }
+        .vehicleCardGlassEffect()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+
+    // MARK: - Refresh Button (Right Side)
+
+    @ViewBuilder
+    private var refreshButton: some View {
+        Button {
+            Task {
+                await performRefresh()
+            }
+        } label: {
+            Group {
+                if isRefreshing {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else if showRefreshSuccess {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.green)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundColor(.blue)
+                }
+            }
+            .frame(width: buttonHeight, height: buttonHeight)
+            .vehicleCardGlassEffect()
+        }
+        .buttonStyle(.plain)
+        .disabled(isRefreshing)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isRefreshing)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showRefreshSuccess)
+    }
+
+    // MARK: - Refresh Logic
+
+    private func performRefresh() async {
+        await MainActor.run {
+            isRefreshing = true
+            showRefreshSuccess = false
+        }
+
+        do {
+            guard let account = bbVehicle.account else {
+                throw APIError(message: "Account not found for vehicle")
+            }
+
+            try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: modelContext)
+
+            await MainActor.run {
+                isRefreshing = false
+                showRefreshSuccess = true
+                WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        showRefreshSuccess = false
+                    }
+                }
+            }
+
+            // Call the optional refresh callback
+            await onRefresh?()
+        } catch {
+            await MainActor.run {
+                isRefreshing = false
+                showRefreshSuccess = false
+                BBLogger.error(.app, "VehicleTitleView: Error refreshing vehicle \(bbVehicle.vin): \(error)")
             }
         }
     }
@@ -164,7 +244,26 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+
+            // Last update time (when status was last updated)
+            if let lastUpdated = bbVehicle.lastUpdated {
+                StatusInfoRow(
+                    icon: "arrow.clockwise",
+                    label: "Last Update",
+                    value: formatLastUpdated(lastUpdated)
+                )
+            }
+
+            // Last sync time (when car synced to server)
+            if let syncDate = bbVehicle.syncDate {
+                StatusInfoRow(
+                    icon: "car",
+                    label: "Car Synced",
+                    value: formatLastUpdated(syncDate)
+                )
+            }
+
             // Odometer
             StatusInfoRow(
                 icon: "speedometer",
@@ -185,19 +284,17 @@ struct VehicleTitleView: View {
                 )
             }
 
-            // Doors Status (car.top icons)
+            // Doors Status
             if let doorOpen = bbVehicle.doorOpen {
                 let doorStatus = buildDoorStatusText(doorOpen: doorOpen)
-                let doorIcon = buildDoorIcon(doorOpen: doorOpen)
-                StatusInfoRow(
-                    icon: doorIcon,
-                    label: "Doors",
+                DoorStatusRow(
+                    doorIcon: buildDoorIcon(doorOpen: doorOpen),
                     value: doorStatus.text,
                     valueColor: doorStatus.isOpen ? .orange : .green
                 )
             }
 
-            // Hood/Trunk Status (car.side icons)
+            // Hood/Trunk Status
             HoodTrunkStatusRow(
                 hoodOpen: bbVehicle.hoodOpen ?? false,
                 trunkOpen: bbVehicle.trunkOpen ?? false
@@ -214,7 +311,7 @@ struct VehicleTitleView: View {
                 )
             }
         }
-        .padding(.top, 4)
+        .padding([.horizontal, .bottom])
     }
 
     private func buildDoorStatusText(doorOpen: VehicleStatus.DoorStatus) -> (text: String, isOpen: Bool) {
@@ -228,7 +325,7 @@ struct VehicleTitleView: View {
         let openCount = openDoors.filter { $0.isOpen }.count
 
         if openCount == 0 {
-            return ("All Closed", false)
+            return ("Closed", false)
         } else if openCount == 1 {
             let openDoor = openDoors.first { $0.isOpen }!
             return ("\(openDoor.name) open", true)
@@ -261,44 +358,48 @@ struct VehicleTitleView: View {
         }
     }
 
-    private func buildDoorIcon(doorOpen: VehicleStatus.DoorStatus) -> String {
+    @ViewBuilder
+    private func buildDoorIcon(doorOpen: VehicleStatus.DoorStatus) -> some View {
         let fl = doorOpen.frontLeft
         let fr = doorOpen.frontRight
         let bl = doorOpen.backLeft
         let br = doorOpen.backRight
 
-        // No doors open
         if !doorOpen.anyOpen {
-            return "car.top"
+            Image("custom.car.top")
+        } else if fl && fr && bl && br {
+            Image(systemName: "car.top.door.front.left.and.front.right.and.rear.left.and.rear.right.open")
+        } else if fl && fr && bl {
+            Image(systemName: "car.top.door.front.left.and.front.right.and.rear.left.open")
+        } else if fl && fr && br {
+            Image(systemName: "car.top.door.front.left.and.front.right.and.rear.right.open")
+        } else if fl && bl && br {
+            Image(systemName: "car.top.door.front.left.and.rear.left.and.rear.right.open")
+        } else if fr && bl && br {
+            Image(systemName: "car.top.door.front.right.and.rear.left.and.rear.right.open")
+        } else if fl && fr {
+            Image(systemName: "car.top.door.front.left.and.front.right.open")
+        } else if bl && br {
+            Image(systemName: "car.top.door.rear.left.and.rear.right.open")
+        } else if fl && bl {
+            Image(systemName: "car.top.door.front.left.and.rear.left.open")
+        } else if fr && br {
+            Image(systemName: "car.top.door.front.right.and.rear.right.open")
+        } else if fl && br {
+            Image(systemName: "car.top.door.front.left.and.rear.right.open")
+        } else if fr && bl {
+            Image(systemName: "car.top.door.front.right.and.rear.left.open")
+        } else if fl {
+            Image(systemName: "car.top.door.front.left.open")
+        } else if fr {
+            Image(systemName: "car.top.door.front.right.open")
+        } else if bl {
+            Image(systemName: "car.top.door.rear.left.open")
+        } else if br {
+            Image(systemName: "car.top.door.rear.right.open")
+        } else {
+            Image("custom.car.top")
         }
-
-        // All four doors
-        if fl && fr && bl && br {
-            return "car.top.door.front.left.and.front.right.and.rear.left.and.rear.right.open"
-        }
-
-        // Three doors (various combinations)
-        if fl && fr && bl { return "car.top.door.front.left.and.front.right.and.rear.left.open" }
-        if fl && fr && br { return "car.top.door.front.left.and.front.right.and.rear.right.open" }
-        if fl && bl && br { return "car.top.door.front.left.and.rear.left.and.rear.right.open" }
-        if fr && bl && br { return "car.top.door.front.right.and.rear.left.and.rear.right.open" }
-
-        // Two doors
-        if fl && fr { return "car.top.door.front.left.and.front.right.open" }
-        if bl && br { return "car.top.door.rear.left.and.rear.right.open" }
-        if fl && bl { return "car.top.door.front.left.and.rear.left.open" }
-        if fr && br { return "car.top.door.front.right.and.rear.right.open" }
-        if fl && br { return "car.top.door.front.left.and.rear.right.open" }
-        if fr && bl { return "car.top.door.front.right.and.rear.left.open" }
-
-        // Single door
-        if fl { return "car.top.door.front.left.open" }
-        if fr { return "car.top.door.front.right.open" }
-        if bl { return "car.top.door.rear.left.open" }
-        if br { return "car.top.door.rear.right.open" }
-
-        // Fallback
-        return "car.top"
     }
 
     // MARK: - Context Menu
@@ -308,16 +409,16 @@ struct VehicleTitleView: View {
         if bbVehicles.count > 1 {
             Menu {
                 ForEach(bbVehicles, id: \.id) { vehicle in
-                    Button(action: {
+                    Button {
                         onVehicleSelected(vehicle)
-                    }, label: {
+                    } label: {
                         HStack {
                             Text(vehicle.displayName)
                             if vehicle.id == bbVehicle.id {
                                 Image(systemName: "checkmark")
                             }
                         }
-                    })
+                    }
                 }
             } label: {
                 Label("Switch Vehicles", systemImage: "iphone.app.switcher")
@@ -354,7 +455,6 @@ struct VehicleTitleView: View {
             }
         }
 
-        // Trip Details (only for Hyundai EVs)
         if bbVehicle.isElectric && vehicleAccount?.supportsEVTripDetails == true {
             Button {
                 showingTripDetails = true
@@ -423,6 +523,34 @@ private struct StatusInfoRow: View {
     }
 }
 
+// MARK: - Door Status Row
+
+private struct DoorStatusRow<Icon: View>: View {
+    let doorIcon: Icon
+    let value: String
+    var valueColor: Color = .primary
+
+    var body: some View {
+        HStack {
+            doorIcon
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 20)
+
+            Text("Doors")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(valueColor)
+        }
+    }
+}
+
 // MARK: - Hood/Trunk Status Row
 
 private struct HoodTrunkStatusRow: View {
@@ -468,11 +596,7 @@ private struct HoodTrunkStatusRow: View {
     @ViewBuilder
     private var carSideIcon: some View {
         if hoodOpen && trunkOpen {
-            ZStack {
-                Image(systemName: "car.side.front.open")
-                Image(systemName: "car.side.rear.open")
-            }
-            .drawingGroup()
+            Image("custom.car.side.rear.open.front.open")
         } else if hoodOpen {
             Image(systemName: "car.side.front.open")
         } else if trunkOpen {

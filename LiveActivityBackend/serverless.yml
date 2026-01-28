@@ -2,18 +2,23 @@ org: schmidtmark
 app: betterblue-live-activity
 service: betterblue-live-activity
 
+custom:
+  apnsEnvironment:
+    dev: development
+    prod: production
+
 provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   environment:
-    TABLE_NAME: betterblue-wakeup-schedules-v4
+    TABLE_NAME: betterblue-wakeup-schedules-${opt:stage, 'dev'}
     # APNs credentials - set these via environment variables
     APNS_KEY_ID: ${env:APNS_KEY_ID, 'LRNJLUAH2P'}
     APNS_TEAM_ID: ${env:APNS_TEAM_ID, 'C2UW47HS8X'}
     APNS_BUNDLE_ID: ${env:APNS_BUNDLE_ID, 'com.markschmidt.BetterBlue'}
-    APNS_ENVIRONMENT: ${opt:stage, 'dev'}  # 'dev' uses sandbox, 'prod' uses production
+    APNS_ENVIRONMENT: ${self:custom.apnsEnvironment.${opt:stage, 'dev'}, 'development'}
     APNS_KEY: ${ssm:/betterblue/apns-key}  # Stored in AWS SSM Parameter Store
   iam:
     role:
@@ -35,6 +40,7 @@ provider:
 functions:
   registerWakeUp:
     handler: handler.registerWakeUp
+    logRetentionInDays: 7
     events:
       - http:
           path: wakeup
@@ -43,6 +49,7 @@ functions:
 
   unregisterWakeUp:
     handler: handler.unregisterWakeUp
+    logRetentionInDays: 7
     events:
       - http:
           path: wakeup/unregister
@@ -51,6 +58,7 @@ functions:
 
   sendWakeUps:
     handler: handler.sendWakeUps
+    logRetentionInDays: 3  # Shortest retention for high-frequency function
     events:
       - schedule: rate(1 minute)
     timeout: 60
@@ -60,7 +68,7 @@ resources:
     WakeUpTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: betterblue-wakeup-schedules-v4
+        TableName: betterblue-wakeup-schedules-${opt:stage, 'dev'}
         AttributeDefinitions:
           - AttributeName: pushToken
             AttributeType: S

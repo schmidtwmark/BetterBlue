@@ -33,11 +33,16 @@ A modern iOS app for controlling your Hyundai or Kia vehicle using BlueLink and 
 - **Plug-in Hybrids** (PHEV) - both electric and gas systems
 
 ### 📱 iOS Features
-- **Widget Support** - quick vehicle status on your home screen
+- **Home Screen Widgets** - quick vehicle status on your home screen
+- **Lock Screen Widgets** - see battery and range at a glance
+- **Control Center Widgets** - lock, unlock, and control climate from Control Center (iOS 18+)
+- **Live Activities** (Beta) - real-time charging progress on your Lock Screen and Dynamic Island
 - **Apple Watch App** - control your vehicle from your wrist
-- **Shortcuts** - Automate vehicle actions and use Siri to send commands
+- **Watch Complications** - battery percentage on your watch face
+- **Siri Shortcuts** - automate vehicle actions with voice commands
 - **Dark Mode** - full support for light and dark themes
 - **Multiple Accounts** - manage vehicles from different accounts
+- **MFA Support** - seamless multi-factor authentication for Kia accounts
 
 ### 🛠 Developer Features
 - **HTTP Logging** - detailed request/response debugging
@@ -53,12 +58,14 @@ BetterBlue/
 ├── BetterBlue/                 # Main iOS app
 │   ├── Views/                  # SwiftUI views
 │   ├── Models/                 # SwiftData models
-│   ├── Utility/               # Helper classes
-│   └── BetterBlueApp.swift    # App entry point
-├── BetterBlueWatch/           # Apple Watch app
-├── Widget/                    # iOS widgets
-├── BetterBlueKit/             # Swift package for API
-└── README.md                  # This file
+│   ├── Utility/                # Helper classes
+│   └── BetterBlueApp.swift     # App entry point
+├── BetterBlueWatch Watch App/  # Apple Watch app
+├── Widget/                     # iOS widgets, Control Center, Live Activities
+├── WatchWidget/                # Watch complications
+├── LiveActivityBackend/        # Backend for Live Activity push notifications
+├── BetterBlueKit/              # Swift package for API communication
+└── README.md                   # This file
 ```
 
 ## Architecture
@@ -82,10 +89,26 @@ swiftlint lint
 - Vehicle status can be monitored in real-time
 - Fake vehicles support custom scenarios for testing
 
+## Live Activities (Beta)
+
+Live Activities display real-time charging progress on your Lock Screen and Dynamic Island. This feature is **off by default** and can be enabled in Settings > Widget Settings.
+
+### How it works
+To keep the Live Activity updated, BetterBlue uses a lightweight [backend service](LiveActivityBackend/) that sends silent push notifications to refresh the charging status periodically.
+
+### Privacy
+- No vehicle information is sent to the backend
+- No account credentials leave your device
+- Only your device's push token is stored temporarily
+- Tokens are automatically deleted after 8 hours
+
+The backend is fully open source - see [LiveActivityBackend/](LiveActivityBackend/) for the source code.
+
 ## Privacy & Security
 
 - **Credentials**: Stored securely in iCloud with SwiftData
 - **Network**: All API calls use HTTPS encryption
+- **Live Activities**: Only push tokens are sent to the backend (no vehicle data)
 
 ## Important Notes
 

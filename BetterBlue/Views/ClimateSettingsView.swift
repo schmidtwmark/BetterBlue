@@ -240,7 +240,7 @@ struct ClimateSettingsContent: View {
             .listRowInsets(EdgeInsets())
         }
 
-        if vehicle.generation >= 3 {
+        if vehicle.generation >= 3 || vehicle.enableSeatHeatControls {
             Section("Front Seats") {
                 HStack(spacing: 0) {
                     SeatHeatControl(

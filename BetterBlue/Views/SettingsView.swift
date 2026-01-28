@@ -34,6 +34,7 @@ struct SettingsView: View {
     // Debug functionality - only in debug builds
     @State private var showingClearDataAlert = false
     @State private var clearDataResult: String?
+    @State private var showingLiveActivitiesInfo = false
 
     var body: some View {
         NavigationView {
@@ -100,6 +101,24 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Widget Notifications", isOn: $appSettings.notificationsEnabled)
+                    Toggle(isOn: $appSettings.liveActivitiesEnabled) {
+                        HStack(spacing: 6) {
+                            Text("Live Activities")
+                            Button {
+                                showingLiveActivitiesInfo = true
+                            } label: {
+                                Text("Beta")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 } header: {
                     Text("Widget Settings")
                 }
@@ -214,6 +233,9 @@ struct SettingsView: View {
                     "configurations, and other app data. This action cannot be undone.",
             )
         }
+        .sheet(isPresented: $showingLiveActivitiesInfo) {
+            LiveActivitiesInfoSheet()
+        }
     }
 
     private func deleteAccounts(offsets: IndexSet) {
@@ -285,6 +307,148 @@ struct SettingsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                 clearDataResult = nil
             }
+        }
+    }
+}
+
+// MARK: - Live Activities Info Sheet
+
+private struct LiveActivitiesInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Live Activities", systemImage: "bolt.fill")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("Beta Feature")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Divider()
+
+                    // What it does
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("What it does")
+                            .font(.headline)
+                        Text(
+                            "When enabled, BetterBlue will display a Live Activity on your " +
+                            "Lock Screen and Dynamic Island while your vehicle is charging. " +
+                            "The Live Activity shows real-time charging progress without " +
+                            "needing to open the app."
+                        )
+                        .foregroundColor(.secondary)
+                    }
+
+                    // How it works
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("How it works")
+                            .font(.headline)
+                        Text(
+                            "To keep the Live Activity updated, BetterBlue registers your " +
+                            "device with a lightweight backend service that periodically " +
+                            "sends silent push notifications to wake the app and refresh " +
+                            "the charging status."
+                        )
+                        .foregroundColor(.secondary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Why Beta?").font(.headline)
+                        Text("Live Activities are considered a Beta feature for now. Supporting push notifications in this way requires paying for cloud server time. If this feature ends up being too expensive to maintain, I will likely disable it.")
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Privacy section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Your Privacy", systemImage: "lock.shield.fill")
+                            .font(.headline)
+                            .foregroundColor(.green)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            PrivacyBullet(
+                                icon: "checkmark.circle.fill",
+                                text: "No vehicle information is sent to the backend"
+                            )
+                            PrivacyBullet(
+                                icon: "checkmark.circle.fill",
+                                text: "No account credentials leave your device"
+                            )
+                            PrivacyBullet(
+                                icon: "checkmark.circle.fill",
+                                text: "Only your device's push token is stored"
+                            )
+                            PrivacyBullet(
+                                icon: "checkmark.circle.fill",
+                                text: "Tokens are automatically deleted after 8 hours"
+                            )
+                        }
+                    }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    // Open source
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Open Source")
+                            .font(.headline)
+                        Text(
+                            "The backend service is fully open source. You can review " +
+                            "exactly what data is collected and how it's used."
+                        )
+                        .foregroundColor(.secondary)
+
+                        Button {
+                            if let url = URL(string: "https://github.com/schmidtwmark/BetterBlue/tree/main/LiveActivityBackend") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Text("View Backend Source Code")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Spacer(minLength: 20)
+                }
+                .padding()
+            }
+            .navigationTitle("About Live Activities")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PrivacyBullet: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(.green)
+                .font(.subheadline)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
     }
 }

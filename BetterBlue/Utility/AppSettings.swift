@@ -53,6 +53,7 @@ class AppSettings {
     private let notificationsEnabledKey = "NotificationsEnabled"
     private let widgetRefreshIntervalKey = "WidgetRefreshInterval"
     private let debugModeEnabledKey = "DebugModeEnabled"
+    private let liveActivitiesEnabledKey = "LiveActivitiesEnabled"
 
     var preferredDistanceUnit: Distance.Units {
         didSet {
@@ -91,6 +92,12 @@ class AppSettings {
         }
     }
 
+    var liveActivitiesEnabled: Bool {
+        didSet {
+            userDefaults.set(liveActivitiesEnabled, forKey: liveActivitiesEnabledKey)
+        }
+    }
+
     private init() {
         let savedDistanceUnit = userDefaults
             .string(forKey: distanceUnitKey) ?? Distance.Units.miles.rawValue
@@ -114,6 +121,9 @@ class AppSettings {
         } else {
             debugModeEnabled = userDefaults.bool(forKey: debugModeEnabledKey)
         }
+
+        // Live Activities is a beta feature, disabled by default
+        liveActivitiesEnabled = userDefaults.bool(forKey: liveActivitiesEnabledKey)
     }
 
     private func requestNotificationPermission() async {

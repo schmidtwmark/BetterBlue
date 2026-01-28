@@ -76,6 +76,10 @@ class BBVehicle {
     var debugConfiguration: BBDebugConfiguration?
     var debugLiveActivity: Bool = false
 
+    /// Override to show seat heat controls on older vehicles (generation < 3)
+    /// Ignored for generation 3+ vehicles where seat heat controls are always shown
+    var enableSeatHeatControls: Bool = false
+
     var chargePortType: ChargePortType {
         get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
         set { chargePortTypeRaw = newValue.rawValue }

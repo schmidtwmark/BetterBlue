@@ -15,7 +15,6 @@ struct VehicleInfoView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var customName: String = ""
     @State private var showingCopiedMessage = false
-    @State private var showingCopiedMileageMessage = false
     @State private var appSettings = AppSettings.shared
     @Query private var allClimatePresets: [ClimatePreset]
 
@@ -27,8 +26,7 @@ struct VehicleInfoView: View {
         Form {
             VehicleBasicInfoSection(
                 bbVehicle: bbVehicle,
-                showingCopiedMessage: $showingCopiedMessage,
-                showingCopiedMileageMessage: $showingCopiedMileageMessage,
+                showingCopiedMessage: $showingCopiedMessage
             )
 
             Section("Custom Name") {
@@ -53,6 +51,30 @@ struct VehicleInfoView: View {
                     ))
                 }
             }
+
+            // Climate Settings (only for older vehicles)
+            if bbVehicle.generation < 3 {
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { bbVehicle.enableSeatHeatControls },
+                        set: { newValue in
+                            bbVehicle.enableSeatHeatControls = newValue
+                            try? modelContext.save()
+                        }
+                    )) {
+                        HStack {
+                            Text("Seat Heat Controls")
+                            SeatHeatInfoButton()
+                        }
+                    }
+                } header: {
+                    Text("Climate Settings")
+                } footer: {
+                    Text("Enable seat heating and cooling controls for vehicles that support them.")
+                }
+            }
+            
+            ClimatePresetsSection(bbVehicle: bbVehicle, vehiclePresets: vehiclePresets)
 
             // EV Settings (only for electric vehicles)
             if bbVehicle.isElectric {
@@ -89,12 +111,6 @@ struct VehicleInfoView: View {
             if let account = bbVehicle.account, account.brandEnum == .fake {
                 Section("Fake Vehicle Configuration") {
                     NavigationLink("Configure Vehicle", destination: FakeVehicleDetailView(vehicle: bbVehicle))
-                }
-            }
-
-            // Debug section (only when debug mode is enabled)
-            if appSettings.debugModeEnabled {
-                Section {
                     Toggle("Debug Live Activity", isOn: Binding(
                         get: { bbVehicle.debugLiveActivity },
                         set: { newValue in
@@ -103,31 +119,15 @@ struct VehicleInfoView: View {
                             LiveActivityManager.shared.updateDebugActivity(for: bbVehicle)
                         }
                     ))
-                } header: {
-                    Text("Debug")
-                } footer: {
-                    Text("Shows a debug Live Activity that displays wakeup count and timing information for testing push notifications.")
                 }
             }
 
-            ClimatePresetsSection(bbVehicle: bbVehicle, vehiclePresets: vehiclePresets)
         }
         .navigationTitle("Vehicle Info")
         .navigationBarTitleDisplayMode(.inline)
         .overlay(alignment: .top) {
             if showingCopiedMessage {
                 Text("VIN copied to clipboard")
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.8))
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .zIndex(1)
-            }
-
-            if showingCopiedMileageMessage {
-                Text("Mileage copied to clipboard")
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(Color.black.opacity(0.8))
@@ -162,6 +162,27 @@ struct VehicleInfoView: View {
             } catch {
                 BBLogger.error(.app, "Failed to create default preset: \(error)")
             }
+        }
+    }
+}
+
+// MARK: - Seat Heat Info Button
+
+private struct SeatHeatInfoButton: View {
+    @State private var showingInfo = false
+
+    var body: some View {
+        Button {
+            showingInfo = true
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundColor(.blue)
+        }
+        .buttonStyle(.plain)
+        .alert("Seat Heat Controls", isPresented: $showingInfo) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Seat heating and cooling controls are automatically available for newer vehicles (generation 3+). Some older vehicles also support these features but require manual enabling.\n\nIf your vehicle has heated or ventilated seats, you can enable this option to show seat controls in your climate presets. If your vehicle doesn't support these features, the controls will have no effect.")
         }
     }
 }

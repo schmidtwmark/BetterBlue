@@ -114,7 +114,7 @@ struct VehicleCardsView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     ForEach(
                         Array(displayedVehicles.enumerated()),
                         id: \.element.id,

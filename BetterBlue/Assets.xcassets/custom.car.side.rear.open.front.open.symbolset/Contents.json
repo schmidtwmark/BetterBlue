@@ -1,0 +1,12 @@
+{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "symbols" : [
+    {
+      "filename" : "custom.car.side.rear.open.front.open.svg",
+      "idiom" : "universal"
+    }
+  ]
+}

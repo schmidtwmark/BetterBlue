@@ -19,6 +19,7 @@ class BBAccount {
     var region: String = "" // Store as string, convert to/from Region enum
     var dateCreated: Date = Date()
     var rememberMeToken: String?
+    var serializedAuthToken: String?
 
     @Relationship(deleteRule: .cascade) var vehicles: [BBVehicle]? = []
 
@@ -29,9 +30,37 @@ class BBAccount {
     @Transient
     private var api: (any APIClientProtocol)?
     @Transient
-    private var authToken: AuthToken?
+    private var cachedAuthToken: AuthToken?
     @Transient
     private var modelContextForMFA: ModelContext?
+
+    /// Auth token with automatic persistence. Reads from cache first, then deserializes from storage.
+    /// When set, automatically serializes to storage.
+    private var authToken: AuthToken? {
+        get {
+            if let cached = cachedAuthToken {
+                return cached
+            }
+            // Try to deserialize from persisted storage
+            guard let serialized = serializedAuthToken,
+                  let data = serialized.data(using: .utf8),
+                  let token = try? JSONDecoder().decode(AuthToken.self, from: data) else {
+                return nil
+            }
+            cachedAuthToken = token
+            return token
+        }
+        set {
+            cachedAuthToken = newValue
+            if let token = newValue,
+               let data = try? JSONEncoder().encode(token),
+               let serialized = String(data: data, encoding: .utf8) {
+                serializedAuthToken = serialized
+            } else {
+                serializedAuthToken = nil
+            }
+        }
+    }
 
     init(username: String, password: String, pin: String, brand: Brand, region: Region) {
         id = UUID()
@@ -96,30 +125,30 @@ extension BBAccount {
             api = createAPIClient(configuration: configuration)
         }
 
-        if authToken == nil {
-            // authToken assignment happens after login() returns
-            // If login() throws, api is still set above.
-            authToken = try await api!.login()
+        // Check if we have a valid persisted token
+        if let existingToken = authToken, existingToken.isValid {
+            BBLogger.info(.auth, "BBAccount: Using persisted auth token (expires: \(existingToken.expiresAt))")
+            return
         }
+
+        // Token is nil or expired, need to login
+        BBLogger.info(.auth, "BBAccount: No valid token, performing login...")
+        authToken = try await api!.login()
     }
 
     @MainActor
     func sendMFA(otpKey: String, xid: String, notifyType: String = "SMS") async throws {
         BBLogger.info(.mfa, "BBAccount: sendMFA requested for \(username)")
 
-        if api == nil, let modelContext = modelContextForMFA {
-            BBLogger.info(.mfa, "BBAccount: API nil, attempting re-init with stored context")
-            try? await initialize(modelContext: modelContext)
-        }
-
-        // Handle cached client wrapping
+        // Don't re-initialize during MFA flow - that would trigger a new login and reset the otpKey
+        // The API should already be initialized from the initial login attempt that triggered MFA
         let actualApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
             cached.underlyingClient
         } else if let api {
             api
         } else {
             BBLogger.error(.api, "BBAccount: API not initialized during MFA request")
-            throw APIError(message: "API not initialized", apiName: "BBAccount")
+            throw APIError(message: "API not initialized. Please try logging in again.", apiName: "BBAccount")
         }
 
         BBLogger.info(.mfa, "BBAccount: Using API type: \(type(of: actualApi))")
@@ -132,16 +161,14 @@ extension BBAccount {
 
     @MainActor
     func verifyMFA(otpKey: String, xid: String, otp: String) async throws {
-        if api == nil, let modelContext = modelContextForMFA {
-            try? await initialize(modelContext: modelContext)
-        }
-
+        // Don't re-initialize during MFA flow - that would trigger a new login and reset the otpKey
+        // The API should already be initialized from the initial login attempt that triggered MFA
         let actualApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
             cached.underlyingClient
         } else if let api {
             api
         } else {
-            throw APIError(message: "API not initialized", apiName: "BBAccount")
+            throw APIError(message: "API not initialized. Please try logging in again.", apiName: "BBAccount")
         }
 
         guard let kiaApi = actualApi as? KiaAPIClient else {
@@ -154,27 +181,9 @@ extension BBAccount {
         // Store the remember me token for future logins
         self.rememberMeToken = newRememberMeToken
 
-        // Step 2: Re-initialize API with new rememberMeToken so the next login call uses it
-        self.api = nil
-        if let modelContext = modelContextForMFA {
-            try await initialize(modelContext: modelContext)
-        }
-
-        // Get the updated KiaAPI with the new rememberMeToken
-        let updatedApi: any APIClientProtocol = if let cached = api as? CachedAPIClient {
-            cached.underlyingClient
-        } else if let api {
-            api
-        } else {
-            throw APIError(message: "API not initialized after MFA", apiName: "BBAccount")
-        }
-
-        guard let updatedKiaApi = updatedApi as? KiaAPIClient else {
-            throw APIError(message: "MFA completion failed", apiName: "BBAccount")
-        }
-
-        // Step 3: Complete login by calling authUser again with rmtoken and sid
-        let finalAuthToken = try await updatedKiaApi.completeLoginWithMFA(sid: verifyOTPSid)
+        // Step 2: Complete login by calling authUser again with rmtoken and sid
+        // Use the same API client - don't re-initialize as that would trigger another login
+        let finalAuthToken = try await kiaApi.completeLoginWithMFA(sid: verifyOTPSid, rmToken: newRememberMeToken)
         self.authToken = finalAuthToken
         BBLogger.info(.api, "BBAccount: MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
     }

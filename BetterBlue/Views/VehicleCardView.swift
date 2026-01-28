@@ -27,6 +27,9 @@ struct VehicleCardView: View {
     @State private var showingErrorHTTPLogs = false
     @State private var refreshTask: Task<Void, Never>?
 
+    // MFA re-authentication state
+    @State private var mfaState = MFAFlowState()
+
     // Safe accessor for evStatus
     private var safeEvStatus: VehicleStatus.EVStatus? {
         // Check if the vehicle is properly attached to a context before accessing properties
@@ -59,29 +62,29 @@ struct VehicleCardView: View {
 
     var body: some View {
         VStack(spacing: 8) {
+            Spacer(minLength: 0)
             // Error message card (only show if there's an error)
             if let errorMessage {
-                Group {
-                    if AppSettings.shared.debugModeEnabled {
-                        HStack {
-                            Text(errorMessage)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .tint(.blue)
-                            Spacer()
+                Button {
+                    if let apiError = lastAPIError {
+                        if apiError.errorType == .requiresMFA {
+                            // Extract MFA info and show appropriate flow
+                            handleMFAError(apiError)
+                        } else {
+                            showingErrorHTTPLogs = true
                         }
-                    } else {
-                        Button {
-                            if lastAPIError != nil {
-                                showingErrorHTTPLogs = true
-                            }
-                        } label: {
-                            HStack {
-                                Text(errorMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                Spacer()
-                            }
+                    }
+                } label: {
+                    HStack {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .tint(.blue)
+                        Spacer()
+                        if lastAPIError?.errorType == .requiresMFA {
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.red.opacity(0.7))
                         }
                     }
                 }
@@ -94,7 +97,15 @@ struct VehicleCardView: View {
                 bbVehicles: bbVehicles,
                 onVehicleSelected: onVehicleSelected,
                 accounts: accounts,
-                transition: transition
+                transition: transition,
+                onRefresh: {
+                    // Clear errors on successful refresh from title view
+                    await MainActor.run {
+                        errorMessage = nil
+                        lastAPIError = nil
+                        onSuccessfulRefresh?()
+                    }
+                }
             )
 
             // Vehicle status info
@@ -143,6 +154,19 @@ struct VehicleCardView: View {
                         }
                 }
             }
+        }
+        .mfaFlow(state: mfaState)
+    }
+
+    // MARK: - MFA Handling
+
+    private func handleMFAError(_ error: APIError) {
+        guard let account = bbVehicle.account else { return }
+        mfaState.start(from: error, account: account) { [self] in
+            // Refresh status after successful MFA
+            errorMessage = nil
+            lastAPIError = nil
+            await refreshStatus()
         }
     }
 
@@ -266,7 +290,8 @@ struct VehicleCardView: View {
         case .failedRetryLogin:
             "Unable to reconnect - check account settings"
         case .requiresMFA:
-            "MFA Required - Please re-authenticate in Settings"
+            // Use the error message which includes better context (e.g., "Session expired" vs "MFA Required")
+            "\(error.message) - Tap to verify"
         case .general:
             getUserFriendlyErrorMessageForGeneralError(error)
         case .kiaInvalidRequest:

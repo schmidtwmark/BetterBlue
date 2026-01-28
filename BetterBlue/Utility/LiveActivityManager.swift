@@ -14,7 +14,11 @@ import OSLog
 import SwiftData
 import UIKit
 
+#if DEBUG
 private let liveActivityBackendURL = "https://phgu023o97.execute-api.us-east-1.amazonaws.com/dev"
+#else
+private let liveActivityBackendURL = "https://6rx06wxs8f.execute-api.us-east-1.amazonaws.com/prod"
+#endif
 
 @MainActor
 final class LiveActivityManager {
@@ -97,6 +101,7 @@ final class LiveActivityManager {
 
     func updateActivity(for vehicle: BBVehicle, status: VehicleStatus, modelContext: ModelContext) {
         #if canImport(ActivityKit)
+        guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
         var type: LiveActivityType = .none
@@ -163,6 +168,7 @@ final class LiveActivityManager {
     /// Start or stop the debug Live Activity based on the vehicle's debugLiveActivity flag
     func updateDebugActivity(for vehicle: BBVehicle) {
         #if canImport(ActivityKit)
+        guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
         if vehicle.debugLiveActivity {
@@ -187,6 +193,7 @@ final class LiveActivityManager {
         climatePresetIcon: String? = nil
     ) {
         #if canImport(ActivityKit)
+        guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard let status = createStatusFromVehicle(vehicle) else { return }
 

@@ -336,7 +336,7 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 
     @Parameter(
         title: "Vehicle",
-        description: "Select the vehicle to unlock",
+        description: "Select the vehicle to unlock"
     )
     var vehicle: VehicleEntity?
 
@@ -352,7 +352,6 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
             try await account.unlockVehicle(bbVehicle, modelContext: context)
         }
 
-        // Send local notification for feedback
         await sendNotification(title: "Unlock Request Sent", body: "Command sent to \(vehicleName)")
 
         WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
@@ -380,7 +379,6 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
         let targetVin = preset.vehicleVin
 
         try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            // Try to find the actual ClimatePreset to get the ClimateOptions
             if let climatePreset = bbVehicle.safeClimatePresets.first(where: { $0.id == presetId }) {
                 try await account.startClimate(
                     bbVehicle,
@@ -390,7 +388,6 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
                     presetIcon: presetIcon
                 )
             } else {
-                // Fallback: use default options (will use selected preset from vehicle)
                 try await account.startClimate(
                     bbVehicle,
                     modelContext: context,
@@ -414,7 +411,7 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
 
     @Parameter(
         title: "Vehicle",
-        description: "Select the vehicle to stop climate control",
+        description: "Select the vehicle to stop climate control"
     )
     var vehicle: VehicleEntity?
 
@@ -444,7 +441,7 @@ struct StartChargeControlIntent: ControlConfigurationIntent {
 
     @Parameter(
         title: "Vehicle",
-        description: "Select the vehicle to start charging",
+        description: "Select the vehicle to start charging"
     )
     var vehicle: VehicleEntity?
 
@@ -474,7 +471,7 @@ struct StopChargeControlIntent: ControlConfigurationIntent {
 
     @Parameter(
         title: "Vehicle",
-        description: "Select the vehicle to stop charging",
+        description: "Select the vehicle to stop charging"
     )
     var vehicle: VehicleEntity?
 
@@ -494,6 +491,65 @@ struct StopChargeControlIntent: ControlConfigurationIntent {
 
         WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
         return .result(dialog: "Charge stop request sent to \(vehicleName)")
+    }
+}
+
+struct SetChargeLimitsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Set Charge Limits"
+    static var description = IntentDescription("Set the AC and DC charge limits for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(
+        title: "Vehicle",
+        description: "Select the vehicle to set charge limits"
+    )
+    var vehicle: VehicleEntity
+
+    @Parameter(
+        title: "AC Charge Limit",
+        description: "The charge limit for AC charging (Level 1/2)",
+        controlStyle: .stepper,
+        inclusiveRange: (50, 100)
+    )
+    var acLimit: Int
+
+    @Parameter(
+        title: "DC Charge Limit",
+        description: "The charge limit for DC fast charging",
+        controlStyle: .stepper,
+        inclusiveRange: (50, 100)
+    )
+    var dcLimit: Int
+
+    init() {}
+
+    init(vehicle: VehicleEntity, acLimit: Int, dcLimit: Int) {
+        self.vehicle = vehicle
+        self.acLimit = acLimit
+        self.dcLimit = dcLimit
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.setTargetSOC(
+                bbVehicle,
+                acLevel: acLimit,
+                dcLevel: dcLimit,
+                modelContext: context
+            )
+        }
+
+        await sendNotification(
+            title: "Charge Limits Set",
+            body: "AC: \(acLimit)%, DC: \(dcLimit)% for \(vehicleName)"
+        )
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Charge limits set to AC: \(acLimit)%, DC: \(dcLimit)% for \(vehicleName)")
     }
 }
 
@@ -521,3 +577,4 @@ enum IntentError: Swift.Error, LocalizedError {
         }
     }
 }
+
