@@ -111,16 +111,20 @@ struct VehicleInfoView: View {
             if let account = bbVehicle.account, account.brandEnum == .fake {
                 Section("Fake Vehicle Configuration") {
                     NavigationLink("Configure Vehicle", destination: FakeVehicleDetailView(vehicle: bbVehicle))
-                    Toggle("Debug Live Activity", isOn: Binding(
-                        get: { bbVehicle.debugLiveActivity },
-                        set: { newValue in
-                            bbVehicle.debugLiveActivity = newValue
-                            try? modelContext.save()
-                            LiveActivityManager.shared.updateDebugActivity(for: bbVehicle)
-                        }
-                    ))
                 }
             }
+            
+            #if DEBUG
+            Toggle("Debug Live Activity", isOn: Binding(
+                get: { bbVehicle.debugLiveActivity },
+                set: { newValue in
+                    bbVehicle.debugLiveActivity = newValue
+                    try? modelContext.save()
+                    LiveActivityManager.shared.updateDebugActivity(for: bbVehicle)
+                }
+            ))
+
+            #endif
 
         }
         .navigationTitle("Vehicle Info")
