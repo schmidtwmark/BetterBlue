@@ -209,10 +209,10 @@ struct EVRangeChargingCard: View {
                         } else {
                             EmptyView()
                         }
-                        
+
                     }
                 }
-                
+
             }
         }
         .padding()

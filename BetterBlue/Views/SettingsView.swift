@@ -35,6 +35,7 @@ struct SettingsView: View {
     @State private var showingClearDataAlert = false
     @State private var clearDataResult: String?
     @State private var showingLiveActivitiesInfo = false
+    @State private var showingExportSheet = false
 
     var body: some View {
         NavigationView {
@@ -156,17 +157,21 @@ struct SettingsView: View {
                         NavigationLink("Sync Diagnostics") {
                             DiagnosticInfoView()
                         }
+                    }
 
-                        Button("Clear All Data") {
-                            showingClearDataAlert = true
-                        }
-                        .foregroundColor(.red)
+                    Button("Clear All Data") {
+                        showingClearDataAlert = true
+                    }
+                    .foregroundColor(.red)
 
-                        if let result = clearDataResult {
-                            Text(result)
-                                .font(.caption)
-                                .foregroundColor(result.contains("Error") ? .red : .green)
-                        }
+                    if let result = clearDataResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundColor(result.contains("Error") ? .red : .green)
+                    }
+
+                    Button("Export Debug Data") {
+                        showingExportSheet = true
                     }
                 } header: {
                     Text("Debug Settings")
@@ -235,6 +240,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingLiveActivitiesInfo) {
             LiveActivitiesInfoSheet()
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            DebugExportSheet(accounts: accounts, appSettings: appSettings)
         }
     }
 
@@ -309,6 +317,154 @@ struct SettingsView: View {
             }
         }
     }
+
+}
+
+// MARK: - Debug Export Data
+
+private struct DebugExportData {
+    let raw: String
+    let redacted: String
+
+    @MainActor
+    static func generate(accounts: [BBAccount], appSettings: AppSettings) async -> DebugExportData {
+        // Create export structure using Codable
+        let export = DebugExportContent(
+            appInfo: DebugExportContent.AppInfo(
+                version: Bundle.main.releaseVersionNumber ?? "unknown",
+                build: Bundle.main.buildVersionNumber ?? "unknown",
+                exportDate: Date()
+            ),
+            appSettings: DebugExportContent.AppSettingsExport(
+                preferredDistanceUnit: appSettings.preferredDistanceUnit.rawValue,
+                preferredTemperatureUnit: appSettings.preferredTemperatureUnit.rawValue,
+                notificationsEnabled: appSettings.notificationsEnabled,
+                widgetRefreshInterval: appSettings.widgetRefreshInterval.rawValue,
+                debugModeEnabled: appSettings.debugModeEnabled,
+                liveActivitiesEnabled: appSettings.liveActivitiesEnabled
+            ),
+            accounts: accounts
+        )
+
+        // Encode to JSON
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let rawJSON: String
+        do {
+            let jsonData = try encoder.encode(export)
+            rawJSON = String(data: jsonData, encoding: .utf8) ?? "{}"
+        } catch {
+            rawJSON = "Error generating export: \(error.localizedDescription)"
+        }
+
+        let redactedJSON = SensitiveDataRedactor.redact(rawJSON) ?? rawJSON
+
+        return DebugExportData(raw: rawJSON, redacted: redactedJSON)
+    }
+}
+
+private struct DebugExportContent: Encodable {
+    let appInfo: AppInfo
+    let appSettings: AppSettingsExport
+    let accounts: [BBAccount]
+
+    struct AppInfo: Encodable {
+        let version: String
+        let build: String
+        let exportDate: Date
+    }
+
+    struct AppSettingsExport: Encodable {
+        let preferredDistanceUnit: String
+        let preferredTemperatureUnit: String
+        let notificationsEnabled: Bool
+        let widgetRefreshInterval: Int
+        let debugModeEnabled: Bool
+        let liveActivitiesEnabled: Bool
+    }
+}
+
+// MARK: - Debug Export Sheet
+
+private enum ExportMode: String, CaseIterable {
+    case redacted = "Redacted"
+    case raw = "Unredacted"
+}
+
+private struct DebugExportSheet: View {
+    let accounts: [BBAccount]
+    let appSettings: AppSettings
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var exportData: DebugExportData?
+    @State private var showingShareSheet = false
+    @State private var exportMode: ExportMode = .redacted
+
+    private var displayedContent: String {
+        guard let data = exportData else { return "" }
+        return exportMode == .redacted ? data.redacted : data.raw
+    }
+
+    var body: some View {
+        NavigationView {
+            Group {
+                if exportData == nil {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Generating export...")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    ScrollView {
+                        Text(displayedContent)
+                            .font(.system(.caption, design: .monospaced))
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .navigationTitle("Debug Export")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+                if exportData != nil {
+                    ToolbarItem(placement: .principal) {
+                        Picker("Export Mode", selection: $exportMode) {
+                            ForEach(ExportMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .fixedSize()
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showingShareSheet = true
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareSheet(activityItems: [displayedContent])
+            }
+            .task {
+                exportData = await DebugExportData.generate(
+                    accounts: accounts,
+                    appSettings: appSettings
+                )
+            }
+        }
+    }
 }
 
 // MARK: - Live Activities Info Sheet
@@ -357,11 +513,16 @@ private struct LiveActivitiesInfoSheet: View {
                         )
                         .foregroundColor(.secondary)
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Why Beta?").font(.headline)
-                        Text("Live Activities are considered a Beta feature for now. Supporting push notifications in this way requires paying for cloud server time. If this feature ends up being too expensive to maintain, I will likely disable it.")
-                            .foregroundColor(.secondary)
+                        Text(
+                            "Live Activities are considered a Beta feature for now. " +
+                            "Supporting push notifications in this way requires paying for " +
+                            "cloud server time. If this feature ends up being too expensive " +
+                            "to maintain, I will likely disable it."
+                        )
+                        .foregroundColor(.secondary)
                     }
 
                     // Privacy section

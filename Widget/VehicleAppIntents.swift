@@ -25,7 +25,7 @@ extension LiveActivityType: AppEnum {
         [
             .climate: DisplayRepresentation(title: "Climate"),
             .charging: DisplayRepresentation(title: "Charging"),
-            .none: DisplayRepresentation(title: "None"),
+            .none: DisplayRepresentation(title: "None")
         ]
     }
 
@@ -577,4 +577,3 @@ enum IntentError: Swift.Error, LocalizedError {
         }
     }
 }
-

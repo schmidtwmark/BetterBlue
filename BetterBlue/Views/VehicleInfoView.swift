@@ -73,7 +73,7 @@ struct VehicleInfoView: View {
                     Text("Enable seat heating and cooling controls for vehicles that support them.")
                 }
             }
-            
+
             ClimatePresetsSection(bbVehicle: bbVehicle, vehiclePresets: vehiclePresets)
 
             // EV Settings (only for electric vehicles)
@@ -113,7 +113,7 @@ struct VehicleInfoView: View {
                     NavigationLink("Configure Vehicle", destination: FakeVehicleDetailView(vehicle: bbVehicle))
                 }
             }
-            
+
             #if DEBUG
             Toggle("Debug Live Activity", isOn: Binding(
                 get: { bbVehicle.debugLiveActivity },
@@ -186,7 +186,14 @@ private struct SeatHeatInfoButton: View {
         .alert("Seat Heat Controls", isPresented: $showingInfo) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Seat heating and cooling controls are automatically available for newer vehicles (generation 3+). Some older vehicles also support these features but require manual enabling.\n\nIf your vehicle has heated or ventilated seats, you can enable this option to show seat controls in your climate presets. If your vehicle doesn't support these features, the controls will have no effect.")
+            Text(
+                "Seat heating and cooling controls are automatically available for newer " +
+                "vehicles (generation 3+). Some older vehicles also support these features " +
+                "but require manual enabling.\n\n" +
+                "If your vehicle has heated or ventilated seats, you can enable this option " +
+                "to show seat controls in your climate presets. If your vehicle doesn't " +
+                "support these features, the controls will have no effect."
+            )
         }
     }
 }

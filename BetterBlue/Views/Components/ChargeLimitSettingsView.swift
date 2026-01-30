@@ -178,7 +178,7 @@ struct ChargeLimitSettingsContent: View {
                     dcLevel: Int(dcLevel),
                     modelContext: modelContext
                 )
-                
+
                 let targetAcLevel = acLevel
                 let targetDcLevel = dcLevel
 
@@ -217,4 +217,3 @@ struct ChargeLimitSettingsContent: View {
         }
     }
 }
-

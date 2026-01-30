@@ -48,16 +48,26 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
     switch effectiveBrand {
     case .hyundai:
         BBLogger.info(.api, "APIClientFactory: Creating Hyundai API client")
-        let endpointProvider = HyundaiAPIEndpointProvider(configuration: configuration.apiConfiguration)
-        let underlyingClient = HyundaiAPIClient(
-            configuration: configuration.apiConfiguration,
-            endpointProvider: endpointProvider,
-        )
-        return CachedAPIClient(underlyingClient: underlyingClient)
+        switch configuration.apiConfiguration.region {
+        case .canada:
+            let endpointProvider = HyundaiAPIEndpointProviderCanada(configuration: configuration.apiConfiguration)
+            let underlyingClient = HyundaiAPIClientCanada(
+                configuration: configuration.apiConfiguration,
+                endpointProvider: endpointProvider,
+            )
+            return CachedAPIClient(underlyingClient: underlyingClient)
+        default:
+            let endpointProvider = HyundaiAPIEndpointProviderUSA(configuration: configuration.apiConfiguration)
+            let underlyingClient = HyundaiAPIClientUSA(
+                configuration: configuration.apiConfiguration,
+                endpointProvider: endpointProvider,
+            )
+            return CachedAPIClient(underlyingClient: underlyingClient)
+        }
     case .kia:
         BBLogger.info(.api, "APIClientFactory: Creating Kia API client")
-        let endpointProvider = KiaAPIEndpointProvider(configuration: configuration.apiConfiguration)
-        let underlyingClient = KiaAPIClient(
+        let endpointProvider = KiaAPIEndpointProviderUSA(configuration: configuration.apiConfiguration)
+        let underlyingClient = KiaAPIClientUSA(
             configuration: configuration.apiConfiguration,
             endpointProvider: endpointProvider,
         )

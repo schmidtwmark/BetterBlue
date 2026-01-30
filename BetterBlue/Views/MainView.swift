@@ -25,7 +25,7 @@ struct MainView: View {
     @State private var mapCameraPosition: MapCameraPosition?
     @State private var markerMenuPosition = CGPoint.zero
     @State private var isLoading = false
-    @State private var lastError: APIError?
+    @State var lastError: APIError?
 
     @State private var screenHeight: CGFloat = 0
     @State private var mapRegion = MKCoordinateRegion(

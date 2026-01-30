@@ -336,3 +336,58 @@ extension BBVehicle {
         }
     }
 }
+
+// MARK: - Codable Conformance for Export
+
+extension BBVehicle: Encodable {
+    enum CodingKeys: String, CodingKey {
+        case id, vin, regId, model, accountId, isElectric, generation, odometer
+        case lastUpdated, syncDate, gasRange, evStatus, location, lockStatus, climateStatus
+        case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
+        case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
+        case chargePortTypeRaw, debugConfiguration, debugLiveActivity, enableSeatHeatControls
+        case climatePresets
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        // Core vehicle fields
+        try container.encode(id, forKey: .id)
+        try container.encode(vin, forKey: .vin)
+        try container.encode(regId, forKey: .regId)
+        try container.encode(model, forKey: .model)
+        try container.encode(accountId, forKey: .accountId)
+        try container.encode(isElectric, forKey: .isElectric)
+        try container.encode(generation, forKey: .generation)
+        try container.encode(odometer, forKey: .odometer)
+
+        // Status fields
+        try container.encodeIfPresent(lastUpdated, forKey: .lastUpdated)
+        try container.encodeIfPresent(syncDate, forKey: .syncDate)
+        try container.encodeIfPresent(gasRange, forKey: .gasRange)
+        try container.encodeIfPresent(evStatus, forKey: .evStatus)
+        try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(lockStatus, forKey: .lockStatus)
+        try container.encodeIfPresent(climateStatus, forKey: .climateStatus)
+        try container.encodeIfPresent(battery12V, forKey: .battery12V)
+        try container.encodeIfPresent(doorOpen, forKey: .doorOpen)
+        try container.encodeIfPresent(trunkOpen, forKey: .trunkOpen)
+        try container.encodeIfPresent(hoodOpen, forKey: .hoodOpen)
+        try container.encodeIfPresent(tirePressureWarning, forKey: .tirePressureWarning)
+
+        // UI/Settings fields
+        try container.encodeIfPresent(customName, forKey: .customName)
+        try container.encode(isHidden, forKey: .isHidden)
+        try container.encode(sortOrder, forKey: .sortOrder)
+        try container.encode(backgroundColorName, forKey: .backgroundColorName)
+        try container.encode(watchBackgroundColorName, forKey: .watchBackgroundColorName)
+        try container.encode(chargePortTypeRaw, forKey: .chargePortTypeRaw)
+        try container.encodeIfPresent(debugConfiguration, forKey: .debugConfiguration)
+        try container.encode(debugLiveActivity, forKey: .debugLiveActivity)
+        try container.encode(enableSeatHeatControls, forKey: .enableSeatHeatControls)
+
+        // Climate presets (relationship)
+        try container.encode(safeClimatePresets, forKey: .climatePresets)
+    }
+}

@@ -298,11 +298,11 @@ struct DynamicIslandExpandedContentView: View {
             evStatus: VehicleStatus.EVStatus(
                 charging: true,
                 chargeSpeed: 7.2,
-                pluggedIn: true,
                 evRange: VehicleStatus.FuelRange(
                     range: Distance(length: 200, units: .miles),
                     percentage: 65
                 ),
+                plugType: .acCharger,
                 chargeTime: .seconds(3600),
                 targetSocAC: 80,
                 targetSocDC: 80
@@ -332,11 +332,11 @@ struct DynamicIslandExpandedContentView: View {
             evStatus: VehicleStatus.EVStatus(
                 charging: false,
                 chargeSpeed: 0,
-                pluggedIn: false,
                 evRange: VehicleStatus.FuelRange(
                     range: Distance(length: 250, units: .miles),
                     percentage: 80
                 ),
+                plugType: .unplugged,
                 chargeTime: .seconds(0)
             ),
             location: VehicleStatus.Location(latitude: 0, longitude: 0),
@@ -366,11 +366,11 @@ struct DynamicIslandExpandedContentView: View {
             evStatus: VehicleStatus.EVStatus(
                 charging: true,
                 chargeSpeed: 150.0,
-                pluggedIn: true,
                 evRange: VehicleStatus.FuelRange(
                     range: Distance(length: 120, units: .miles),
                     percentage: 45
                 ),
+                plugType: .dcCharger,
                 chargeTime: .seconds(1800),
                 targetSocAC: 80,
                 targetSocDC: 80
@@ -400,11 +400,11 @@ struct DynamicIslandExpandedContentView: View {
             evStatus: VehicleStatus.EVStatus(
                 charging: false,
                 chargeSpeed: 0,
-                pluggedIn: false,
                 evRange: VehicleStatus.FuelRange(
                     range: Distance(length: 250, units: .miles),
                     percentage: 80
                 ),
+                plugType: .unplugged,
                 chargeTime: .seconds(0)
             ),
             location: VehicleStatus.Location(latitude: 0, longitude: 0),

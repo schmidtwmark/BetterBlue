@@ -15,7 +15,6 @@ func formatLastUpdated(_ date: Date?) -> String {
     let timeFormatter = DateFormatter()
     timeFormatter.timeStyle = .short
 
-    
     if calendar.isDateInToday(date) {
         return "Today at \(timeFormatter.string(from: date))"
     } else if calendar.isDateInYesterday(date) {
@@ -32,7 +31,7 @@ func compactLastUpdated(_ date: Date?) -> String {
     guard let date else {
         return ""
     }
-    
+
     let calendar = Calendar.current
     if calendar.isDateInToday(date) {
         let timeFormatter = DateFormatter()

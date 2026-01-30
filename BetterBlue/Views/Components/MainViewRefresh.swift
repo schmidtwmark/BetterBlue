@@ -17,6 +17,12 @@ extension MainView {
     func refreshCurrentVehicleIfNeeded(modelContext: ModelContext) async {
         guard let vehicle = currentVehicle else { return }
 
+        // Don't auto-refresh if the last response was an error (to avoid retry loops)
+        if lastError != nil {
+            BBLogger.info(.app, "MainView: Last response was an error, skipping auto-refresh")
+            return
+        }
+
         // Check if status is older than 5 minutes
         if let lastUpdated = vehicle.lastUpdated,
            lastUpdated > Date().addingTimeInterval(-300) {

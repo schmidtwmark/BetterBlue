@@ -43,7 +43,7 @@ struct VehicleEntity: AppEntity {
     var backgroundColorName: String
     var timestamp: Date
     var presets: [ClimatePresetEntity] = []
-    
+
     var selectedPreset: ClimatePresetEntity? {
         presets.first(where: \.isSelected)
     }

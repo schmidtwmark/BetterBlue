@@ -172,8 +172,8 @@ struct FakeVehicleListView: View {
             bbVehicle.evStatus = VehicleStatus.EVStatus(
                 charging: config.isCharging,
                 chargeSpeed: config.chargeSpeed,
-                pluggedIn: config.isPluggedIn,
                 evRange: VehicleStatus.FuelRange(range: evRange, percentage: config.batteryPercentage),
+                plugType: config.isPluggedIn ? .acCharger : .unplugged,
                 chargeTime: .seconds(0)
             )
         } else {

@@ -4,6 +4,7 @@
 //
 //  SwiftData-based fake vehicle configuration
 //
+// swiftlint:disable type_body_length
 
 import BetterBlueKit
 import SwiftData

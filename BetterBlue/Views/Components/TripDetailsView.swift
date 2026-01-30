@@ -498,7 +498,7 @@ struct EnergyBreakdownPill: View {
 private struct TripDetailsPreviewWrapper: View {
     let trips: [EVTripDetail]?
     var isLoading: Bool = false
-    var errorMessage: String? = nil
+    var errorMessage: String?
 
     var body: some View {
         TripDetailsPreviewContent(

@@ -33,6 +33,8 @@ class BBAccount {
     private var cachedAuthToken: AuthToken?
     @Transient
     private var modelContextForMFA: ModelContext?
+    @Transient
+    private var pendingMFAError: APIError?
 
     /// Auth token with automatic persistence. Reads from cache first, then deserializes from storage.
     /// When set, automatically serializes to storage.
@@ -103,6 +105,12 @@ extension BBAccount {
     func initialize(modelContext: ModelContext, deviceType: DeviceType?) async throws {
         self.modelContextForMFA = modelContext
 
+        // If MFA is pending, throw that error instead of trying to use a stale token
+        if let mfaError = pendingMFAError {
+            BBLogger.info(.auth, "BBAccount: MFA is pending, re-throwing MFA error")
+            throw mfaError
+        }
+
         // If a specific device type is requested, always reinitialize the API client
         if api == nil || deviceType != nil {
             let logSink = if let deviceType {
@@ -133,7 +141,15 @@ extension BBAccount {
 
         // Token is nil or expired, need to login
         BBLogger.info(.auth, "BBAccount: No valid token, performing login...")
-        authToken = try await api!.login()
+        do {
+            authToken = try await api!.login()
+            // Clear any pending MFA error on successful login
+            pendingMFAError = nil
+        } catch let error as APIError where error.errorType == .requiresMFA {
+            // Store MFA error so other parallel operations know MFA is required
+            pendingMFAError = error
+            throw error
+        }
     }
 
     @MainActor
@@ -152,11 +168,11 @@ extension BBAccount {
         }
 
         BBLogger.info(.mfa, "BBAccount: Using API type: \(type(of: actualApi))")
-        guard let kiaApi = actualApi as? KiaAPIClient else {
-            BBLogger.error(.api, "BBAccount: MFA not supported: API is not KiaAPIClient")
+        guard actualApi.supportsMFA() else {
+            BBLogger.error(.api, "BBAccount: MFA not supported for this API")
             throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
         }
-        try await kiaApi.sendOTP(otpKey: otpKey, xid: xid, notifyType: notifyType)
+        try await actualApi.sendMFACode(otpKey: otpKey, xid: xid, notifyType: notifyType)
     }
 
     @MainActor
@@ -171,26 +187,34 @@ extension BBAccount {
             throw APIError(message: "API not initialized. Please try logging in again.", apiName: "BBAccount")
         }
 
-        guard let kiaApi = actualApi as? KiaAPIClient else {
+        guard actualApi.supportsMFA() else {
             throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
         }
 
         // Step 1: Verify OTP - returns rmToken and sid
-        let (newRememberMeToken, verifyOTPSid) = try await kiaApi.verifyOTP(otpKey: otpKey, xid: xid, otp: otp)
+        let (newRememberMeToken, verifyOTPSid) = try await actualApi.verifyMFACode(otpKey: otpKey, xid: xid, otp: otp)
 
         // Store the remember me token for future logins
         self.rememberMeToken = newRememberMeToken
 
         // Step 2: Complete login by calling authUser again with rmtoken and sid
         // Use the same API client - don't re-initialize as that would trigger another login
-        let finalAuthToken = try await kiaApi.completeLoginWithMFA(sid: verifyOTPSid, rmToken: newRememberMeToken)
+        let finalAuthToken = try await actualApi.completeMFALogin(sid: verifyOTPSid, rmToken: newRememberMeToken)
         self.authToken = finalAuthToken
+        // Clear pending MFA error now that MFA is complete
+        self.pendingMFAError = nil
         BBLogger.info(.api, "BBAccount: MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
     }
 
+    /// Determines if an error should trigger a full re-authentication.
+    /// All API errors except MFA-related ones should invalidate the session.
+    private func shouldReauthenticate(for error: APIError) -> Bool {
+        error.errorType != .requiresMFA
+    }
+
     @MainActor
-    private func handleInvalidVehicleSession(modelContext: ModelContext) async throws {
-        BBLogger.info(.api, "BBAccount: Invalid session/credentials detected, performing full re-initialization...")
+    private func handleAPIError(_ error: APIError, modelContext: ModelContext) async throws {
+        BBLogger.info(.api, "BBAccount: API error (\(error.errorType)) detected, performing full re-initialization...")
 
         clearAPICache()
         self.api = nil
@@ -232,8 +256,8 @@ extension BBAccount {
         do {
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
             updateVehicles(vehicles: fetchedVehicles)
-        } catch let error as APIError where error.errorType == .invalidCredentials {
-            try await handleInvalidVehicleSession(modelContext: modelContext)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
@@ -252,24 +276,16 @@ extension BBAccount {
         // For Kia vehicles, ensure vehicleKey is populated by refreshing if needed
         if brandEnum == .kia && bbVehicle.vehicleKey == nil {
             BBLogger.debug(.api, "BBAccount: Kia vehicle missing vehicleKey, fetching fresh data...")
-            let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
-
-            guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
-                throw APIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
-            }
-
-            bbVehicle.vehicleKey = matchingVehicle.vehicleKey
-            BBLogger.debug(.api, "BBAccount: Updated vehicleKey for VIN: \(bbVehicle.vin)")
+            try await loadVehicles(modelContext: modelContext)
+            return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext)
         }
 
         let vehicle = bbVehicle.toVehicle()
         let status: VehicleStatus
         do {
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
-        } catch let error as APIError where
-            error.errorType == .invalidVehicleSession ||
-            error.errorType == .invalidCredentials {
-            try await handleInvalidVehicleSession(modelContext: modelContext)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
@@ -407,10 +423,8 @@ extension BBAccount {
         let vehicle = bbVehicle.toVehicle()
         do {
             try await api.sendCommand(for: vehicle, command: command, authToken: authToken)
-        } catch let error as APIError where
-            error.errorType == .invalidVehicleSession ||
-            error.errorType == .invalidCredentials {
-            try await handleInvalidVehicleSession(modelContext: modelContext)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
@@ -506,10 +520,8 @@ extension BBAccount {
 
         do {
             return try await api.fetchEVTripDetails(for: vehicle, authToken: authToken)
-        } catch let error as APIError where
-            error.errorType == .invalidVehicleSession ||
-            error.errorType == .invalidCredentials {
-            try await handleInvalidVehicleSession(modelContext: modelContext)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
@@ -564,5 +576,29 @@ extension BBAccount {
         } catch {
             BBLogger.error(.api, "BBAccount: Failed to update vehicle sort orders: \(error)")
         }
+    }
+}
+
+// MARK: - Codable Conformance for Export
+
+extension BBAccount: Encodable {
+    enum CodingKeys: String, CodingKey {
+        case id, username, password, pin, brand, region, dateCreated
+        case rememberMeToken, serializedAuthToken, vehicles
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encode(username, forKey: .username)
+        try container.encode(password, forKey: .password)
+        try container.encode(pin, forKey: .pin)
+        try container.encode(brand, forKey: .brand)
+        try container.encode(region, forKey: .region)
+        try container.encode(dateCreated, forKey: .dateCreated)
+        try container.encodeIfPresent(rememberMeToken, forKey: .rememberMeToken)
+        try container.encodeIfPresent(serializedAuthToken, forKey: .serializedAuthToken)
+        try container.encode(safeVehicles, forKey: .vehicles)
     }
 }

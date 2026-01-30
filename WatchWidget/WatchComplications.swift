@@ -109,7 +109,7 @@ struct VehicleStatusComplication: Widget {
             .accessoryCircular,
             .accessoryCorner,
             .accessoryRectangular,
-            .accessoryInline,
+            .accessoryInline
         ])
     }
 }

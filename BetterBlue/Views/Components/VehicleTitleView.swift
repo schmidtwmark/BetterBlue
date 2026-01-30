@@ -4,6 +4,7 @@
 //
 //  Created by Mark Schmidt on 9/8/25.
 //
+// swiftlint:disable type_body_length
 
 import BetterBlueKit
 import CoreLocation

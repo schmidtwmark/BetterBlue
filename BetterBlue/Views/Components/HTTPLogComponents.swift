@@ -11,7 +11,6 @@ import SwiftUI
 struct JSONBodyView: View {
     let content: NSAttributedString
     @Binding var showingShareSheet: Bool
-    @Namespace private var transition
 
     var body: some View {
         Text(AttributedString(content))
@@ -19,10 +18,7 @@ struct JSONBodyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
             .sheet(isPresented: $showingShareSheet) {
-                ShareSheet(activityItems: [content])
-                    .navigationTransition(
-                        .zoom(sourceID: "json-share)", in: transition),
-                    )
+                ShareSheet(activityItems: [content.string])
             }
     }
 }
