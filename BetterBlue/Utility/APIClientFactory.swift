@@ -45,35 +45,40 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         password: configuration.apiConfiguration.password,
     ) ? .fake : configuration.apiConfiguration.brand
 
-    switch effectiveBrand {
-    case .hyundai:
-        BBLogger.info(.api, "APIClientFactory: Creating Hyundai API client")
-        switch configuration.apiConfiguration.region {
-        case .canada:
-            let endpointProvider = HyundaiAPIEndpointProviderCanada(configuration: configuration.apiConfiguration)
-            let underlyingClient = HyundaiAPIClientCanada(
-                configuration: configuration.apiConfiguration,
-                endpointProvider: endpointProvider,
-            )
-            return CachedAPIClient(underlyingClient: underlyingClient)
-        default:
-            let endpointProvider = HyundaiAPIEndpointProviderUSA(configuration: configuration.apiConfiguration)
-            let underlyingClient = HyundaiAPIClientUSA(
-                configuration: configuration.apiConfiguration,
-                endpointProvider: endpointProvider,
-            )
-            return CachedAPIClient(underlyingClient: underlyingClient)
-        }
-    case .kia:
-        BBLogger.info(.api, "APIClientFactory: Creating Kia API client")
-        let endpointProvider = KiaAPIEndpointProviderUSA(configuration: configuration.apiConfiguration)
-        let underlyingClient = KiaAPIClientUSA(
+    // Handle fake brand separately (app-specific, not in BetterBlueKit)
+    if effectiveBrand == .fake {
+        BBLogger.info(.api, "APIClientFactory: Creating SwiftData-based Fake API client")
+        let vehicleProvider = SwiftDataFakeVehicleProvider(modelContext: configuration.modelContext)
+        let underlyingClient = FakeAPIClient(
             configuration: configuration.apiConfiguration,
-            endpointProvider: endpointProvider,
+            vehicleProvider: vehicleProvider,
         )
         return CachedAPIClient(underlyingClient: underlyingClient)
-    case .fake:
-        BBLogger.info(.api, "APIClientFactory: Creating SwiftData-based Fake API client")
+    }
+
+    // Use BetterBlueKit factory for real API clients
+    BBLogger.info(.api, "APIClientFactory: Creating \(effectiveBrand.displayName) API client for \(configuration.apiConfiguration.region.rawValue)")
+
+    // Create a configuration with the effective brand
+    let effectiveConfiguration = APIClientConfiguration(
+        region: configuration.apiConfiguration.region,
+        brand: effectiveBrand,
+        username: configuration.apiConfiguration.username,
+        password: configuration.apiConfiguration.password,
+        pin: configuration.apiConfiguration.pin,
+        accountId: configuration.apiConfiguration.accountId,
+        logSink: configuration.apiConfiguration.logSink,
+        rememberMeToken: configuration.apiConfiguration.rememberMeToken
+    )
+
+    do {
+        let underlyingClient = try createBetterBlueKitAPIClient(configuration: effectiveConfiguration)
+        return CachedAPIClient(underlyingClient: underlyingClient)
+    } catch {
+        // This shouldn't happen in normal usage since we check the brand above,
+        // but if it does, fall back to a sensible error state
+        BBLogger.error(.api, "APIClientFactory: Failed to create client: \(error.localizedDescription)")
+        // Return a fake client as fallback to prevent crashes
         let vehicleProvider = SwiftDataFakeVehicleProvider(modelContext: configuration.modelContext)
         let underlyingClient = FakeAPIClient(
             configuration: configuration.apiConfiguration,

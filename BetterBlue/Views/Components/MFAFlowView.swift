@@ -99,7 +99,8 @@ final class MFAFlowState {
 
         Task {
             do {
-                try await account.sendMFA(otpKey: otpKey, xid: xid, notifyType: notifyType)
+                let method: MFAMethod = notifyType == "EMAIL" ? .email : .sms
+                try await account.sendMFA(otpKey: otpKey, xid: xid, method: method)
                 self.notifyType = notifyType
                 self.isResendingCode = false
                 self.errorMessage = nil

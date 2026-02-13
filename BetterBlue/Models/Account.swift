@@ -153,7 +153,7 @@ extension BBAccount {
     }
 
     @MainActor
-    func sendMFA(otpKey: String, xid: String, notifyType: String = "SMS") async throws {
+    func sendMFA(otpKey: String, xid: String, method: MFAMethod = .sms) async throws {
         BBLogger.info(.mfa, "BBAccount: sendMFA requested for \(username)")
 
         // Don't re-initialize during MFA flow - that would trigger a new login and reset the otpKey
@@ -172,7 +172,7 @@ extension BBAccount {
             BBLogger.error(.api, "BBAccount: MFA not supported for this API")
             throw APIError(message: "MFA not supported for this brand", apiName: "BBAccount")
         }
-        try await actualApi.sendMFACode(otpKey: otpKey, xid: xid, notifyType: notifyType)
+        try await actualApi.sendMFACode(xid: xid, otpKey: otpKey, method: method)
     }
 
     @MainActor
@@ -192,7 +192,7 @@ extension BBAccount {
         }
 
         // Step 1: Verify OTP - returns rmToken and sid
-        let (newRememberMeToken, verifyOTPSid) = try await actualApi.verifyMFACode(otpKey: otpKey, xid: xid, otp: otp)
+        let (newRememberMeToken, verifyOTPSid) = try await actualApi.verifyMFACode(xid: xid, otpKey: otpKey, code: otp)
 
         // Store the remember me token for future logins
         self.rememberMeToken = newRememberMeToken

@@ -296,6 +296,8 @@ struct VehicleCardView: View {
             getUserFriendlyErrorMessageForGeneralError(error)
         case .kiaInvalidRequest:
             error.message
+        case .regionNotSupported:
+            "This region is not yet supported"
         }
     }
 }
