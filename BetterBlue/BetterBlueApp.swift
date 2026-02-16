@@ -99,7 +99,8 @@ struct BetterBlueApp: App {
                     }
                 }
 
-                AppLogger.app.info("DeepLink: Starting climate for \(vehicle.displayName) with preset: \(presetName ?? "default")")
+                let preset = presetName ?? "default"
+                AppLogger.app.info("DeepLink: Starting climate for \(vehicle.displayName) with preset: \(preset)")
                 try await account.startClimate(
                     vehicle,
                     options: options,
@@ -139,12 +140,16 @@ struct BetterBlueApp: App {
 @MainActor
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
 
         // Request notification permissions and register for remote notifications
         Task {
-            let granted = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+            let notificationCenter = UNUserNotificationCenter.current()
+            let granted = try? await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
             AppLogger.push.info("AppDelegate: Notification permissions granted: \(granted ?? false)")
 
             // Register for remote notifications to receive background wakeups

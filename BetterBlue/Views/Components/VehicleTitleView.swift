@@ -4,7 +4,6 @@
 //
 //  Created by Mark Schmidt on 9/8/25.
 //
-// swiftlint:disable type_body_length
 
 import BetterBlueKit
 import CoreLocation
@@ -361,42 +360,42 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private func buildDoorIcon(doorOpen: VehicleStatus.DoorStatus) -> some View {
-        let fl = doorOpen.frontLeft
-        let fr = doorOpen.frontRight
-        let bl = doorOpen.backLeft
-        let br = doorOpen.backRight
+        let frontLeft = doorOpen.frontLeft
+        let frontRight = doorOpen.frontRight
+        let backLeft = doorOpen.backLeft
+        let backRight = doorOpen.backRight
 
         if !doorOpen.anyOpen {
             Image("custom.car.top")
-        } else if fl && fr && bl && br {
+        } else if frontLeft && frontRight && backLeft && backRight {
             Image(systemName: "car.top.door.front.left.and.front.right.and.rear.left.and.rear.right.open")
-        } else if fl && fr && bl {
+        } else if frontLeft && frontRight && backLeft {
             Image(systemName: "car.top.door.front.left.and.front.right.and.rear.left.open")
-        } else if fl && fr && br {
+        } else if frontLeft && frontRight && backRight {
             Image(systemName: "car.top.door.front.left.and.front.right.and.rear.right.open")
-        } else if fl && bl && br {
+        } else if frontLeft && backLeft && backRight {
             Image(systemName: "car.top.door.front.left.and.rear.left.and.rear.right.open")
-        } else if fr && bl && br {
+        } else if frontRight && backLeft && backRight {
             Image(systemName: "car.top.door.front.right.and.rear.left.and.rear.right.open")
-        } else if fl && fr {
+        } else if frontLeft && frontRight {
             Image(systemName: "car.top.door.front.left.and.front.right.open")
-        } else if bl && br {
+        } else if backLeft && backRight {
             Image(systemName: "car.top.door.rear.left.and.rear.right.open")
-        } else if fl && bl {
+        } else if frontLeft && backLeft {
             Image(systemName: "car.top.door.front.left.and.rear.left.open")
-        } else if fr && br {
+        } else if frontRight && backRight {
             Image(systemName: "car.top.door.front.right.and.rear.right.open")
-        } else if fl && br {
+        } else if frontLeft && backRight {
             Image(systemName: "car.top.door.front.left.and.rear.right.open")
-        } else if fr && bl {
+        } else if frontRight && backLeft {
             Image(systemName: "car.top.door.front.right.and.rear.left.open")
-        } else if fl {
+        } else if frontLeft {
             Image(systemName: "car.top.door.front.left.open")
-        } else if fr {
+        } else if frontRight {
             Image(systemName: "car.top.door.front.right.open")
-        } else if bl {
+        } else if backLeft {
             Image(systemName: "car.top.door.rear.left.open")
-        } else if br {
+        } else if backRight {
             Image(systemName: "car.top.door.rear.right.open")
         } else {
             Image("custom.car.top")

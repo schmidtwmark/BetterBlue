@@ -46,7 +46,6 @@ struct ErrorBox: View {
     }
 }
 
-// swiftlint:disable:this type_body_length file_length
 struct AddAccountView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

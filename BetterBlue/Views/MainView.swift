@@ -295,7 +295,8 @@ extension MainView {
     private func initializeFromSwiftData() {
         BBLogger.debug(.app, "MapCentering: Available vehicles: \(displayedVehicles.count)")
         for (index, vehicle) in displayedVehicles.enumerated() {
-            BBLogger.debug(.app, "MapCentering: Vehicle \(index): \(vehicle.displayName) - has coordinate: \(vehicle.coordinate != nil)")
+            let hasCoord = vehicle.coordinate != nil
+            BBLogger.debug(.app, "MapCentering: Vehicle \(index): \(vehicle.displayName) - has coordinate: \(hasCoord)")
         }
         if let firstVehicleWithLocation = displayedVehicles.first(where: {
             $0.coordinate != nil
@@ -328,11 +329,12 @@ extension MainView {
                 try await account.loadVehicles(modelContext: modelContext)
                 hasSuccessfulAccount = true
             } catch {
+                let user = account.username
                 if let apiError = error as? APIError {
-                    BBLogger.warning(.app, "MainView: Failed to load vehicles for account '\(account.username)': \(apiError.message)")
+                    BBLogger.warning(.app, "MainView: Failed to load vehicles for '\(user)': \(apiError.message)")
                     latestError = apiError
                 } else {
-                    BBLogger.error(.app, "MainView: Failed to load vehicles for account '\(account.username)': \(error.localizedDescription)")
+                    BBLogger.error(.app, "MainView: Failed to load vehicles for '\(user)': \(error.localizedDescription)")
                     latestError = APIError(
                         message: error.localizedDescription,
                     )

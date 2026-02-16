@@ -235,7 +235,7 @@ struct VehicleCardView: View {
 
                 // Only show error if it's not a cancellation
                 if !Task.isCancelled, !(error is CancellationError) {
-                    BBLogger.error(.app, "VehicleCardView: Error fetching vehicle status for \(bbVehicle.vin): \(error)")
+                    BBLogger.error(.app, "VehicleCardView: Error fetching status for \(bbVehicle.vin): \(error)")
                     handleError(error)
                 }
             }

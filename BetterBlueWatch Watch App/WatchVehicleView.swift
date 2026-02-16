@@ -478,7 +478,6 @@ struct WatchVehicleButton: View {
         ClimatePreset.self
     ])
     let modelConfiguration = ModelConfiguration(isStoredInMemoryOnly: true)
-    // swiftlint:disable:next force_try
     let container = try! ModelContainer(for: schema, configurations: [modelConfiguration])
 
     let sampleVehicle = BBVehicle(from: Vehicle(
