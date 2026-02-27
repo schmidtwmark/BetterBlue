@@ -20,7 +20,7 @@ struct ClimateSettingsSheet: View {
     @State private var newPresetIcon = "fan"
 
     private var vehiclePresets: [ClimatePreset] {
-        allClimatePresets.filter { $0.vehicleId == vehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
+        allClimatePresets.filter { $0.vehicle?.id == vehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var body: some View {
@@ -67,10 +67,9 @@ extension ClimateSettingsSheet {
                 iconName: "fan",
                 climateOptions: ClimateOptions(),
                 isSelected: true,
-                vehicleId: vehicle.id,
+                vehicle: vehicle
             )
             modelContext.insert(defaultPreset)
-            vehicle.climatePresets?.append(defaultPreset)
             try? modelContext.save()
         }
     }
@@ -82,12 +81,11 @@ extension ClimateSettingsSheet {
             iconName: randomIcon,
             climateOptions: ClimateOptions(),
             isSelected: false,
-            vehicleId: vehicle.id,
+            vehicle: vehicle
         )
         let newIndex = vehiclePresets.count
         newPreset.sortOrder = newIndex
         modelContext.insert(newPreset)
-        vehicle.climatePresets?.append(newPreset)
         try? modelContext.save()
 
         // Select the new preset tab with animation after a short delay to ensure it's created

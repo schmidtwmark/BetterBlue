@@ -18,7 +18,7 @@ struct ClimateButton: View {
     @Query private var allClimatePresets: [ClimatePreset]
 
     private var filteredPresets: [ClimatePreset] {
-        allClimatePresets.filter { $0.vehicleId == bbVehicle.id }
+        allClimatePresets.filter { $0.vehicle?.id == bbVehicle.id }
     }
 
     private var selectedPreset: ClimatePreset? {

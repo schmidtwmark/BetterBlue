@@ -58,6 +58,31 @@ func createContainer(storeURL: URL, schema: Schema) throws -> ModelContainer {
     }
 }
 
+/// Removes orphaned climate presets that have no vehicle relationship.
+/// These are leftover from before the relationship was properly set during creation.
+@MainActor
+func cleanupOrphanedClimatePresets(container: ModelContainer) {
+    let context = container.mainContext
+
+    do {
+        let presetDescriptor = FetchDescriptor<ClimatePreset>()
+        let allPresets = try context.fetch(presetDescriptor)
+
+        var deletedCount = 0
+        for preset in allPresets where preset.vehicle == nil {
+            context.delete(preset)
+            deletedCount += 1
+        }
+
+        if deletedCount > 0 {
+            try context.save()
+            BBLogger.info(.app, "Cleaned up \(deletedCount) orphaned climate preset(s)")
+        }
+    } catch {
+        BBLogger.error(.app, "Failed to cleanup orphaned climate presets: \(error)")
+    }
+}
+
 /// Creates a shared ModelContainer for use across main app, widget, and watch app
 func createSharedModelContainer() throws -> ModelContainer {
     let schema = Schema([
@@ -65,7 +90,7 @@ func createSharedModelContainer() throws -> ModelContainer {
         BBVehicle.self,
         BBHTTPLog.self,
         ClimatePreset.self
-    ], version: .init(1, 0, 8))
+    ], version: .init(1, 0, 9))
 
     #if targetEnvironment(simulator)
         let storeURL = getSimulatorStoreURL()

@@ -31,6 +31,9 @@ struct BetterBlueApp: App {
             let deviceType = HTTPLogSinkManager.detectMainAppDeviceType()
             HTTPLogSinkManager.shared.configure(with: container, deviceType: deviceType)
 
+            // Clean up any orphaned climate presets from before the relationship fix
+            cleanupOrphanedClimatePresets(container: container)
+
             return container
         } catch {
             BBLogger.error(.app, "Failed to create ModelContainer: \(error)")

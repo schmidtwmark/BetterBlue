@@ -19,7 +19,7 @@ struct ClimateSettingsContent: View {
     @State private var newName = ""
 
     private var vehiclePresets: [ClimatePreset] {
-        allClimatePresets.filter { $0.vehicleId == vehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
+        allClimatePresets.filter { $0.vehicle?.id == vehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var body: some View {
@@ -295,7 +295,7 @@ extension ClimateSettingsContent {
                 iconName: "fan",
                 climateOptions: ClimateOptions(),
                 isSelected: true,
-                vehicleId: vehicle.id,
+                vehicle: vehicle
             )
             modelContext.insert(defaultPreset)
             try? modelContext.save()

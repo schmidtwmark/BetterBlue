@@ -40,39 +40,47 @@ private struct ClimatePresetFetcher {
             let modelContainer = try createSharedModelContainer()
             let context = ModelContext(modelContainer)
 
-            let descriptor = FetchDescriptor<BBVehicle>(sortBy: [SortDescriptor(\.sortOrder)])
-            let vehicles = try context.fetch(descriptor)
+            // Fetch all presets directly (like @Query does)
+            let presetDescriptor = FetchDescriptor<ClimatePreset>(sortBy: [SortDescriptor(\.sortOrder)])
+            let allPresets = try context.fetch(presetDescriptor)
+
+            // Fetch all vehicles to identify those without presets
+            let vehicleDescriptor = FetchDescriptor<BBVehicle>(sortBy: [SortDescriptor(\.sortOrder)])
+            let allVehicles = try context.fetch(vehicleDescriptor)
 
             var entities: [ClimatePresetEntity] = []
 
-            for vehicle in vehicles {
-                let presets = vehicle.safeClimatePresets.sorted { $0.sortOrder < $1.sortOrder }
+            // Track which vehicles have presets
+            var vehiclesWithPresets = Set<UUID>()
 
-                if presets.isEmpty {
-                    // Create Default preset using vehicle ID as the entity ID
-                    if ids == nil || ids!.contains(vehicle.id) {
-                        entities.append(ClimatePresetEntity(
-                            id: vehicle.id,
-                            vehicleVin: vehicle.vin,
-                            vehicleName: vehicle.displayName,
-                            presetName: "Default",
-                            presetIcon: "fan",
-                            isSelected: true
-                        ))
-                    }
-                } else {
-                    for preset in presets {
-                        if ids == nil || ids!.contains(preset.id) {
-                            entities.append(ClimatePresetEntity(
-                                id: preset.id,
-                                vehicleVin: vehicle.vin,
-                                vehicleName: vehicle.displayName,
-                                presetName: preset.name,
-                                presetIcon: preset.iconName,
-                                isSelected: preset.isSelected
-                            ))
-                        }
-                    }
+            // Process actual presets
+            for preset in allPresets {
+                guard let vehicle = preset.vehicle else { continue }
+                vehiclesWithPresets.insert(vehicle.id)
+
+                if ids == nil || ids!.contains(preset.id) {
+                    entities.append(ClimatePresetEntity(
+                        id: preset.id,
+                        vehicleVin: vehicle.vin,
+                        vehicleName: vehicle.displayName,
+                        presetName: preset.name,
+                        presetIcon: preset.iconName,
+                        isSelected: preset.isSelected
+                    ))
+                }
+            }
+
+            // Add default presets for vehicles without any presets
+            for vehicle in allVehicles where !vehiclesWithPresets.contains(vehicle.id) {
+                if ids == nil || ids!.contains(vehicle.id) {
+                    entities.append(ClimatePresetEntity(
+                        id: vehicle.id,
+                        vehicleVin: vehicle.vin,
+                        vehicleName: vehicle.displayName,
+                        presetName: "Default",
+                        presetIcon: "fan",
+                        isSelected: true
+                    ))
                 }
             }
 
@@ -83,14 +91,9 @@ private struct ClimatePresetFetcher {
         }
     }
 
-    // Helper to resolve just the vehicle ID from a preset ID (which might be a vehicle ID for default)
+    // Helper to resolve just the vehicle VIN from a preset ID (which might be a vehicle ID for default)
     static func getVehicleId(for presetId: UUID) async -> String? {
-        // This logic is implicitly handled by the Intent which gets the full Entity back.
-        // But StartClimateIntent uses this helper. We need to update it or StartClimateIntent.
-        // StartClimateIntent uses: ClimatePresetFetcher.getVehicleId(for: preset.id)
-        // We should implement this efficiently.
-
         let allEntities = fetchPresets(withIDs: [presetId])
-        return allEntities.first?.vehicleVin // We stored VIN in the entity
+        return allEntities.first?.vehicleVin
     }
 }

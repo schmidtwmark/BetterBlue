@@ -17,7 +17,6 @@ class ClimatePreset: Identifiable {
     var climateOptions: ClimateOptions = ClimateOptions()
     var isSelected: Bool = false
     var sortOrder: Int = 0
-    var vehicleId: UUID = UUID()
 
     @Relationship(inverse: \BBVehicle.climatePresets) var vehicle: BBVehicle?
 
@@ -34,14 +33,14 @@ class ClimatePreset: Identifiable {
          iconName: String = "fan",
          climateOptions: ClimateOptions,
          isSelected: Bool = false,
-         vehicleId: UUID) {
+         vehicle: BBVehicle) {
         id = UUID()
         self.name = name
         self.iconName = iconName
         self.climateOptions = climateOptions
         self.isSelected = isSelected
         sortOrder = 0
-        self.vehicleId = vehicleId
+        self.vehicle = vehicle
     }
 }
 
@@ -60,6 +59,7 @@ extension ClimatePreset: Encodable {
         try container.encode(climateOptions, forKey: .climateOptions)
         try container.encode(isSelected, forKey: .isSelected)
         try container.encode(sortOrder, forKey: .sortOrder)
-        try container.encode(vehicleId, forKey: .vehicleId)
+        // Encode vehicle ID for backward compatibility in exports
+        try container.encode(vehicle?.id, forKey: .vehicleId)
     }
 }

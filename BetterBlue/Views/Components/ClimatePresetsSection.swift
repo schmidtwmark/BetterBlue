@@ -103,7 +103,7 @@ struct ClimatePresetsSection: View {
             iconName: randomIcon,
             climateOptions: ClimateOptions(),
             isSelected: false,
-            vehicleId: bbVehicle.id,
+            vehicle: bbVehicle
         )
         newPreset.sortOrder = vehiclePresets.count
         modelContext.insert(newPreset)

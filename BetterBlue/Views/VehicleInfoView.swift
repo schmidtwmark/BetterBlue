@@ -19,7 +19,7 @@ struct VehicleInfoView: View {
     @Query private var allClimatePresets: [ClimatePreset]
 
     private var vehiclePresets: [ClimatePreset] {
-        allClimatePresets.filter { $0.vehicleId == bbVehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
+        allClimatePresets.filter { $0.vehicle?.id == bbVehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var body: some View {
@@ -156,7 +156,7 @@ struct VehicleInfoView: View {
                 iconName: "fan",
                 climateOptions: ClimateOptions(),
                 isSelected: true,
-                vehicleId: bbVehicle.id,
+                vehicle: bbVehicle
             )
             defaultPreset.sortOrder = 0
             modelContext.insert(defaultPreset)
