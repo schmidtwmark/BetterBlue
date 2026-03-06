@@ -13,12 +13,14 @@ import WidgetKit
 struct ErrorBox: View {
     let headline: String
     let detail: AttributedString?
+    let backgroundColor: Color
+    let icon: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.orange)
+                .foregroundColor(backgroundColor)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(headline)
@@ -39,8 +41,8 @@ struct ErrorBox: View {
         .padding(.vertical, 12)
         .background {
             RoundedRectangle(cornerRadius: 12)
-                .fill(.orange.opacity(0.1))
-                .stroke(.orange.opacity(0.3), lineWidth: 1)
+                .fill(backgroundColor.opacity(0.1))
+                .stroke(backgroundColor.opacity(0.3), lineWidth: 1)
         }
         .padding(.top, 8)
     }
@@ -149,7 +151,7 @@ struct AddAccountView: View {
             if selectedBrand != .fake {
                 Picker("Region", selection: $selectedRegion) {
                     ForEach(Region.allCases, id: \.self) { region in
-                        Text(region.rawValue).tag(region)
+                        Text(region.displayName).tag(region)
                     }
                 }
                 .pickerStyle(MenuPickerStyle())
@@ -157,13 +159,16 @@ struct AddAccountView: View {
         } header: {
             Text("Service Configuration")
                     } footer: {
-                        if selectedBrand != .fake && selectedRegion != .usa {
+                        if betaRegions(for: selectedBrand).contains(selectedRegion) {
+                            let regionDetail = try? AttributedString(markdown: "If you experience issues, please report them on the [Github page](https://github.com/schmidtwmark/BetterBlueKit).")
+                            ErrorBox(headline: "\(selectedBrand.displayName) \(selectedRegion.displayName) is in BETA", detail: regionDetail, backgroundColor: .blue, icon: "hammer.circle")
+                        } else if !supportedRegions(for: selectedBrand).contains(selectedRegion) {
                             let regionDetail = try? AttributedString(
                                 markdown: "If you'd like to help bring BetterBlue to your region, " +
                                           "please consider [contributing to the open source project]" +
                                           "(https://github.com/schmidtwmark/BetterBlueKit)."
                             )
-                            ErrorBox(headline: "Regions other than US are unsupported.", detail: regionDetail)
+                            ErrorBox(headline: "\(selectedBrand.displayName) \(selectedRegion.displayName) is unsupported.", detail: regionDetail, backgroundColor: .orange, icon: "exclamationmark.triangle")
                         }        }
     }
 
