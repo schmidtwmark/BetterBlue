@@ -72,13 +72,15 @@ struct GasRangeCardView: View {
                     .fontWeight(.semibold)
             }
             Spacer()
-            VStack(alignment: .trailing) {
-                Text("Fuel")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text("\(Int(gasRange.percentage))%")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+            if gasRange.percentage >= 0.0 {
+                VStack(alignment: .trailing) {
+                    Text("Fuel")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("\(Int(gasRange.percentage))%")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
             }
         }
         .padding()
