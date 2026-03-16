@@ -107,10 +107,11 @@ struct VehicleActivityWidget: Widget {
     }
 
     func formattedRange(for status: VehicleStatus) -> String {
+        let preferredUnit = AppSettings.shared.preferredDistanceUnit
         if let evStatus = status.evStatus, evStatus.evRange.range.length > 0 {
-            return evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: evStatus.evRange.range.units)
+            return evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: preferredUnit)
         } else if let gasRange = status.gasRange, gasRange.range.length > 0 {
-            return gasRange.range.units.format(gasRange.range.length, to: gasRange.range.units)
+            return gasRange.range.units.format(gasRange.range.length, to: preferredUnit)
         }
         return "--"
     }
@@ -454,7 +455,7 @@ struct VehicleActivityContentView: View {
 
     private var formattedRange: String {
         guard let evStatus, evStatus.evRange.range.length > 0 else { return "--" }
-        return evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: evStatus.evRange.range.units)
+        return evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: AppSettings.shared.preferredDistanceUnit)
     }
 
     var body: some View {
