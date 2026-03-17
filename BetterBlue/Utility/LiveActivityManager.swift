@@ -13,6 +13,7 @@ import Foundation
 import OSLog
 import SwiftData
 import UIKit
+import WidgetKit
 
 #if DEBUG
 private let liveActivityBackendURL = "https://phgu023o97.execute-api.us-east-1.amazonaws.com/dev"
@@ -140,6 +141,9 @@ final class LiveActivityManager {
         )
 
         await existingActivity.update(ActivityContent(state: updatedState, staleDate: nil))
+
+        // Refresh widgets to stay in sync with live activity
+        WidgetCenter.shared.reloadAllTimelines()
         #endif
     }
 
