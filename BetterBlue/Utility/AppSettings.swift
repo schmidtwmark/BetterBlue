@@ -8,6 +8,11 @@
 import BetterBlueKit
 import Foundation
 import SwiftUI
+import WidgetKit
+
+#if canImport(ActivityKit)
+    import ActivityKit
+#endif
 
 #if canImport(UserNotifications)
     import UserNotifications
@@ -56,14 +61,24 @@ class AppSettings {
     private let liveActivitiesEnabledKey = "LiveActivitiesEnabled"
 
     var preferredDistanceUnit: Distance.Units {
-        didSet {
-            userDefaults.set(preferredDistanceUnit.rawValue, forKey: distanceUnitKey)
+        get {
+            let savedValue = userDefaults.string(forKey: distanceUnitKey) ?? Distance.Units.miles.rawValue
+            return Distance.Units(rawValue: savedValue) ?? .miles
+        }
+        set {
+            userDefaults.set(newValue.rawValue, forKey: distanceUnitKey)
+            refreshWidgetsAndLiveActivities()
         }
     }
 
     var preferredTemperatureUnit: Temperature.Units {
-        didSet {
-            userDefaults.set(preferredTemperatureUnit.rawValue, forKey: temperatureUnitKey)
+        get {
+            let savedValue = userDefaults.string(forKey: temperatureUnitKey) ?? Temperature.Units.fahrenheit.rawValue
+            return Temperature.Units(rawValue: savedValue) ?? .fahrenheit
+        }
+        set {
+            userDefaults.set(newValue.rawValue, forKey: temperatureUnitKey)
+            refreshWidgetsAndLiveActivities()
         }
     }
 
@@ -99,14 +114,6 @@ class AppSettings {
     }
 
     private init() {
-        let savedDistanceUnit = userDefaults
-            .string(forKey: distanceUnitKey) ?? Distance.Units.miles.rawValue
-        preferredDistanceUnit = Distance.Units(rawValue: savedDistanceUnit) ?? .miles
-
-        let savedTemperatureUnit = userDefaults
-            .string(forKey: temperatureUnitKey) ?? Temperature.Units.fahrenheit.rawValue
-        preferredTemperatureUnit = Temperature.Units(rawValue: savedTemperatureUnit) ?? .fahrenheit
-
         notificationsEnabled = userDefaults.bool(forKey: notificationsEnabledKey)
 
         let savedRefreshInterval = userDefaults.integer(forKey: widgetRefreshIntervalKey)
@@ -143,6 +150,23 @@ class AppSettings {
                 BBLogger.error(.push, "Notifications: Permission request failed: \(error)")
                 await MainActor.run {
                     notificationsEnabled = false
+                }
+            }
+        #endif
+    }
+
+    private func refreshWidgetsAndLiveActivities() {
+        
+        // Refresh all widgets to pick up the new unit settings
+        BBLogger.info(.app, "Refreshing widget and live activities")
+        WidgetCenter.shared.reloadAllTimelines()
+
+        // Refresh all live activities to pick up the new unit settings
+        #if canImport(ActivityKit)
+            for activity in Activity<VehicleActivityAttributes>.activities {
+                Task {
+                    let currentState = activity.content.state
+                    await activity.update(ActivityContent(state: currentState, staleDate: nil))
                 }
             }
         #endif
