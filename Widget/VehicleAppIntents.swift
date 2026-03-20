@@ -553,6 +553,262 @@ struct SetChargeLimitsIntent: AppIntent {
     }
 }
 
+// MARK: - Shortcuts Intents (for Siri & Shortcuts automations, runs on locked device)
+
+struct LockVehicleIntent: AppIntent {
+    static var title: LocalizedStringResource = "Lock Vehicle"
+    static var description = IntentDescription("Lock your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to lock")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.lockVehicle(bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(title: "Lock Request Sent", body: "Command sent to \(vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Lock request sent to \(vehicleName)")
+    }
+}
+
+struct UnlockVehicleIntent: AppIntent {
+    static var title: LocalizedStringResource = "Unlock Vehicle"
+    static var description = IntentDescription("Unlock your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to unlock")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.unlockVehicle(bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(title: "Unlock Request Sent", body: "Command sent to \(vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Unlock request sent to \(vehicleName)")
+    }
+}
+
+struct StartClimateIntent: AppIntent {
+    static var title: LocalizedStringResource = "Start Climate"
+    static var description = IntentDescription("Start climate control for your vehicle using a preset")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Preset", description: "The climate control preset to use")
+    var preset: ClimatePresetEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let presetId = preset.id
+        let presetName = preset.presetName
+        let presetIcon = preset.presetIcon
+        let targetVin = preset.vehicleVin
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            if let climatePreset = bbVehicle.safeClimatePresets.first(where: { $0.id == presetId }) {
+                try await account.startClimate(
+                    bbVehicle,
+                    options: climatePreset.climateOptions,
+                    modelContext: context,
+                    presetName: presetName,
+                    presetIcon: presetIcon
+                )
+            } else {
+                try await account.startClimate(
+                    bbVehicle,
+                    modelContext: context,
+                    presetName: presetName,
+                    presetIcon: presetIcon
+                )
+            }
+        }
+
+        await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(preset.vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Climate start request sent to \(preset.vehicleName)")
+    }
+}
+
+struct StopClimateIntent: AppIntent {
+    static var title: LocalizedStringResource = "Stop Climate"
+    static var description = IntentDescription("Stop climate control for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to stop climate control")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.stopClimate(bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(title: "Climate Stop Request Sent", body: "Command sent to \(vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Climate stop request sent to \(vehicleName)")
+    }
+}
+
+struct StartChargeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Start Charging"
+    static var description = IntentDescription("Start charging for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to start charging")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.startCharge(bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(title: "Charge Start Request Sent", body: "Command sent to \(vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Charge start request sent to \(vehicleName)")
+    }
+}
+
+struct StopChargeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Stop Charging"
+    static var description = IntentDescription("Stop charging for your vehicle")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to stop charging")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+            try await account.stopCharge(bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(title: "Charge Stop Request Sent", body: "Command sent to \(vehicleName)")
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        return .result(dialog: "Charge stop request sent to \(vehicleName)")
+    }
+}
+
+// MARK: - App Shortcuts Provider
+
+struct BetterBlueShortcutsProvider: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: LockVehicleIntent(),
+            phrases: [
+                "Lock my car with \(.applicationName)",
+                "Lock vehicle with \(.applicationName)",
+            ],
+            shortTitle: "Lock Vehicle",
+            systemImageName: "lock.fill"
+        )
+        AppShortcut(
+            intent: UnlockVehicleIntent(),
+            phrases: [
+                "Unlock my car with \(.applicationName)",
+                "Unlock vehicle with \(.applicationName)",
+            ],
+            shortTitle: "Unlock Vehicle",
+            systemImageName: "lock.open.fill"
+        )
+        AppShortcut(
+            intent: StartClimateIntent(),
+            phrases: [
+                "Start climate with \(.applicationName)",
+                "Turn on climate with \(.applicationName)",
+                "Warm up my car with \(.applicationName)",
+                "Cool down my car with \(.applicationName)",
+            ],
+            shortTitle: "Start Climate",
+            systemImageName: "fan.fill"
+        )
+        AppShortcut(
+            intent: StopClimateIntent(),
+            phrases: [
+                "Stop climate with \(.applicationName)",
+                "Turn off climate with \(.applicationName)",
+            ],
+            shortTitle: "Stop Climate",
+            systemImageName: "fan.slash.fill"
+        )
+        AppShortcut(
+            intent: RefreshVehicleStatusIntent(),
+            phrases: [
+                "Refresh vehicle status with \(.applicationName)",
+                "Update my car status with \(.applicationName)",
+            ],
+            shortTitle: "Refresh Status",
+            systemImageName: "arrow.clockwise"
+        )
+        AppShortcut(
+            intent: GetVehicleStatusIntent(),
+            phrases: [
+                "Get vehicle status with \(.applicationName)",
+                "Check my car with \(.applicationName)",
+                "How is my car with \(.applicationName)",
+            ],
+            shortTitle: "Get Status",
+            systemImageName: "car.fill"
+        )
+        AppShortcut(
+            intent: StartChargeIntent(),
+            phrases: [
+                "Start charging with \(.applicationName)",
+                "Charge my car with \(.applicationName)",
+            ],
+            shortTitle: "Start Charging",
+            systemImageName: "bolt.fill"
+        )
+        AppShortcut(
+            intent: StopChargeIntent(),
+            phrases: [
+                "Stop charging with \(.applicationName)",
+            ],
+            shortTitle: "Stop Charging",
+            systemImageName: "bolt.slash.fill"
+        )
+    }
+}
+
 // MARK: - Intent Errors
 
 enum IntentError: Swift.Error, LocalizedError {
