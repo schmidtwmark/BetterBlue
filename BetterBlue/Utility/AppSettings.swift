@@ -48,11 +48,58 @@ enum WidgetRefreshInterval: Int, CaseIterable {
     }
 }
 
+/// Protocol to abstract storage for cross-device sync (iCloud on device, shared file in simulator)
+private protocol SyncStore {
+    func string(forKey key: String) -> String?
+    func setString(_ value: String, forKey key: String)
+    func performSync()
+}
+
+extension NSUbiquitousKeyValueStore: SyncStore {
+    func setString(_ value: String, forKey key: String) {
+        set(value as Any, forKey: key)
+    }
+
+    func performSync() {
+        synchronize()
+    }
+}
+
+/// Shared UserDefaults-based sync store for simulator (uses /tmp/BetterBlue_Shared)
+private final class SimulatorSyncStore: SyncStore {
+    private let defaults: UserDefaults
+
+    init() {
+        let sharedPath = "/tmp/BetterBlue_Shared"
+        try? FileManager.default.createDirectory(
+            atPath: sharedPath,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        // Use a UserDefaults with a custom suite that points to the shared location
+        defaults = UserDefaults(suiteName: sharedPath) ?? UserDefaults.standard
+    }
+
+    func string(forKey key: String) -> String? {
+        defaults.string(forKey: key)
+    }
+
+    func setString(_ value: String, forKey key: String) {
+        defaults.set(value, forKey: key)
+    }
+
+    func performSync() {
+        defaults.synchronize()
+    }
+}
+
 @MainActor @Observable
 class AppSettings {
     static let shared = AppSettings()
 
     private let userDefaults = UserDefaults(suiteName: "group.com.betterblue.shared")!
+    private let syncStore: SyncStore
+    private let isSimulator: Bool
     private let distanceUnitKey = "DistanceUnit"
     private let temperatureUnitKey = "TemperatureUnit"
     private let notificationsEnabledKey = "NotificationsEnabled"
@@ -61,23 +108,21 @@ class AppSettings {
     private let liveActivitiesEnabledKey = "LiveActivitiesEnabled"
 
     var preferredDistanceUnit: Distance.Units {
-        get {
-            let savedValue = userDefaults.string(forKey: distanceUnitKey) ?? Distance.Units.miles.rawValue
-            return Distance.Units(rawValue: savedValue) ?? .miles
-        }
-        set {
-            userDefaults.set(newValue.rawValue, forKey: distanceUnitKey)
+        didSet {
+            // Write to both sync store (for cross-device sync) and UserDefaults (for widgets)
+            syncStore.setString(preferredDistanceUnit.rawValue, forKey: distanceUnitKey)
+            userDefaults.set(preferredDistanceUnit.rawValue, forKey: distanceUnitKey)
+            syncStore.performSync()
             refreshWidgetsAndLiveActivities()
         }
     }
 
     var preferredTemperatureUnit: Temperature.Units {
-        get {
-            let savedValue = userDefaults.string(forKey: temperatureUnitKey) ?? Temperature.Units.fahrenheit.rawValue
-            return Temperature.Units(rawValue: savedValue) ?? .fahrenheit
-        }
-        set {
-            userDefaults.set(newValue.rawValue, forKey: temperatureUnitKey)
+        didSet {
+            // Write to both sync store (for cross-device sync) and UserDefaults (for widgets)
+            syncStore.setString(preferredTemperatureUnit.rawValue, forKey: temperatureUnitKey)
+            userDefaults.set(preferredTemperatureUnit.rawValue, forKey: temperatureUnitKey)
+            syncStore.performSync()
             refreshWidgetsAndLiveActivities()
         }
     }
@@ -114,6 +159,25 @@ class AppSettings {
     }
 
     private init() {
+        #if targetEnvironment(simulator)
+            isSimulator = true
+            syncStore = SimulatorSyncStore()
+        #else
+            isSimulator = false
+            syncStore = NSUbiquitousKeyValueStore.default
+        #endif
+
+        // Initialize unit preferences from sync store (iCloud on device, shared file in simulator)
+        let savedDistanceUnit = syncStore.string(forKey: distanceUnitKey)
+            ?? userDefaults.string(forKey: distanceUnitKey)
+            ?? Distance.Units.miles.rawValue
+        preferredDistanceUnit = Distance.Units(rawValue: savedDistanceUnit) ?? .miles
+
+        let savedTemperatureUnit = syncStore.string(forKey: temperatureUnitKey)
+            ?? userDefaults.string(forKey: temperatureUnitKey)
+            ?? Temperature.Units.fahrenheit.rawValue
+        preferredTemperatureUnit = Temperature.Units(rawValue: savedTemperatureUnit) ?? .fahrenheit
+
         notificationsEnabled = userDefaults.bool(forKey: notificationsEnabledKey)
 
         let savedRefreshInterval = userDefaults.integer(forKey: widgetRefreshIntervalKey)
@@ -131,6 +195,48 @@ class AppSettings {
 
         // Live Activities is a beta feature, disabled by default
         liveActivitiesEnabled = userDefaults.bool(forKey: liveActivitiesEnabledKey)
+
+        // Start sync store and listen for changes from other devices
+        syncStore.performSync()
+
+        #if !targetEnvironment(simulator)
+            // Only set up iCloud observer on real devices
+            NotificationCenter.default.addObserver(
+                forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+                object: NSUbiquitousKeyValueStore.default,
+                queue: .main
+            ) { [weak self] notification in
+                // Extract values from notification before async boundary
+                guard let self,
+                      let userInfo = notification.userInfo,
+                      let changeReason = userInfo[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int,
+                      let changedKeys = userInfo[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] else {
+                    return
+                }
+                Task { @MainActor [self] in
+                    self.handleiCloudChange(changeReason: changeReason, changedKeys: changedKeys)
+                }
+            }
+        #endif
+    }
+
+    private func handleiCloudChange(changeReason: Int, changedKeys: [String]) {
+        BBLogger.info(.app, "iCloud settings changed externally (reason: \(changeReason)): \(changedKeys)")
+
+        // Update stored properties from iCloud values (triggers observation for SwiftUI)
+        if changedKeys.contains(distanceUnitKey),
+           let value = syncStore.string(forKey: distanceUnitKey),
+           let unit = Distance.Units(rawValue: value),
+           unit != preferredDistanceUnit {
+            preferredDistanceUnit = unit
+        }
+
+        if changedKeys.contains(temperatureUnitKey),
+           let value = syncStore.string(forKey: temperatureUnitKey),
+           let unit = Temperature.Units(rawValue: value),
+           unit != preferredTemperatureUnit {
+            preferredTemperatureUnit = unit
+        }
     }
 
     private func requestNotificationPermission() async {

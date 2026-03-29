@@ -242,7 +242,7 @@ struct SettingsView: View {
             LiveActivitiesInfoSheet()
         }
         .sheet(isPresented: $showingExportSheet) {
-            DebugExportSheet(accounts: accounts, appSettings: appSettings)
+            DebugExportSheet(accounts: accounts, appSettings: appSettings, modelContext: modelContext)
         }
     }
 
@@ -327,7 +327,15 @@ private struct DebugExportData {
     let redacted: String
 
     @MainActor
-    static func generate(accounts: [BBAccount], appSettings: AppSettings) async -> DebugExportData {
+    static func generate(accounts: [BBAccount], appSettings: AppSettings, modelContext: ModelContext) async -> DebugExportData {
+        // Fetch HTTP logs for each account
+        var accountExports: [AccountExport] = []
+
+        for account in accounts {
+            let httpLogs = fetchHTTPLogsForAccount(accountId: account.id, vehicles: account.safeVehicles, modelContext: modelContext)
+            accountExports.append(AccountExport(account: account, httpLogs: httpLogs))
+        }
+
         // Create export structure using Codable
         let export = DebugExportContent(
             appInfo: DebugExportContent.AppInfo(
@@ -343,7 +351,7 @@ private struct DebugExportData {
                 debugModeEnabled: appSettings.debugModeEnabled,
                 liveActivitiesEnabled: appSettings.liveActivitiesEnabled
             ),
-            accounts: accounts
+            accounts: accountExports
         )
 
         // Encode to JSON
@@ -363,12 +371,170 @@ private struct DebugExportData {
 
         return DebugExportData(raw: rawJSON, redacted: redactedJSON)
     }
+
+    @MainActor
+    private static func fetchHTTPLogsForAccount(accountId: UUID, vehicles: [BBVehicle], modelContext: ModelContext) -> AccountHTTPLogs {
+        // Fetch all logs for this account, sorted by timestamp descending
+        let predicate = #Predicate<BBHTTPLog> { $0.log.accountId == accountId }
+        var descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.log.timestamp, order: .reverse)])
+
+        let allLogs: [BBHTTPLog]
+        do {
+            allLogs = try modelContext.fetch(descriptor)
+        } catch {
+            return AccountHTTPLogs(login: nil, getVehicles: nil, vehicleStatuses: [])
+        }
+
+        // Find most recent login
+        let loginLog = allLogs.first { $0.log.requestType == .login }?.log
+
+        // Find most recent fetchVehicles
+        let getVehiclesLog = allLogs.first { $0.log.requestType == .fetchVehicles }?.log
+
+        // Find most recent fetchVehicleStatus for each vehicle
+        var vehicleStatuses: [HTTPLog] = []
+        for vehicle in vehicles {
+            // Find the most recent status fetch that contains this vehicle's VIN in the URL
+            if let statusLog = allLogs.first(where: {
+                $0.log.requestType == .fetchVehicleStatus && $0.log.url.contains(vehicle.vin)
+            })?.log {
+                vehicleStatuses.append(statusLog)
+            }
+        }
+
+        return AccountHTTPLogs(login: loginLog, getVehicles: getVehiclesLog, vehicleStatuses: vehicleStatuses)
+    }
+}
+
+private struct AccountHTTPLogs: Encodable {
+    let login: HTTPLog?
+    let getVehicles: HTTPLog?
+    let vehicleStatuses: [HTTPLog]
+
+    enum CodingKeys: String, CodingKey {
+        case login, getVehicles, vehicleStatuses
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(login.map { HTTPLogExport(log: $0) }, forKey: .login)
+        try container.encodeIfPresent(getVehicles.map { HTTPLogExport(log: $0) }, forKey: .getVehicles)
+        try container.encode(vehicleStatuses.map { HTTPLogExport(log: $0) }, forKey: .vehicleStatuses)
+    }
+}
+
+/// Wrapper for HTTPLog that encodes request/response bodies as proper JSON objects
+private struct HTTPLogExport: Encodable {
+    let log: HTTPLog
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp, accountId, requestType, method, url
+        case requestHeaders, requestBody
+        case responseStatus, responseHeaders, responseBody
+        case error, apiError, duration, stackTrace
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(log.timestamp, forKey: .timestamp)
+        try container.encode(log.accountId, forKey: .accountId)
+        try container.encode(log.requestType, forKey: .requestType)
+        try container.encode(log.method, forKey: .method)
+        try container.encode(log.url, forKey: .url)
+        try container.encode(log.requestHeaders, forKey: .requestHeaders)
+        try container.encodeIfPresent(log.responseStatus, forKey: .responseStatus)
+        try container.encode(log.responseHeaders, forKey: .responseHeaders)
+        try container.encodeIfPresent(log.error, forKey: .error)
+        try container.encodeIfPresent(log.apiError, forKey: .apiError)
+        try container.encode(log.duration, forKey: .duration)
+        try container.encodeIfPresent(log.stackTrace, forKey: .stackTrace)
+
+        // Encode request body as JSON object if valid, otherwise as string
+        if let body = log.requestBody {
+            try encodeJSONBody(body, forKey: .requestBody, in: &container)
+        }
+
+        // Encode response body as JSON object if valid, otherwise as string
+        if let body = log.responseBody {
+            try encodeJSONBody(body, forKey: .responseBody, in: &container)
+        }
+    }
+
+    private func encodeJSONBody(_ body: String, forKey key: CodingKeys, in container: inout KeyedEncodingContainer<CodingKeys>) throws {
+        if let data = body.data(using: .utf8),
+           let jsonObject = try? JSONSerialization.jsonObject(with: data) {
+            // It's valid JSON - encode as raw JSON
+            if let dict = jsonObject as? [String: Any] {
+                try container.encode(AnyCodable(dict), forKey: key)
+            } else if let array = jsonObject as? [Any] {
+                try container.encode(AnyCodable(array), forKey: key)
+            } else {
+                // Primitive JSON value, encode as string
+                try container.encode(body, forKey: key)
+            }
+        } else {
+            // Not valid JSON, encode as string
+            try container.encode(body, forKey: key)
+        }
+    }
+}
+
+/// Type-erased Codable wrapper for arbitrary JSON values
+private struct AnyCodable: Encodable {
+    let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+
+        switch value {
+        case let bool as Bool:
+            try container.encode(bool)
+        case let int as Int:
+            try container.encode(int)
+        case let double as Double:
+            try container.encode(double)
+        case let string as String:
+            try container.encode(string)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dict as [String: Any]:
+            try container.encode(dict.mapValues { AnyCodable($0) })
+        case is NSNull:
+            try container.encodeNil()
+        default:
+            try container.encodeNil()
+        }
+    }
+}
+
+private struct AccountExport: Encodable {
+    let account: BBAccount
+    let httpLogs: AccountHTTPLogs
+
+    enum CodingKeys: String, CodingKey {
+        case id, username, brand, region, vehicles, httpLogs = "http_logs"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(account.id, forKey: .id)
+        try container.encode(account.username, forKey: .username)
+        try container.encode(account.brand, forKey: .brand)
+        try container.encode(account.region, forKey: .region)
+        try container.encode(account.safeVehicles, forKey: .vehicles)
+        try container.encode(httpLogs, forKey: .httpLogs)
+    }
 }
 
 private struct DebugExportContent: Encodable {
     let appInfo: AppInfo
     let appSettings: AppSettingsExport
-    let accounts: [BBAccount]
+    let accounts: [AccountExport]
 
     struct AppInfo: Encodable {
         let version: String
@@ -396,6 +562,7 @@ private enum ExportMode: String, CaseIterable {
 private struct DebugExportSheet: View {
     let accounts: [BBAccount]
     let appSettings: AppSettings
+    let modelContext: ModelContext
 
     @Environment(\.dismiss) private var dismiss
     @State private var exportData: DebugExportData?
@@ -460,7 +627,8 @@ private struct DebugExportSheet: View {
             .task {
                 exportData = await DebugExportData.generate(
                     accounts: accounts,
-                    appSettings: appSettings
+                    appSettings: appSettings,
+                    modelContext: modelContext
                 )
             }
         }

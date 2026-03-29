@@ -9,11 +9,28 @@ import BetterBlueKit
 import Highlight
 import SwiftUI
 
+private struct ShareableContent: Identifiable {
+    let id = UUID()
+    let content: String
+}
+
 struct HTTPLogDetailView: View {
     let log: HTTPLog
     var transition: Namespace.ID?
     @Namespace private var fallbackTransition
     @State private var copiedMessage: String?
+    @State private var shareContent: ShareableContent?
+
+    private func generateLogJSON() -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(log),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return json
+    }
 
     var body: some View {
         TabView {
@@ -70,6 +87,18 @@ struct HTTPLogDetailView: View {
         }
         .navigationTitle("HTTP Log Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    shareContent = ShareableContent(content: generateLogJSON())
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .sheet(item: $shareContent) { item in
+            ShareSheet(activityItems: [item.content])
+        }
         .overlay(alignment: .top) {
             if let message = copiedMessage {
                 Text(message)
