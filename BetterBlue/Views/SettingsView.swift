@@ -376,7 +376,7 @@ private struct DebugExportData {
     private static func fetchHTTPLogsForAccount(accountId: UUID, vehicles: [BBVehicle], modelContext: ModelContext) -> AccountHTTPLogs {
         // Fetch all logs for this account, sorted by timestamp descending
         let predicate = #Predicate<BBHTTPLog> { $0.log.accountId == accountId }
-        var descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.log.timestamp, order: .reverse)])
+        let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.log.timestamp, order: .reverse)])
 
         let allLogs: [BBHTTPLog]
         do {

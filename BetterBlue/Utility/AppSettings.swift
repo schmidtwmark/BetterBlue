@@ -269,8 +269,8 @@ class AppSettings {
 
         // Refresh all live activities to pick up the new unit settings
         #if canImport(ActivityKit)
-            for activity in Activity<VehicleActivityAttributes>.activities {
-                Task {
+            Task { @MainActor in
+                for activity in Activity<VehicleActivityAttributes>.activities {
                     let currentState = activity.content.state
                     await activity.update(ActivityContent(state: currentState, staleDate: nil))
                 }

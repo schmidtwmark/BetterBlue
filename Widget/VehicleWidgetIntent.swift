@@ -130,7 +130,7 @@ struct VehicleQuery: EntityQuery {
     ) async throws -> [VehicleEntity] {
         let presets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
         return try await MainActor.run {
-            let modelContainer = try createSharedModelContainer()
+            let modelContainer = try createSharedModelContainer(enableCloudKit: false)
             let context = ModelContext(modelContainer)
 
             let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
@@ -145,7 +145,7 @@ struct VehicleQuery: EntityQuery {
     func suggestedEntities() async throws -> [VehicleEntity] {
         let presets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
         return try await MainActor.run {
-            let modelContainer = try createSharedModelContainer()
+            let modelContainer = try createSharedModelContainer(enableCloudKit: false)
             let context = ModelContext(modelContainer)
 
             let descriptor = FetchDescriptor<BBVehicle>(

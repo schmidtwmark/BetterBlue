@@ -39,9 +39,9 @@ func getAppGroupStoreURL() throws -> URL {
     }
 }
 
-func createContainer(storeURL: URL, schema: Schema) throws -> ModelContainer {
+func createContainer(storeURL: URL, schema: Schema, cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .automatic) throws -> ModelContainer {
     do {
-        let modelConfiguration = ModelConfiguration(url: storeURL, cloudKitDatabase: .automatic)
+        let modelConfiguration = ModelConfiguration(url: storeURL, cloudKitDatabase: cloudKitDatabase)
         return try ModelContainer(for: schema, configurations: [modelConfiguration])
     } catch {
         BBLogger.error(.app, "BetterBlue: Failed to create ModelContainer: \(error)")
@@ -83,8 +83,11 @@ func cleanupOrphanedClimatePresets(container: ModelContainer) {
     }
 }
 
-/// Creates a shared ModelContainer for use across main app, widget, and watch app
-func createSharedModelContainer() throws -> ModelContainer {
+/// Creates a shared ModelContainer for use across main app, widget, and watch app.
+/// - Parameter enableCloudKit: Whether to enable CloudKit sync. Set to `false` for
+///   App Intents and widgets running in the background to avoid `0xdead10cc` crashes
+///   caused by holding SQLite file locks during process suspension.
+func createSharedModelContainer(enableCloudKit: Bool = true) throws -> ModelContainer {
     let schema = Schema([
         BBAccount.self,
         BBVehicle.self,
@@ -92,13 +95,15 @@ func createSharedModelContainer() throws -> ModelContainer {
         ClimatePreset.self
     ], version: .init(1, 0, 9))
 
+    let cloudKitDatabase: ModelConfiguration.CloudKitDatabase = enableCloudKit ? .automatic : .none
+
     #if targetEnvironment(simulator)
         let storeURL = getSimulatorStoreURL()
-        return try createContainer(storeURL: storeURL, schema: schema)
+        return try createContainer(storeURL: storeURL, schema: schema, cloudKitDatabase: cloudKitDatabase)
     #else
         let cloudConfig = ModelConfiguration(
             "iCloud.com.markschmidt.BetterBlue",
-            cloudKitDatabase: .automatic
+            cloudKitDatabase: cloudKitDatabase
         )
 
         if let container = try? ModelContainer(
@@ -108,6 +113,6 @@ func createSharedModelContainer() throws -> ModelContainer {
             return container
         }
         let storeURL = try getAppGroupStoreURL()
-        return try createContainer(storeURL: storeURL, schema: schema)
+        return try createContainer(storeURL: storeURL, schema: schema, cloudKitDatabase: cloudKitDatabase)
     #endif
 }

@@ -292,7 +292,8 @@ final class LiveActivityManager {
         }
 
         if let activity = existingActivity {
-            Task {
+            nonisolated(unsafe) let activity = activity
+            Task { @MainActor in
                 await activity.update(ActivityContent(state: contentState, staleDate: nil))
             }
         } else {
@@ -373,11 +374,12 @@ final class LiveActivityManager {
 
     private func endActivity(for vehicle: BBVehicle) {
         #if canImport(ActivityKit)
-        guard let activity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vehicle.vin }) else {
+        guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vehicle.vin }) else {
             return
         }
 
-        Task {
+        nonisolated(unsafe) let activity = existingActivity
+        Task { @MainActor in
             await activity.end(nil, dismissalPolicy: .immediate)
 
             // If no more active Live Activities, unregister from backend

@@ -48,7 +48,7 @@ struct WatchComplicationProvider: TimelineProvider {
     @MainActor
     private func fetchEntry() async -> WatchComplicationEntry {
         do {
-            let modelContainer = try createSharedModelContainer()
+            let modelContainer = try createSharedModelContainer(enableCloudKit: false)
             let context = ModelContext(modelContainer)
             let vehicles = try context.fetch(FetchDescriptor<BBVehicle>(
                 predicate: #Predicate { !$0.isHidden },

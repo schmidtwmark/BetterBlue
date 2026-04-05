@@ -37,7 +37,7 @@ private struct ClimatePresetFetcher {
 
     static func fetchPresets(withIDs ids: [UUID]?) -> [ClimatePresetEntity] {
         do {
-            let modelContainer = try createSharedModelContainer()
+            let modelContainer = try createSharedModelContainer(enableCloudKit: false)
             let context = ModelContext(modelContainer)
 
             // Fetch all presets directly (like @Query does)

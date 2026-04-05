@@ -69,7 +69,7 @@ struct StopLiveActivityIntent: LiveActivityIntent {
         }
 
         // Fetch the vehicle and account
-        let modelContainer = try createSharedModelContainer()
+        let modelContainer = try createSharedModelContainer(enableCloudKit: false)
         let context = ModelContext(modelContainer)
         let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
 
@@ -132,7 +132,7 @@ struct RefreshVehicleStatusIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let modelContainer = try createSharedModelContainer()
+        let modelContainer = try createSharedModelContainer(enableCloudKit: false)
         let context = ModelContext(modelContainer)
 
         let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
@@ -167,7 +167,7 @@ struct GetVehicleStatusIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let modelContainer = try createSharedModelContainer()
+        let modelContainer = try createSharedModelContainer(enableCloudKit: false)
         let context = ModelContext(modelContainer)
 
         let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
@@ -236,7 +236,7 @@ private func performVehicleActionWithVin(
     _ vin: String,
     action: @escaping (BBVehicle, BBAccount, ModelContext) async throws -> Void,
 ) async throws {
-    let modelContainer = try createSharedModelContainer()
+    let modelContainer = try createSharedModelContainer(enableCloudKit: false)
     let context = ModelContext(modelContainer)
 
     let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())

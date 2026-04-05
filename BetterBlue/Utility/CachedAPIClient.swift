@@ -230,7 +230,7 @@ class CachedAPIClient: APIClientProtocol {
 
 // MARK: - Supporting Types
 
-private protocol OngoingRequest {
+private protocol OngoingRequest: Sendable {
     func waitForCompletion() async throws -> Any
 }
 
