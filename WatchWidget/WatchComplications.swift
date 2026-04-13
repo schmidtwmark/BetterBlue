@@ -63,7 +63,7 @@ struct WatchComplicationProvider: TimelineProvider {
             var rangeText: String?
             var percentage: Double?
 
-            if vehicle.isElectric, let evStatus = vehicle.evStatus {
+            if vehicle.fuelType.hasElectricCapability, let evStatus = vehicle.evStatus {
                 percentage = evStatus.evRange.percentage
                 if evStatus.evRange.range.length > 0 {
                     rangeText = evStatus.evRange.range.units.format(

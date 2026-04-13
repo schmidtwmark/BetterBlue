@@ -215,7 +215,7 @@ struct VehicleCardView: View {
                 showRefreshSuccess = true
 
                 // Refresh widgets when vehicle status is updated
-                WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+                WidgetCenter.shared.reloadAllTimelines()
 
                 // Notify parent that refresh was successful (clears global error)
                 onSuccessfulRefresh?()

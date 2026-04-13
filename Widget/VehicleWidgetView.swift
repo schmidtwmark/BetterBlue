@@ -156,8 +156,8 @@ struct VehicleHeaderView: View {
             } else {
                 // Medium widget: icon, range, dot, percentage
                 HStack(spacing: 4) {
-                    Image(systemName: vehicle.isElectric ? "bolt.fill" : "fuelpump.fill")
-                        .foregroundColor(vehicle.isElectric ? .green : .orange)
+                    Image(systemName: vehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
+                        .foregroundColor(vehicle.fuelType.hasElectricCapability ? .green : .orange)
                         .font(.caption)
 
                     Text(vehicle.rangeText)
@@ -270,7 +270,7 @@ struct VehicleButtonsView: View {
         id: .init(),
         displayName: "Ioniq 5",
         vin: "test",
-        isElectric: true,
+        fuelType: .electric,
         rangeText: "250 mi",
         batteryPercentage: 85.0,
         timestamp: Date(),
@@ -287,7 +287,7 @@ struct VehicleButtonsView: View {
         id: .init(),
         displayName: "Genesis GV60",
         vin: "test",
-        isElectric: true,
+        fuelType: .electric,
         rangeText: "250 mi",
         batteryPercentage: 85.0,
         timestamp: Date(),
@@ -352,7 +352,7 @@ struct LockScreenProgressIcon: View {
                 .rotationEffect(.degrees(-90))
                 .animation(.easeInOut(duration: 1), value: rangePercentage)
 
-            Image(systemName: vehicle.isElectric ? "bolt.car.fill" : "car.fill")
+            Image(systemName: vehicle.fuelType.hasElectricCapability ? "bolt.car.fill" : "car.fill")
         }
         .frame(width: 44, height: 44)
     }
@@ -402,7 +402,7 @@ struct LockScreenWideRangeWidget: View {
         id: .init(),
         displayName: "Model Y",
         vin: "test",
-        isElectric: true,
+        fuelType: .electric,
         rangeText: "280 mi",
         batteryPercentage: 75.0,
         timestamp: Date(),
@@ -419,7 +419,7 @@ struct LockScreenWideRangeWidget: View {
         id: .init(),
         displayName: "Ioniq 5",
         vin: "test",
-        isElectric: true,
+        fuelType: .electric,
         rangeText: "250 mi",
         batteryPercentage: 85.0,
         timestamp: Date(),

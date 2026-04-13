@@ -18,15 +18,17 @@ struct EVChargingProgressView: View {
     let chargeSpeed: String?
     let chargeTimeRemaining: String?
     let targetSOC: Double?
+    let showHeader: Bool
 
     init(
         icon: Image? = nil,
-        formattedRange: String,
+        formattedRange: String = "",
         batteryPercentage: Int,
         isCharging: Bool,
         chargeSpeed: String?,
         chargeTimeRemaining: String?,
-        targetSOC: Double?
+        targetSOC: Double?,
+        showHeader: Bool = true
     ) {
         self.icon = icon
         self.formattedRange = formattedRange
@@ -35,39 +37,42 @@ struct EVChargingProgressView: View {
         self.chargeSpeed = chargeSpeed
         self.chargeTimeRemaining = chargeTimeRemaining
         self.targetSOC = targetSOC
+        self.showHeader = showHeader
     }
 
     var body: some View {
         VStack(spacing: 12) {
-            // Top row: Icon (optional), Range, and Battery percentage
-            HStack(spacing: 12) {
-                if let icon {
-                    icon
-                        .font(.title2)
-                        .foregroundColor(isCharging ? .green : .primary)
-                        .symbolEffect(.pulse, isActive: isCharging)
-                        .frame(width: 28)
-                }
+            if showHeader {
+                // Top row: Icon (optional), Range, and Battery percentage
+                HStack(spacing: 12) {
+                    if let icon {
+                        icon
+                            .font(.title2)
+                            .foregroundColor(isCharging ? .green : .primary)
+                            .symbolEffect(.pulse, isActive: isCharging)
+                            .frame(width: 28)
+                    }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("EV Range")
-                        .font(.caption)
-                    Text(formattedRange)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("EV Range")
+                            .font(.caption)
+                        Text(formattedRange)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Battery")
-                        .font(.caption)
-                    Text("\(batteryPercentage)%")
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Battery")
+                            .font(.caption)
+                        Text("\(batteryPercentage)%")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
                 }
+                .foregroundColor(.primary)
             }
-            .foregroundColor(.primary)
 
             // Progress bar
             if isCharging {
@@ -94,8 +99,8 @@ struct EVChargingProgressView: View {
                         height: 32
                     )
 
-                // Target SOC indicator (dashed line)
-                if let targetSOC {
+                // Target SOC indicator (dashed line) - hidden at 100% since it's at the edge
+                if let targetSOC, targetSOC < 100 {
                     Line()
                         .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
                         .foregroundColor(.white)
@@ -108,8 +113,9 @@ struct EVChargingProgressView: View {
                     if let speed = chargeSpeed {
                         Text(speed)
                             .font(.caption)
-                            .fontWeight(.medium)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                             .padding(.leading, 12)
                     }
                     Spacer()
@@ -122,8 +128,9 @@ struct EVChargingProgressView: View {
                         Spacer()
                         Text(timeRemaining)
                             .font(.caption)
-                            .fontWeight(.medium)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                             .padding(.trailing, 12)
                     }
                     .frame(

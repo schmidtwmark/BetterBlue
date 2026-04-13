@@ -26,7 +26,7 @@ extension BBVehicle {
             regId: regId,
             model: model,
             accountId: accountId,
-            isElectric: isElectric,
+            fuelType: fuelType,
             generation: generation,
             odometer: odometer,
             vehicleKey: vehicleKey,

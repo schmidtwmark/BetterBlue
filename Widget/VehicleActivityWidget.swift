@@ -158,7 +158,14 @@ struct DynamicIslandExpandedContentView: View {
         VStack(spacing: 8) {
             // Progress bar for charging
             if context.state.activityType == .charging {
-                chargingProgressBar
+                EVChargingProgressView(
+                    batteryPercentage: batteryPercentage,
+                    isCharging: true,
+                    chargeSpeed: chargeSpeed,
+                    chargeTimeRemaining: chargeTimeRemaining,
+                    targetSOC: evStatus?.currentTargetSOC,
+                    showHeader: false
+                )
             }
 
             // Climate status
@@ -228,65 +235,6 @@ struct DynamicIslandExpandedContentView: View {
         }
     }
 
-    private var chargingProgressBar: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Background
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 32)
-
-                // Foreground progress
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.green)
-                    .frame(
-                        width: geometry.size.width * (Double(batteryPercentage) / 100.0),
-                        height: 32
-                    )
-
-                // Target SOC indicator (dashed line)
-                if let targetSOC = evStatus?.currentTargetSOC {
-                    Line()
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
-                        .foregroundColor(.white)
-                        .frame(width: 2, height: 32)
-                        .offset(x: geometry.size.width * (targetSOC / 100.0) - 1)
-                }
-
-                // Text overlay - charge speed on left
-                HStack {
-                    if let speed = chargeSpeed {
-                        Text(speed)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.leading, 12)
-                    }
-                    Spacer()
-                }
-                .frame(height: 32)
-
-                // Time remaining - positioned within target SOC area
-                if let timeRemaining = chargeTimeRemaining {
-                    HStack {
-                        Spacer()
-                        Text(timeRemaining)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.trailing, 12)
-                    }
-                    .frame(
-                        width: evStatus?.currentTargetSOC != nil
-                            ? geometry.size.width * ((evStatus?.currentTargetSOC ?? 100) / 100.0)
-                            : geometry.size.width,
-                        height: 32
-                    )
-                }
-            }
-        }
-        .frame(height: 32)
-    }
 }
 
 #Preview("Charging", as: .content, using: VehicleActivityAttributes(vehicleName: "My Ioniq 5", vin: "VIN123", vehicleId: UUID())) {

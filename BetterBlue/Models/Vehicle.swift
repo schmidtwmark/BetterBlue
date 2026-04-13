@@ -46,7 +46,7 @@ class BBVehicle {
     var regId: String = ""
     var model: String = ""
     var accountId: UUID = UUID()
-    var isElectric: Bool = false
+    var fuelTypeRaw: String = FuelType.gas.rawValue
     var generation: Int = 0
     var odometer: Distance = Distance(length: 0, units: .miles)
 
@@ -85,6 +85,11 @@ class BBVehicle {
         set { chargePortTypeRaw = newValue.rawValue }
     }
 
+    var fuelType: FuelType {
+        get { FuelType(rawValue: fuelTypeRaw) ?? .gas }
+        set { fuelTypeRaw = newValue.rawValue }
+    }
+
     // Optional vehicle key for Kia vehicles
     @Transient var vehicleKey: String?
 
@@ -101,7 +106,7 @@ class BBVehicle {
         regId = vehicle.regId
         model = vehicle.model
         accountId = vehicle.accountId
-        isElectric = vehicle.isElectric
+        fuelType = vehicle.fuelType
         generation = vehicle.generation
         odometer = vehicle.odometer
 
@@ -140,14 +145,16 @@ extension BBVehicle {
         lastUpdated = status.lastUpdated
         syncDate = status.syncDate
 
-        // if gas range / ev status are empty, keep our existing values
-        if let gasRange = status.gasRange, status.evStatus == nil {
+        // Update gas range and EV status, keeping existing values if new ones aren't provided
+        // PHEVs can have both gasRange and evStatus simultaneously
+        if let gasRange = status.gasRange {
             self.gasRange = gasRange
         }
-        if let evStatus = status.evStatus, status.gasRange == nil {
+        if let evStatus = status.evStatus {
             self.evStatus = evStatus
         }
-        if isElectric {
+        // Only clear gas range for pure EVs (PHEVs retain both gas and EV range)
+        if fuelType == .electric && status.evStatus != nil && status.gasRange == nil {
             gasRange = nil
         }
         location = status.location
@@ -341,7 +348,7 @@ extension BBVehicle {
 
 extension BBVehicle: Encodable {
     enum CodingKeys: String, CodingKey {
-        case id, vin, regId, model, accountId, isElectric, generation, odometer
+        case id, vin, regId, model, accountId, fuelTypeRaw, generation, odometer
         case lastUpdated, syncDate, gasRange, evStatus, location, lockStatus, climateStatus
         case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
@@ -358,7 +365,7 @@ extension BBVehicle: Encodable {
         try container.encode(regId, forKey: .regId)
         try container.encode(model, forKey: .model)
         try container.encode(accountId, forKey: .accountId)
-        try container.encode(isElectric, forKey: .isElectric)
+        try container.encode(fuelTypeRaw, forKey: .fuelTypeRaw)
         try container.encode(generation, forKey: .generation)
         try container.encode(odometer, forKey: .odometer)
 

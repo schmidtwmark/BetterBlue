@@ -149,7 +149,7 @@ struct RefreshVehicleStatusIntent: AppIntent {
         let allPresets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()
         let updatedVehicle = VehicleEntity(from: bbVehicle, with: unit, allPresets: allPresets)
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
 
         return .result(dialog: "\(updatedVehicle.displayName) status updated. \(updatedVehicle.rangeText)")
     }
@@ -188,7 +188,7 @@ struct GetVehicleStatusIntent: AppIntent {
         statusComponents.append("Range: \(vehicle.rangeText)")
 
         // EV specific status
-        if bbVehicle.isElectric, let evStatus = bbVehicle.evStatus {
+        if bbVehicle.fuelType.hasElectricCapability, let evStatus = bbVehicle.evStatus {
             statusComponents.append("Battery: \(Int(evStatus.evRange.percentage))%")
 
             if evStatus.pluggedIn {
@@ -202,7 +202,7 @@ struct GetVehicleStatusIntent: AppIntent {
                     statusComponents.append("Plugged in but not charging")
                 }
             }
-        } else if !bbVehicle.isElectric, let gasRange = bbVehicle.gasRange {
+        } else if bbVehicle.fuelType == .gas, let gasRange = bbVehicle.gasRange {
             statusComponents.append("Fuel: \(Int(gasRange.percentage))%")
         }
 
@@ -324,7 +324,7 @@ struct LockVehicleControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Lock Request Sent", body: "Command sent to \(vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Lock request sent to \(vehicleName)")
     }
 }
@@ -354,7 +354,7 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Unlock Request Sent", body: "Command sent to \(vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Unlock request sent to \(vehicleName)")
     }
 }
@@ -399,7 +399,7 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(preset.vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Climate start request sent to \(preset.vehicleName)")
     }
 }
@@ -429,7 +429,7 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Climate Stop Request Sent", body: "Command sent to \(vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Climate stop request sent to \(vehicleName)")
     }
 }
@@ -459,7 +459,7 @@ struct StartChargeControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Charge Start Request Sent", body: "Command sent to \(vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Charge start request sent to \(vehicleName)")
     }
 }
@@ -489,7 +489,7 @@ struct StopChargeControlIntent: ControlConfigurationIntent {
 
         await sendNotification(title: "Charge Stop Request Sent", body: "Command sent to \(vehicleName)")
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Charge stop request sent to \(vehicleName)")
     }
 }
@@ -548,7 +548,7 @@ struct SetChargeLimitsIntent: AppIntent {
             body: "AC: \(acLimit)%, DC: \(dcLimit)% for \(vehicleName)"
         )
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         return .result(dialog: "Charge limits set to AC: \(acLimit)%, DC: \(dcLimit)% for \(vehicleName)")
     }
 }

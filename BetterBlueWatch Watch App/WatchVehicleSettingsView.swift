@@ -127,7 +127,7 @@ struct WatchVehicleSettingsView: View {
         regId: "test",
         model: "Ioniq 5",
         accountId: UUID(),
-        isElectric: true,
+        fuelType: .electric,
         generation: 3,
         odometer: Distance(length: 25000, units: .miles),
         vehicleKey: nil,

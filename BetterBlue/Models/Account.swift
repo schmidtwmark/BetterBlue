@@ -330,7 +330,7 @@ extension BBAccount {
                 // Update existing vehicle's core data (but preserve UI state like custom names, etc.)
                 existingBBVehicle.regId = vehicle.regId
                 existingBBVehicle.model = vehicle.model
-                existingBBVehicle.isElectric = vehicle.isElectric
+                existingBBVehicle.fuelType = vehicle.fuelType
                 existingBBVehicle.generation = vehicle.generation
                 existingBBVehicle.odometer = vehicle.odometer
                 existingBBVehicle.vehicleKey = vehicle.vehicleKey

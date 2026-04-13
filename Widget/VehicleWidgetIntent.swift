@@ -37,7 +37,7 @@ struct VehicleEntity: AppEntity {
     var id: UUID
     var displayName: String
     var vin: String
-    var isElectric: Bool
+    var fuelType: FuelType
     var rangeText: String
     var batteryPercentage: Double?
     var backgroundColorName: String
@@ -66,7 +66,7 @@ struct VehicleEntity: AppEntity {
         id: UUID,
         displayName: String,
         vin: String,
-        isElectric: Bool,
+        fuelType: FuelType,
         rangeText: String,
         batteryPercentage: Double?,
         timestamp: Date,
@@ -76,7 +76,7 @@ struct VehicleEntity: AppEntity {
         self.id = id
         self.displayName = displayName
         self.vin = vin
-        self.isElectric = isElectric
+        self.fuelType = fuelType
         self.rangeText = rangeText
         self.batteryPercentage = batteryPercentage
         self.timestamp = timestamp
@@ -88,12 +88,12 @@ struct VehicleEntity: AppEntity {
         id = bbVehicle.id
         displayName = bbVehicle.displayName
         vin = bbVehicle.vin
-        isElectric = bbVehicle.isElectric
+        fuelType = bbVehicle.fuelType
         backgroundColorName = bbVehicle.backgroundColorName
         timestamp = bbVehicle.lastUpdated ?? Date()
 
         // Use safe property accessors to prevent context detachment
-        if bbVehicle.isElectric {
+        if bbVehicle.fuelType.hasElectricCapability {
             if bbVehicle.modelContext != nil, let evStatus = bbVehicle.evStatus {
                 batteryPercentage = evStatus.evRange.percentage
                 let range = evStatus.evRange.range.length > 0 ?

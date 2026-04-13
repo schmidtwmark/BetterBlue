@@ -331,8 +331,12 @@ struct FakeVehicleDetailView: View {
     }
 
     private func updateVehicleType() {
-        // Update isElectric flag based on vehicle type
-        vehicle.isElectric = vehicleType == .electric || vehicleType == .pluginHybrid
+        // Update fuelType based on vehicle type
+        vehicle.fuelType = switch vehicleType {
+        case .gas: .gas
+        case .electric: .electric
+        case .pluginHybrid: .phev
+        }
 
         switch vehicleType {
         case .gas:
@@ -473,7 +477,7 @@ struct FakeVehicleDetailView: View {
                 regId: "FAKE123",
                 model: "Test Vehicle",
                 accountId: testAccount.id,
-                isElectric: true,
+                fuelType: .electric,
                 generation: 3,
                 odometer: Distance(length: 15000, units: .miles)
             ))

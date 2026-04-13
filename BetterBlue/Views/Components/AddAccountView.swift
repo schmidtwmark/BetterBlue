@@ -146,6 +146,12 @@ struct AddAccountView: View {
                     selectedBrand = availableBrands.first ?? .hyundai
                 }
             }
+            .onChange(of: selectedBrand) { _, newValue in
+                if newValue == .fake && username.isEmpty && password.isEmpty {
+                    username = "fake-\(UUID().uuidString.prefix(8).lowercased())@betterblue.com"
+                    password = "betterblue"
+                }
+            }
 
             // Only show region picker for non-fake accounts
             if selectedBrand != .fake {

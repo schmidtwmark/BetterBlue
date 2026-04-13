@@ -24,17 +24,17 @@ struct WatchVehicleView: View {
     }
 
     private var batteryPercentage: Int? {
-        guard currentVehicle.isElectric, let evStatus = currentVehicle.evStatus else { return nil }
+        guard currentVehicle.fuelType.hasElectricCapability, let evStatus = currentVehicle.evStatus else { return nil }
         return Int(evStatus.evRange.percentage)
     }
 
     private var fuelPercentage: Int? {
-        guard !currentVehicle.isElectric, let gasRange = currentVehicle.gasRange else { return nil }
+        guard !currentVehicle.fuelType.hasElectricCapability, let gasRange = currentVehicle.gasRange else { return nil }
         return Int(gasRange.percentage)
     }
 
     private var rangeText: String {
-        if currentVehicle.isElectric, let evStatus = currentVehicle.evStatus {
+        if currentVehicle.fuelType.hasElectricCapability, let evStatus = currentVehicle.evStatus {
             let range = evStatus.evRange.range.length > 0 ?
                 evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: appSettings.preferredDistanceUnit) :
                 "--"
@@ -57,12 +57,12 @@ struct WatchVehicleView: View {
     }
 
     private var isPluggedIn: Bool {
-        guard currentVehicle.isElectric, let evStatus = currentVehicle.evStatus else { return false }
+        guard currentVehicle.fuelType.hasElectricCapability, let evStatus = currentVehicle.evStatus else { return false }
         return evStatus.pluggedIn
     }
 
     private var isCharging: Bool {
-        guard currentVehicle.isElectric, let evStatus = currentVehicle.evStatus else { return false }
+        guard currentVehicle.fuelType.hasElectricCapability, let evStatus = currentVehicle.evStatus else { return false }
         return evStatus.charging
     }
 
@@ -173,8 +173,8 @@ struct WatchVehicleView: View {
                                     Spacer()
                                 }
                                 HStack {
-                                    Image(systemName: currentVehicle.isElectric ? "bolt.fill" : "fuelpump.fill")
-                                        .foregroundColor(currentVehicle.isElectric ? .green : .orange)
+                                    Image(systemName: currentVehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
+                                        .foregroundColor(currentVehicle.fuelType.hasElectricCapability ? .green : .orange)
                                         .font(.caption)
 
                                     Text(rangeText)
@@ -485,7 +485,7 @@ struct WatchVehicleButton: View {
         regId: "test",
         model: "Ioniq 5",
         accountId: UUID(),
-        isElectric: true,
+        fuelType: .electric,
         generation: 3,
         odometer: Distance(length: 25000, units: .miles),
         vehicleKey: nil,

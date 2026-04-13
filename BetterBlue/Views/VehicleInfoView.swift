@@ -77,7 +77,7 @@ struct VehicleInfoView: View {
             ClimatePresetsSection(bbVehicle: bbVehicle, vehiclePresets: vehiclePresets)
 
             // EV Settings (only for electric vehicles)
-            if bbVehicle.isElectric {
+            if bbVehicle.fuelType.hasElectricCapability {
                 Section("EV Settings") {
                     Picker("Charge Port Type", selection: Binding(
                         get: { bbVehicle.chargePortType },
@@ -214,7 +214,7 @@ private struct SeatHeatInfoButton: View {
                 regId: "REG123",
                 model: "Ioniq 5",
                 accountId: testAccount.id,
-                isElectric: true,
+                fuelType: .electric,
                 generation: 3,
                 odometer: Distance(length: 25000, units: .miles)
             ))

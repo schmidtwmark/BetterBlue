@@ -338,7 +338,7 @@ extension ClimateSettingsContent {
         regId: "testRegId",
         model: "Ioniq 5",
         accountId: UUID(),
-        isElectric: true,
+        fuelType: .electric,
         generation: 3,
         odometer: .init(length: 500, units: .miles),
         vehicleKey: nil,

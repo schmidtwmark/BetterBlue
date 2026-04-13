@@ -41,7 +41,7 @@ extension MainView {
                 vehicle.updateStatus(with: status)
 
                 await MainActor.run {
-                    WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+                    WidgetCenter.shared.reloadAllTimelines()
                 }
 
                 BBLogger.info(.app, "MainView: Successfully refreshed \(vehicle.displayName)")

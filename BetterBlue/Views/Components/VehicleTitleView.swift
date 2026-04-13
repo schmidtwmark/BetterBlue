@@ -219,7 +219,7 @@ struct VehicleTitleView: View {
             await MainActor.run {
                 isRefreshing = false
                 showRefreshSuccess = true
-                WidgetCenter.shared.reloadTimelines(ofKind: "BetterBlueWidget")
+                WidgetCenter.shared.reloadAllTimelines()
 
                 Task {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -455,7 +455,7 @@ struct VehicleTitleView: View {
             }
         }
 
-        if bbVehicle.isElectric && vehicleAccount?.supportsEVTripDetails == true {
+        if bbVehicle.fuelType.hasElectricCapability && vehicleAccount?.supportsEVTripDetails == true {
             Button {
                 showingTripDetails = true
             } label: {

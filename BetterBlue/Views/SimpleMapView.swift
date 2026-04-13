@@ -91,7 +91,7 @@ struct VehicleMapMarker: View {
                 regId: "REG123",
                 model: "Ioniq 5",
                 accountId: testAccount.id,
-                isElectric: true,
+                fuelType: .electric,
                 generation: 3,
                 odometer: Distance(length: 25000, units: .miles)
             ))

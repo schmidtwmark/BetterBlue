@@ -17,7 +17,7 @@ struct FakeVehicleListView: View {
 
     private struct VehicleConfig {
         let model: String
-        let isElectric: Bool
+        let fuelType: FuelType
         let batteryPercentage: Double
         let fuelPercentage: Double
         let isLocked: Bool
@@ -112,13 +112,13 @@ struct FakeVehicleListView: View {
 
     private func createDefaultFakeVehicle(index: Int, accountId: UUID?) -> BBVehicle {
         let configs = [
-            VehicleConfig(model: "Hyundai IONIQ 5", isElectric: true, batteryPercentage: 92.0, fuelPercentage: 0.0,
+            VehicleConfig(model: "Hyundai IONIQ 5", fuelType: .electric, batteryPercentage: 92.0, fuelPercentage: 0.0,
                           isLocked: true, climateDefrost: true, climateAir: true, temperature: 68.0,
                           isCharging: true, isPluggedIn: true, chargeSpeed: 45.0, odometer: 8500.0),
-            VehicleConfig(model: "Hyundai Sonata", isElectric: false, batteryPercentage: 0.0, fuelPercentage: 75.0,
+            VehicleConfig(model: "Hyundai Sonata", fuelType: .gas, batteryPercentage: 0.0, fuelPercentage: 75.0,
                           isLocked: false, climateDefrost: false, climateAir: false, temperature: 70.0,
                           isCharging: false, isPluggedIn: false, chargeSpeed: 0.0, odometer: 32000.0),
-            VehicleConfig(model: "Kia EV6", isElectric: true, batteryPercentage: 88.0, fuelPercentage: 0.0,
+            VehicleConfig(model: "Kia EV6", fuelType: .electric, batteryPercentage: 88.0, fuelPercentage: 0.0,
                           isLocked: false, climateDefrost: false, climateAir: true, temperature: 70.0,
                           isCharging: false, isPluggedIn: true, chargeSpeed: 0.0, odometer: 12000.0)
         ]
@@ -136,7 +136,7 @@ struct FakeVehicleListView: View {
             regId: regId,
             model: config.model,
             accountId: accountId ?? UUID(),
-            isElectric: config.isElectric,
+            fuelType: config.fuelType,
             generation: 3,
             odometer: odometer,
         )
@@ -167,7 +167,7 @@ struct FakeVehicleListView: View {
             temperature: Temperature(value: config.temperature, units: .fahrenheit),
         )
 
-        if config.isElectric {
+        if config.fuelType.hasElectricCapability {
             let evRange = Distance(length: config.batteryPercentage * 3.0, units: .miles)
             bbVehicle.evStatus = VehicleStatus.EVStatus(
                 charging: config.isCharging,
@@ -205,7 +205,7 @@ struct VehicleRow: View {
 
                 Spacer()
 
-                if vehicle.isElectric {
+                if vehicle.fuelType.hasElectricCapability {
                     if let evStatus = vehicle.evStatus {
                         Label("\(Int(evStatus.evRange.percentage))%", systemImage: "bolt.fill")
                             .font(.caption)
