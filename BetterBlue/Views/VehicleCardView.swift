@@ -61,72 +61,74 @@ struct VehicleCardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            Spacer(minLength: 0)
-            // Error message card (only show if there's an error)
-            if let errorMessage {
-                Button {
-                    if let apiError = lastAPIError {
-                        if apiError.errorType == .requiresMFA {
-                            // Extract MFA info and show appropriate flow
-                            handleMFAError(apiError)
-                        } else {
-                            showingErrorHTTPLogs = true
+        GlassEffectContainer {
+            VStack(spacing: 8) {
+                Spacer(minLength: 0)
+                // Error message card (only show if there's an error)
+                if let errorMessage {
+                    Button {
+                        if let apiError = lastAPIError {
+                            if apiError.errorType == .requiresMFA {
+                                // Extract MFA info and show appropriate flow
+                                handleMFAError(apiError)
+                            } else {
+                                showingErrorHTTPLogs = true
+                            }
                         }
-                    }
-                } label: {
-                    HStack {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .tint(.blue)
-                        Spacer()
-                        if lastAPIError?.errorType == .requiresMFA {
-                            Image(systemName: "chevron.right")
+                    } label: {
+                        HStack {
+                            Text(errorMessage)
                                 .font(.caption)
-                                .foregroundColor(.red.opacity(0.7))
+                                .foregroundColor(.red)
+                                .tint(.blue)
+                            Spacer()
+                            if lastAPIError?.errorType == .requiresMFA {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
                         }
                     }
+                    .padding()
+                    .vehicleCardGlassEffect()
                 }
-                .padding()
-                .vehicleCardGlassEffect()
-            }
 
-            VehicleTitleView(
-                bbVehicle: bbVehicle,
-                bbVehicles: bbVehicles,
-                onVehicleSelected: onVehicleSelected,
-                accounts: accounts,
-                transition: transition,
-                onRefresh: {
-                    // Clear errors on successful refresh from title view
-                    await MainActor.run {
-                        errorMessage = nil
-                        lastAPIError = nil
-                        onSuccessfulRefresh?()
+                VehicleTitleView(
+                    bbVehicle: bbVehicle,
+                    bbVehicles: bbVehicles,
+                    onVehicleSelected: onVehicleSelected,
+                    accounts: accounts,
+                    transition: transition,
+                    onRefresh: {
+                        // Clear errors on successful refresh from title view
+                        await MainActor.run {
+                            errorMessage = nil
+                            lastAPIError = nil
+                            onSuccessfulRefresh?()
+                        }
                     }
+                )
+
+                // Vehicle status info
+                // EV Range Display (if available)
+                if let evStatus = safeEvStatus {
+                    EVRangeDisplayCard(evStatus: evStatus)
                 }
-            )
 
-            // Vehicle status info
-            // EV Range Display (if available)
-            if let evStatus = safeEvStatus {
-                EVRangeDisplayCard(evStatus: evStatus)
+                // Charging Control Button (if EV)
+                if safeEvStatus != nil {
+                    ChargingButton(bbVehicle: bbVehicle, transition: transition)
+                }
+
+                // Gas Range Card (if available)
+                if let gasRange = safeGasRange {
+                    GasRangeCardView(gasRange: gasRange)
+                }
+
+                // Controls Row - Lock and Climate buttons side by side
+                LockButton(bbVehicle: bbVehicle, transition: transition)
+                ClimateButton(bbVehicle: bbVehicle, transition: transition)
             }
-
-            // Charging Control Button (if EV)
-            if safeEvStatus != nil {
-                ChargingButton(bbVehicle: bbVehicle, transition: transition)
-            }
-
-            // Gas Range Card (if available)
-            if let gasRange = safeGasRange {
-                GasRangeCardView(gasRange: gasRange)
-            }
-
-            // Controls Row - Lock and Climate buttons side by side
-            LockButton(bbVehicle: bbVehicle, transition: transition)
-            ClimateButton(bbVehicle: bbVehicle, transition: transition)
         }
         .padding(.horizontal)
         .task {
@@ -268,8 +270,8 @@ struct VehicleCardView: View {
             "Vehicle not found on server"
         } else if error.message.contains("500") || error.message.contains("502") || error.message.contains("503") {
             "Server temporarily unavailable - try again later"
-        } else if error.code != nil, error.code! >= 400 {
-            "Server error (\(error.code!)) - try again later"
+        } else if let code = error.code, code >= 400 {
+            "Server error (\(code)) - try again later"
         } else {
             "Unable to refresh - check connection and try again"
         }

@@ -13,6 +13,7 @@ import WidgetKit
 
 struct MainView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var accounts: [BBAccount]
     @Query(
         filter: #Predicate<BBVehicle> { vehicle in !vehicle.isHidden },
@@ -167,6 +168,9 @@ struct MainView: View {
                 .task {
                     while true {
                         try? await Task.sleep(for: .seconds(60))
+                        // Skip refresh when backgrounded to avoid 0xdead10cc crashes
+                        // from holding SQLite file locks during suspension
+                        guard scenePhase == .active else { continue }
                         await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
                     }
                 }

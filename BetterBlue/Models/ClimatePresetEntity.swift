@@ -58,7 +58,7 @@ private struct ClimatePresetFetcher {
                 guard let vehicle = preset.vehicle else { continue }
                 vehiclesWithPresets.insert(vehicle.id)
 
-                if ids == nil || ids!.contains(preset.id) {
+                if ids == nil || ids?.contains(preset.id) == true {
                     entities.append(ClimatePresetEntity(
                         id: preset.id,
                         vehicleVin: vehicle.vin,
@@ -72,7 +72,7 @@ private struct ClimatePresetFetcher {
 
             // Add default presets for vehicles without any presets
             for vehicle in allVehicles where !vehiclesWithPresets.contains(vehicle.id) {
-                if ids == nil || ids!.contains(vehicle.id) {
+                if ids == nil || ids?.contains(vehicle.id) == true {
                     entities.append(ClimatePresetEntity(
                         id: vehicle.id,
                         vehicleVin: vehicle.vin,

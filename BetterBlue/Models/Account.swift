@@ -142,7 +142,10 @@ extension BBAccount {
         // Token is nil or expired, need to login
         BBLogger.info(.auth, "BBAccount: No valid token, performing login...")
         do {
-            authToken = try await api!.login()
+            guard let api else {
+                throw APIError(message: "API client not initialized")
+            }
+            authToken = try await api.login()
             // Clear any pending MFA error on successful login
             pendingMFAError = nil
         } catch let error as APIError where error.errorType == .requiresMFA {
