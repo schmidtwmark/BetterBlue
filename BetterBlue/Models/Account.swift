@@ -20,6 +20,7 @@ class BBAccount {
     var dateCreated: Date = Date()
     var rememberMeToken: String?
     var serializedAuthToken: String?
+    var deviceId: String?
 
     @Relationship(deleteRule: .cascade) var vehicles: [BBVehicle]? = []
 
@@ -119,6 +120,12 @@ extension BBAccount {
                 HTTPLogSinkManager.shared.createLogSink()
             }
 
+            // Generate a stable device ID for Kia accounts so the rmToken stays valid
+            // across API client re-initializations
+            if deviceId == nil {
+                deviceId = UUID().uuidString.uppercased()
+            }
+
             let configuration = APIClientFactoryConfiguration(
                 region: regionEnum,
                 brand: brandEnum,
@@ -128,7 +135,8 @@ extension BBAccount {
                 accountId: id,
                 modelContext: modelContext,
                 logSink: logSink,
-                rememberMeToken: rememberMeToken
+                rememberMeToken: rememberMeToken,
+                deviceId: deviceId
             )
             api = createAPIClient(configuration: configuration)
         }

@@ -21,7 +21,8 @@ struct APIClientFactoryConfiguration {
         accountId: UUID,
         modelContext: ModelContext,
         logSink: HTTPLogSink? = nil,
-        rememberMeToken: String? = nil
+        rememberMeToken: String? = nil,
+        deviceId: String? = nil
     ) {
         apiConfiguration = APIClientConfiguration(
             region: region,
@@ -31,7 +32,8 @@ struct APIClientFactoryConfiguration {
             pin: pin,
             accountId: accountId,
             logSink: logSink,
-            rememberMeToken: rememberMeToken
+            rememberMeToken: rememberMeToken,
+            deviceId: deviceId
         )
         self.modelContext = modelContext
     }
