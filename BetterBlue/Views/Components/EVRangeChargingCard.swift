@@ -380,7 +380,11 @@ struct EVRangeChargingCard: View {
 
             // Immediately fetch status to update Live Activity
             do {
-                try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
+                try await account.fetchAndUpdateVehicleStatus(
+                    for: bbVehicle,
+                    modelContext: context,
+                    cached: false
+                )
             } catch {
                 BBLogger.warning(.app, "EVRangeChargingCard: Failed to fetch status after stop command: \(error)")
             }

@@ -214,7 +214,13 @@ struct VehicleTitleView: View {
                 throw APIError(message: "Account not found for vehicle")
             }
 
-            try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: modelContext)
+            // User tapped refresh: force a real-time poll so the response
+            // reflects the vehicle's current state, not the backend cache.
+            try await account.fetchAndUpdateVehicleStatus(
+                for: bbVehicle,
+                modelContext: modelContext,
+                cached: false
+            )
 
             await MainActor.run {
                 isRefreshing = false

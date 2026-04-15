@@ -225,9 +225,12 @@ extension BBVehicle {
                 throw APIError(message: "Account not found for vehicle")
             }
 
+            // Post-command verification needs to reflect the vehicle's
+            // actual state, not the backend's cached snapshot.
             let updatedStatus = try await account.fetchVehicleStatus(
                 for: self,
                 modelContext: modelContext,
+                cached: false
             )
 
             // Update the vehicle's status

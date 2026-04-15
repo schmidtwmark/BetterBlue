@@ -277,39 +277,52 @@ extension BBAccount {
         }
     }
 
+    /// Fetches a vehicle's status.
+    /// - Parameter cached: pass `false` when the user explicitly asked for
+    ///   fresh data (manual sync, post-command verification). Defaults to
+    ///   `true` for background/widget reads so we don't repeatedly wake the
+    ///   vehicle modem.
     @MainActor
-    func fetchVehicleStatus(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws -> VehicleStatus {
+    func fetchVehicleStatus(
+        for bbVehicle: BBVehicle,
+        modelContext: ModelContext,
+        cached: Bool = true
+    ) async throws -> VehicleStatus {
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
-            return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext)
+            return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext, cached: cached)
         }
 
         // For Kia vehicles, ensure vehicleKey is populated by refreshing if needed
         if brandEnum == .kia && bbVehicle.vehicleKey == nil {
             BBLogger.debug(.api, "BBAccount: Kia vehicle missing vehicleKey, fetching fresh data...")
             try await loadVehicles(modelContext: modelContext)
-            return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext)
+            return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext, cached: cached)
         }
 
         let vehicle = bbVehicle.toVehicle()
         let status: VehicleStatus
         do {
-            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
+            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken, cached: cached)
         } catch let error as APIError where shouldReauthenticate(for: error) {
             try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
 
-            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken)
+            status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken, cached: cached)
         }
         LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
         return status
     }
 
     @MainActor
-    func fetchAndUpdateVehicleStatus(for vehicle: BBVehicle, modelContext: ModelContext) async throws {
-        let status = try await fetchVehicleStatus(for: vehicle, modelContext: modelContext)
+    func fetchAndUpdateVehicleStatus(
+        for vehicle: BBVehicle,
+        modelContext: ModelContext,
+        cached: Bool = true
+    ) async throws {
+        let status = try await fetchVehicleStatus(for: vehicle, modelContext: modelContext, cached: cached)
         vehicle.updateStatus(with: status)
     }
 

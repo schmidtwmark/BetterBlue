@@ -107,19 +107,35 @@ class CachedAPIClient: APIClientProtocol {
         return try await task.value
     }
 
-    func fetchVehicleStatus(for vehicle: Vehicle, authToken: AuthToken) async throws -> VehicleStatus {
+    func fetchVehicleStatus(
+        for vehicle: Vehicle,
+        authToken: AuthToken,
+        cached: Bool
+    ) async throws -> VehicleStatus {
         let requestKey = RequestKey.fetchVehicleStatus(vin: vehicle.vin)
         let cacheKey = CacheKey.fetchVehicleStatus(vin: vehicle.vin)
 
+        // When the caller explicitly requests a real-time status (manual sync,
+        // post-command verification), skip the in-memory TTL cache — otherwise
+        // a recent widget refresh would swallow the user's request — and
+        // invalidate any stale entry so later callers also see fresh data.
+        if !cached {
+            cache.removeValue(forKey: cacheKey)
+        }
+
         // Check if we have a cached response that's still valid
-        if let cachedEntry = cache[cacheKey],
+        if cached,
+           let cachedEntry = cache[cacheKey],
            Date().timeIntervalSince(cachedEntry.timestamp) < cacheTTL,
            let cachedStatus = cachedEntry.response as? VehicleStatus {
             BBLogger.debug(.api, "CachedAPIClient:Using cached fetchVehicleStatus response for VIN: \(vehicle.vin)")
             return cachedStatus
         }
 
-        // Check if there's already an ongoing request of this type
+        // Check if there's already an ongoing request of this type. We still
+        // coalesce in-flight real-time requests: if two force-refresh taps
+        // fire, the second awaits the first rather than double-polling the
+        // vehicle modem.
         if let ongoingRequest = ongoingRequests[requestKey] {
             BBLogger.debug(.api, "CachedAPIClient:Waiting for ongoing fetchVehicleStatus request for VIN: \(vehicle.vin)")
             guard let vehicleStatus = try await ongoingRequest.waitForCompletion() as? VehicleStatus else {
@@ -134,8 +150,15 @@ class CachedAPIClient: APIClientProtocol {
                 ongoingRequests.removeValue(forKey: requestKey)
             }
 
-            BBLogger.debug(.api, "CachedAPIClient:Performing new fetchVehicleStatus request for VIN: \(vehicle.vin)")
-            let result = try await underlyingClient.fetchVehicleStatus(for: vehicle, authToken: authToken)
+            BBLogger.debug(
+                .api,
+                "CachedAPIClient:Performing new fetchVehicleStatus request for VIN: \(vehicle.vin) (cached: \(cached))"
+            )
+            let result = try await underlyingClient.fetchVehicleStatus(
+                for: vehicle,
+                authToken: authToken,
+                cached: cached
+            )
 
             // Cache successful response
             cache[cacheKey] = CacheEntry(response: result, timestamp: Date())

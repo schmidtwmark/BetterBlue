@@ -112,7 +112,11 @@ struct ChargingButton: View {
             // Immediately fetch status to update Live Activity
             // This ensures the Live Activity ends even if waitForStatusChange times out
             do {
-                try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
+                try await account.fetchAndUpdateVehicleStatus(
+                    for: bbVehicle,
+                    modelContext: context,
+                    cached: false
+                )
             } catch {
                 BBLogger.warning(.app, "ChargingButton: Failed to fetch status after stop command: \(error)")
             }

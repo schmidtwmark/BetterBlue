@@ -391,12 +391,29 @@ private struct DebugExportData {
         // Find most recent fetchVehicles
         let getVehiclesLog = allLogs.first { $0.log.requestType == .fetchVehicles }?.log
 
-        // Find most recent fetchVehicleStatus for each vehicle
+        // Find most recent fetchVehicleStatus for each vehicle.
+        //
+        // Historically this filtered on `url.contains(vehicle.vin)`, which
+        // silently produced an empty array — no status endpoint actually
+        // carries the VIN in the URL (it's in headers or the body), so the
+        // match never succeeded. We now match on the log's `vin` field
+        // (populated by APIClientBase from the call site) and fall back to
+        // checking the request headers / body for older logs that predate
+        // the schema change.
         var vehicleStatuses: [HTTPLog] = []
         for vehicle in vehicles {
-            // Find the most recent status fetch that contains this vehicle's VIN in the URL
             if let statusLog = allLogs.first(where: {
-                $0.log.requestType == .fetchVehicleStatus && $0.log.url.contains(vehicle.vin)
+                guard $0.log.requestType == .fetchVehicleStatus else { return false }
+                if $0.log.vin == vehicle.vin { return true }
+                // Backwards-compat for logs written before HTTPLog.vin existed.
+                let headers = $0.log.requestHeaders
+                if headers["vin"] == vehicle.vin || headers["APPCLOUD-VIN"] == vehicle.vin {
+                    return true
+                }
+                if let body = $0.log.requestBody, body.contains(vehicle.vin) {
+                    return true
+                }
+                return $0.log.url.contains(vehicle.vin)
             })?.log {
                 vehicleStatuses.append(statusLog)
             }

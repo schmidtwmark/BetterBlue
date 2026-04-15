@@ -143,7 +143,12 @@ struct RefreshVehicleStatusIntent: AppIntent {
             throw IntentError.vehicleNotFound
         }
 
-        try await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context)
+        // Explicit user-invoked refresh intent → force real-time poll.
+        try await account.fetchAndUpdateVehicleStatus(
+            for: bbVehicle,
+            modelContext: context,
+            cached: false
+        )
 
         let unit = AppSettings.shared.preferredDistanceUnit
         let allPresets = try await ClimatePresetEntity.defaultQuery.suggestedEntities()

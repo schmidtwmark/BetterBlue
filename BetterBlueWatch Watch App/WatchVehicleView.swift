@@ -300,7 +300,14 @@ struct WatchVehicleView: View {
                 throw APIError(message: "Account not found for vehicle")
             }
 
-            let status = try await account.fetchVehicleStatus(for: currentVehicle, modelContext: modelContext)
+            // Watch refresh is always user-initiated (tap or view appear);
+            // force a real-time poll so it matches the MyHyundai/Kia Connect
+            // behaviour users expect.
+            let status = try await account.fetchVehicleStatus(
+                for: currentVehicle,
+                modelContext: modelContext,
+                cached: false
+            )
             currentVehicle.updateStatus(with: status)
             lastRefreshDate = Date()
 
