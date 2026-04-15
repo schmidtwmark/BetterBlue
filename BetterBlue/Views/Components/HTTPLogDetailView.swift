@@ -25,7 +25,9 @@ struct HTTPLogDetailView: View {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(log),
+        // Use the shared wrapper so request/response bodies render as real
+        // nested JSON instead of re-escaped string blobs.
+        guard let data = try? encoder.encode(HTTPLogExport(log: log)),
               let json = String(data: data, encoding: .utf8) else {
             return "{}"
         }

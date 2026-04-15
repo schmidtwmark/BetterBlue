@@ -38,7 +38,8 @@ struct VehicleActivityWidget: Widget {
                             .font(.headline)
                             .fontWeight(.semibold)
                             .padding(.trailing, 8)
-                    } else if context.state.activityType == .climate {
+                    } else if context.state.activityType == .climate,
+                              context.state.status.climateStatus.temperature.isPlausibleForDisplay {
                         let temp = context.state.status.climateStatus.temperature
                         Text("\(Int(temp.value))\(temp.units.symbol)")
                             .font(.headline)
@@ -77,7 +78,8 @@ struct VehicleActivityWidget: Widget {
                     Text("#\(context.state.wakeupCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
-                } else if context.state.activityType == .climate {
+                } else if context.state.activityType == .climate,
+                          context.state.status.climateStatus.temperature.isPlausibleForDisplay {
                     let temp = context.state.status.climateStatus.temperature
                     Text("\(Int(temp.value))\(temp.units.symbol)")
                         .font(.caption2)
@@ -439,10 +441,12 @@ struct VehicleActivityContentView: View {
 
                     Spacer()
 
-                    let temp = context.state.status.climateStatus.temperature
-                    Text("\(Int(temp.value))\(temp.units.symbol)")
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                    if context.state.status.climateStatus.temperature.isPlausibleForDisplay {
+                        let temp = context.state.status.climateStatus.temperature
+                        Text("\(Int(temp.value))\(temp.units.symbol)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
                 }
             }
 

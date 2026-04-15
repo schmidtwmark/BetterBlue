@@ -40,8 +40,14 @@ struct ClimateButton: View {
     var climateRunningText: String {
         guard bbVehicle.modelContext != nil else { return "" }
         if isClimateOn, let climateStatus = bbVehicle.climateStatus {
-            let formattedTemp = climateStatus.temperature.units.format(
-                climateStatus.temperature.value,
+            let temperature = climateStatus.temperature
+            guard temperature.isPlausibleForDisplay else {
+                // Reading is a parser fallback / bogus sensor value (see
+                // issue #30); just confirm climate is running.
+                return "Running"
+            }
+            let formattedTemp = temperature.units.format(
+                temperature.value,
                 to: appSettings.preferredTemperatureUnit,
             )
             return "Running at \(formattedTemp)"

@@ -53,9 +53,14 @@ private struct ClimatePresetFetcher {
             // Track which vehicles have presets
             var vehiclesWithPresets = Set<UUID>()
 
-            // Process actual presets
+            // Process actual presets.
+            // Skip any preset whose vehicle is orphaned (no parent account) —
+            // those are zombies left over from a prior cascade delete that
+            // didn't finish and we don't want Siri/widget pickers to surface
+            // them. They'll be purged on the next app launch by
+            // `cleanupOrphanedVehicles()`.
             for preset in allPresets {
-                guard let vehicle = preset.vehicle else { continue }
+                guard let vehicle = preset.vehicle, vehicle.account != nil else { continue }
                 vehiclesWithPresets.insert(vehicle.id)
 
                 if ids == nil || ids?.contains(preset.id) == true {
@@ -70,8 +75,9 @@ private struct ClimatePresetFetcher {
                 }
             }
 
-            // Add default presets for vehicles without any presets
-            for vehicle in allVehicles where !vehiclesWithPresets.contains(vehicle.id) {
+            // Add default presets for vehicles without any presets (still
+            // filtering out orphaned zombies).
+            for vehicle in allVehicles where !vehiclesWithPresets.contains(vehicle.id) && vehicle.account != nil {
                 if ids == nil || ids?.contains(vehicle.id) == true {
                     entities.append(ClimatePresetEntity(
                         id: vehicle.id,

@@ -215,7 +215,9 @@ struct GetVehicleStatusIntent: AppIntent {
         if let climateStatus = bbVehicle.climateStatus {
             if climateStatus.airControlOn {
                 statusComponents.append("Climate control is on")
-                statusComponents.append("Target temperature: \(climateStatus.temperature.value)°")
+                if climateStatus.temperature.isPlausibleForDisplay {
+                    statusComponents.append("Target temperature: \(climateStatus.temperature.value)°")
+                }
             } else {
                 statusComponents.append("Climate control is off")
             }

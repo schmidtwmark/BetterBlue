@@ -31,7 +31,11 @@ struct BetterBlueApp: App {
             let deviceType = HTTPLogSinkManager.detectMainAppDeviceType()
             HTTPLogSinkManager.shared.configure(with: container, deviceType: deviceType)
 
-            // Clean up any orphaned climate presets from before the relationship fix
+            // Order matters: purge zombie vehicles first so their cascaded
+            // presets are removed, *then* sweep up any presets still left
+            // dangling (which can happen independently via an interrupted
+            // delete on an earlier schema).
+            cleanupOrphanedVehicles(container: container)
             cleanupOrphanedClimatePresets(container: container)
 
             return container

@@ -83,6 +83,36 @@ func cleanupOrphanedClimatePresets(container: ModelContainer) {
     }
 }
 
+/// Removes "zombie" vehicles whose parent `BBAccount` no longer exists.
+/// Normally `BBAccount` → `BBVehicle` is cascade-delete, but interrupted
+/// CloudKit syncs and earlier schema iterations can leave orphan vehicle
+/// rows that Siri/App Intents/widget pickers would otherwise still list.
+/// Their cascaded `climatePresets` are dropped by SwiftData automatically
+/// once the vehicle goes away.
+@MainActor
+func cleanupOrphanedVehicles(container: ModelContainer) {
+    let context = container.mainContext
+
+    do {
+        let vehicleDescriptor = FetchDescriptor<BBVehicle>()
+        let allVehicles = try context.fetch(vehicleDescriptor)
+
+        var deletedCount = 0
+        for vehicle in allVehicles where vehicle.account == nil {
+            BBLogger.info(.app, "Purging orphaned vehicle \(vehicle.vin) (\(vehicle.displayName))")
+            context.delete(vehicle)
+            deletedCount += 1
+        }
+
+        if deletedCount > 0 {
+            try context.save()
+            BBLogger.info(.app, "Cleaned up \(deletedCount) orphaned vehicle(s)")
+        }
+    } catch {
+        BBLogger.error(.app, "Failed to cleanup orphaned vehicles: \(error)")
+    }
+}
+
 /// Creates a shared ModelContainer for use across main app, widget, and watch app.
 /// - Parameter enableCloudKit: Whether to enable CloudKit sync. Set to `false` for
 ///   App Intents and widgets running in the background to avoid `0xdead10cc` crashes
