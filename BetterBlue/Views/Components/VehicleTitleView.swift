@@ -55,9 +55,6 @@ struct VehicleTitleView: View {
             // Right side: Refresh button (stays at bottom)
             refreshButton
         }
-        .contextMenu {
-            contextMenuContent
-        }
         .sheet(isPresented: $showingVehicleInfo) {
             NavigationView {
                 VehicleInfoView(bbVehicle: bbVehicle)
@@ -122,49 +119,55 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var titleCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row - fixed height when collapsed
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bbVehicle.displayName)
-                        .font(isExpanded ? .title2 : .headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-
-                    // VIN only shown when expanded
-                    if isExpanded {
-                        Text(bbVehicle.vin)
+        Menu {
+            contextMenuContent
+            
+        } label: {
+            
+            VStack(alignment: .leading, spacing: 0) {
+                // Header row - fixed height when collapsed
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(bbVehicle.displayName)
+                            .font(isExpanded ? .title2 : .headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        // VIN only shown when expanded
+                        if isExpanded {
+                            Text(bbVehicle.vin)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Last update time shown in header when collapsed
+                    if !isExpanded, let lastUpdated = bbVehicle.lastUpdated {
+                        Text(compactLastUpdated(lastUpdated))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                }
-
-                Spacer()
-
-                // Last update time shown in header when collapsed
-                if !isExpanded, let lastUpdated = bbVehicle.lastUpdated {
-                    Text(compactLastUpdated(lastUpdated))
+                    
+                    Image(systemName: "chevron.down")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                .padding()
+                .frame(height: isExpanded ? nil : buttonHeight, alignment: .leading)
+                .frame(minHeight: buttonHeight)
+                
+                // Expanded content
+                if isExpanded {
+                    expandedContent
+                }
             }
-            .padding()
-            .frame(height: isExpanded ? nil : buttonHeight, alignment: .leading)
-            .frame(minHeight: buttonHeight)
-
-            // Expanded content
-            if isExpanded {
-                expandedContent
-            }
+            .vehicleCardGlassEffect()
+            .contentShape(Rectangle())
         }
-        .vehicleCardGlassEffect()
-        .contentShape(Rectangle())
-        .onTapGesture {
+        primaryAction: {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                 isExpanded.toggle()
             }

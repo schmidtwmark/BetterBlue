@@ -23,7 +23,8 @@ extension View {
         let shape = RoundedRectangle(cornerRadius: radius)
         return self
             .containerShape(shape)
-            .glassEffect(.regular, in: shape)
+            .glassEffect(.regular.interactive(), in: shape)
+//            .background(.ultraThinMaterial)
             .clipShape(shape)
     }
 }
