@@ -177,6 +177,14 @@ struct SettingsView: View {
                     Text("Debug Settings")
                 }
 
+                Section {
+                    NavigationLink(destination: TroubleshootingView()) {
+                        Label("Troubleshooting", systemImage: "questionmark.circle")
+                    }
+                } header: {
+                    Text("Help")
+                }
+
                 // About section with version and GitHub links
                 Section {
                     if let version = Bundle.main.releaseVersionNumber, let build = Bundle.main.buildVersionNumber {

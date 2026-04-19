@@ -63,6 +63,7 @@ struct VehicleCardView: View {
     var body: some View {
         // I would love to use a GlassEffectContainer to synchronize the colors of the glass buttons, but in 26.1 apple broke menu morphing in GlassEffectContainers
         // I could spend some time reimplementing menus to perform the transition (gross) but this is fine for now
+        // Feedback FB22549321 contains details for this issue
 //        GlassEffectContainer {
             VStack(spacing: 8) {
                 Spacer(minLength: 0)

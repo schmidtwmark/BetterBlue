@@ -11,6 +11,7 @@ import SwiftUI
 struct EmptyAccountsView: View {
     let transition: Namespace.ID
     @State private var showingAddAccount = false
+    @State private var showingTroubleshooting = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -33,6 +34,15 @@ struct EmptyAccountsView: View {
                 id: "add-account",
                 in: transition,
             )
+
+            Button {
+                showingTroubleshooting = true
+            } label: {
+                Label("Trouble signing in?", systemImage: "questionmark.circle")
+                    .font(.callout)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
         }
         .padding()
         .sheet(isPresented: $showingAddAccount) {
@@ -54,6 +64,16 @@ struct EmptyAccountsView: View {
             .navigationTransition(
                 .zoom(sourceID: "add-account", in: transition),
             )
+        }
+        .sheet(isPresented: $showingTroubleshooting) {
+            NavigationStack {
+                TroubleshootingView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") { showingTroubleshooting = false }
+                        }
+                    }
+            }
         }
     }
 }

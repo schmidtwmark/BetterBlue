@@ -24,7 +24,6 @@ extension View {
         return self
             .containerShape(shape)
             .glassEffect(.regular.interactive(), in: shape)
-//            .background(.ultraThinMaterial)
             .clipShape(shape)
     }
 }

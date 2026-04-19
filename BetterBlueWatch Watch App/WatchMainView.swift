@@ -92,6 +92,7 @@ struct WatchMainView: View {
 struct WatchEmptyStateView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingDiagnostics = false
+    @State private var showingTroubleshooting = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -108,22 +109,41 @@ struct WatchEmptyStateView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button {
-                showingDiagnostics = true
-            } label: {
-                HStack {
-                    Image(systemName: "info.circle")
-                    Text("Sync Info")
+            VStack(spacing: 4) {
+                Button {
+                    showingDiagnostics = true
+                } label: {
+                    HStack {
+                        Image(systemName: "info.circle")
+                        Text("Sync Info")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
                 }
-                .font(.caption)
-                .foregroundColor(.blue)
+                .buttonStyle(.plain)
+
+                Button {
+                    showingTroubleshooting = true
+                } label: {
+                    HStack {
+                        Image(systemName: "questionmark.circle")
+                        Text("Troubleshooting")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.top, 8)
         }
         .padding()
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticInfoView()
+        }
+        .sheet(isPresented: $showingTroubleshooting) {
+            NavigationStack {
+                WatchTroubleshootingView()
+            }
         }
     }
 }

@@ -99,13 +99,14 @@ struct EVChargingProgressView: View {
                         height: 32
                     )
 
-                // Target SOC indicator (dashed line) - hidden at 100% since it's at the edge
+                // Target SOC indicator — a thin dashed vertical line.
+                // Hidden at 100% since it would sit flush with the bar edge.
                 if let targetSOC, targetSOC < 100 {
                     Line()
-                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
-                        .foregroundColor(.white)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [3, 3]))
+                        .foregroundColor(.white.opacity(0.8))
                         .frame(width: 2, height: 32)
-                        .offset(x: geometry.size.width * (targetSOC / 100.0) - 1)
+                        .offset(x: geometry.size.width * (targetSOC / 100.0))
                 }
 
                 // Text overlay - charge speed on left

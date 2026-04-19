@@ -459,6 +459,69 @@ private struct W5_CustomButtonStyle: View {
     }
 }
 
+/// W6. `.glassEffectUnion(id:namespace:)` — tell the container that this
+///    button is its own island by giving it a unique union id. The
+///    container should then NOT try to coordinate this view's glass with
+///    its siblings, leaving the surface attached to the button (so the
+///    contextMenu snapshot captures it and scales as one unit).
+private struct W6_GlassEffectUnion: View {
+    @Namespace private var ns
+
+    var body: some View {
+        Variant(label: "W6. .glassEffectUnion(id:namespace:)") {
+            GlassEffectContainer {
+                VStack(spacing: 8) {
+                    Text("Normal sibling (no interaction)")
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .vehicleCardGlassEffect()
+
+                    Button {} label: {
+                        Text("Tap or hold — unioned")
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .vehicleCardGlassEffect()
+                    .glassEffectUnion(id: "ctx-button", namespace: ns)
+                    .contextMenu { SampleMenu() }
+                }
+            }
+        }
+    }
+}
+
+/// W7. Same as W6 but with the `.glassEffectUnion` applied BEFORE the
+///    glass modifier. Order matters for glass coordination; this is worth
+///    trying if W6 doesn't work.
+private struct W7_GlassEffectUnionBefore: View {
+    @Namespace private var ns
+
+    var body: some View {
+        Variant(label: "W7. union id applied before glass") {
+            GlassEffectContainer {
+                VStack(spacing: 8) {
+                    Text("Normal sibling (no interaction)")
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .vehicleCardGlassEffect()
+
+                    Button {} label: {
+                        Text("Tap or hold — union first")
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffectUnion(id: "ctx-button-pre", namespace: ns)
+                    .vehicleCardGlassEffect()
+                    .contextMenu { SampleMenu() }
+                }
+            }
+        }
+    }
+}
+
+
 // MARK: - Preview
 
 #Preview("Context menu variants") {
@@ -486,6 +549,8 @@ private struct W5_CustomButtonStyle: View {
             W3_CompositingGroup()
             W4_DrawingGroup()
             W5_CustomButtonStyle()
+            W6_GlassEffectUnion()
+            W7_GlassEffectUnionBefore()
         }
         .padding()
     }
