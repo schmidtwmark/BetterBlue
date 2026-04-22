@@ -48,6 +48,13 @@ struct ChargingButton: View {
     }
 
     var body: some View {
+        PersistentModelGuard(model: bbVehicle) {
+            activeBody
+        }
+    }
+
+    @ViewBuilder
+    private var activeBody: some View {
         let startCharging = MainVehicleAction(
             action: { statusUpdater in
                 try await setCharge(true, statusUpdater: statusUpdater)

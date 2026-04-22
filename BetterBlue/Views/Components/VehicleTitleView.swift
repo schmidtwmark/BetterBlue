@@ -48,13 +48,14 @@ struct VehicleTitleView: View {
     }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            // Left side: Title card with expandable content
-            titleCard
+        PersistentModelGuard(model: bbVehicle) {
+            HStack(alignment: .bottom, spacing: 8) {
+                // Left side: Title card with expandable content
+                titleCard
 
-            // Right side: Refresh button (stays at bottom)
-            refreshButton
-        }
+                // Right side: Refresh button (stays at bottom)
+                refreshButton
+            }
         .sheet(isPresented: $showingVehicleInfo) {
             NavigationView {
                 VehicleInfoView(bbVehicle: bbVehicle)
@@ -103,14 +104,15 @@ struct VehicleTitleView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingTripDetails) {
-            NavigationView {
-                TripDetailsView(bbVehicle: bbVehicle)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Done") { showingTripDetails = false }
+            .sheet(isPresented: $showingTripDetails) {
+                NavigationView {
+                    TripDetailsView(bbVehicle: bbVehicle)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") { showingTripDetails = false }
+                            }
                         }
-                    }
+                }
             }
         }
     }

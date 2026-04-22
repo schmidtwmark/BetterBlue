@@ -23,6 +23,13 @@ struct ClimateSettingsContent: View {
     }
 
     var body: some View {
+        PersistentModelGuard(model: vehicle) {
+            activeBody
+        }
+    }
+
+    @ViewBuilder
+    private var activeBody: some View {
         List {
             // Preset info section with editable name and icon
             Section {

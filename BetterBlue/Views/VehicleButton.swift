@@ -61,22 +61,24 @@ struct VehicleControlButton: View {
     private let statusIconWidth: CGFloat = 24
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Left side: Status display with context menu
-            statusButton
+        PersistentModelGuard(model: bbVehicle) {
+            HStack(spacing: 8) {
+                // Left side: Status display with context menu
+                statusButton
 
-            // Right side: Quick action button
-            quickActionButton
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .sheet(isPresented: $showingErrorDetails) {
-            // Jump straight to the full details sheet — the menu item is
-            // already an explicit "show me the error" affordance.
-            if let lastActionError {
-                ErrorDetailsSheet(error: lastActionError) {
-                    showingErrorDetails = false
+                // Right side: Quick action button
+                quickActionButton
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .sheet(isPresented: $showingErrorDetails) {
+                // Jump straight to the full details sheet — the menu item is
+                // already an explicit "show me the error" affordance.
+                if let lastActionError {
+                    ErrorDetailsSheet(error: lastActionError) {
+                        showingErrorDetails = false
+                    }
+                    .presentationDetents([.medium, .large])
                 }
-                .presentationDetents([.medium, .large])
             }
         }
     }

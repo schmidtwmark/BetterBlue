@@ -23,6 +23,13 @@ struct VehicleInfoView: View {
     }
 
     var body: some View {
+        PersistentModelGuard(model: bbVehicle) {
+            activeBody
+        }
+    }
+
+    @ViewBuilder
+    private var activeBody: some View {
         Form {
             VehicleBasicInfoSection(
                 bbVehicle: bbVehicle,

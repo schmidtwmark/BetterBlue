@@ -24,6 +24,13 @@ struct ClimateSettingsSheet: View {
     }
 
     var body: some View {
+        PersistentModelGuard(model: vehicle) {
+            activeBody
+        }
+    }
+
+    @ViewBuilder
+    private var activeBody: some View {
         NavigationView {
             TabView(selection: $selectedTab) {
                 ForEach(Array(vehiclePresets.enumerated()), id: \.1.id) { index, preset in

@@ -70,6 +70,11 @@ struct VehicleCardView: View {
         // I could spend some time reimplementing menus to perform the transition (gross) but this is fine for now
         // Feedback FB22549321 contains details for this issue
 //        GlassEffectContainer {
+        // Guard so that a detached (post-delete) `BBVehicle` can't be
+        // rendered — any persisted-property access would trap. Short-
+        // circuits all child views too (VehicleTitleView, LockButton,
+        // ClimateButton, ChargingButton, EVRangeDisplayCard).
+        PersistentModelGuard(model: bbVehicle) {
             VStack(spacing: 8) {
                 Spacer(minLength: 0)
                 // Error message card (only show if there's an error)
@@ -167,6 +172,7 @@ struct VehicleCardView: View {
             }
         }
         .mfaFlow(state: mfaState)
+        }
     }
 
     // MARK: - MFA Handling

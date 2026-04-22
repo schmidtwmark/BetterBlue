@@ -19,21 +19,23 @@ struct TripDetailsView: View {
     @State private var showEnergyBreakdown = false
 
     var body: some View {
-        Group {
-            if isLoading {
-                loadingView
-            } else if let loadError {
-                errorView(loadError)
-            } else if trips.isEmpty {
-                emptyView
-            } else {
-                tripListView
+        PersistentModelGuard(model: bbVehicle) {
+            Group {
+                if isLoading {
+                    loadingView
+                } else if let loadError {
+                    errorView(loadError)
+                } else if trips.isEmpty {
+                    emptyView
+                } else {
+                    tripListView
+                }
             }
-        }
-        .navigationTitle("Trip History")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadTripDetails()
+            .navigationTitle("Trip History")
+            .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await loadTripDetails()
+            }
         }
     }
 
