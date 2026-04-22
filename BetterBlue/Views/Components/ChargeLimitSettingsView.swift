@@ -39,7 +39,7 @@ struct ChargeLimitSettingsContent: View {
     @State private var dcLevel: Double
     @State private var isSaving = false
     @State private var statusMessage: String?
-    @State private var errorMessage: String?
+    @State private var saveError: ActionError?
     @State private var successMessage: String?
 
     init(vehicle: BBVehicle, onSave: (() -> Void)? = nil) {
@@ -104,15 +104,9 @@ struct ChargeLimitSettingsContent: View {
             }
             .disabled(isSaving)
 
-            if let errorMessage {
+            if let saveError {
                 Section {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.red)
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                    }
-                    .font(.callout)
+                    ErrorDetailsView(error: saveError)
                 }
             }
 
@@ -162,12 +156,15 @@ struct ChargeLimitSettingsContent: View {
     @MainActor
     private func saveChargeLimits() {
         guard let account = vehicle.account else {
-            errorMessage = "Account not found for vehicle"
+            saveError = ActionError(
+                action: "Set charge limits",
+                error: APIError(message: "Account not found for vehicle")
+            )
             return
         }
 
         isSaving = true
-        errorMessage = nil
+        saveError = nil
         statusMessage = "Sending command..."
 
         Task {
@@ -211,7 +208,11 @@ struct ChargeLimitSettingsContent: View {
                     // Command was sent, just couldn't verify - show success anyway
                     successMessage = "Charge limits saved"
                 } else {
-                    errorMessage = error.localizedDescription
+                    saveError = ActionError(
+                        action: "Set charge limits",
+                        error: error,
+                        accountId: account.id
+                    )
                 }
             }
         }

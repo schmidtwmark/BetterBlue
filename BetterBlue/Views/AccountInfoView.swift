@@ -17,7 +17,9 @@ struct AccountInfoView: View {
     @State private var newPassword: String = ""
     @State private var newPin: String = ""
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    /// Set when a save attempt fails so the form can render a full
+    /// `ErrorDetailsView`. Cleared before each attempt and on success.
+    @State private var saveError: ActionError?
     @State private var successMessage: String?
     @State private var showingPasswordDialog = false
     @State private var showingPinDialog = false
@@ -139,14 +141,9 @@ struct AccountInfoView: View {
                             .foregroundColor(.green)
                     }
                 }
-            } else if let errorMessage {
+            } else if let saveError {
                 Section {
-                    HStack {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundColor(.red)
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                    }
+                    ErrorDetailsView(error: saveError)
                 }
             }
         }
@@ -189,7 +186,7 @@ struct AccountInfoView: View {
         guard !newPassword.isEmpty else { return }
 
         isLoading = true
-        errorMessage = nil
+        saveError = nil
 
         do {
             // We don't need to create a new Account struct, just test authentication
@@ -209,7 +206,7 @@ struct AccountInfoView: View {
                 BBAccount.updateAccount(account, password: newPassword, pin: account.pin, modelContext: modelContext)
                 newPassword = ""
                 isLoading = false
-                errorMessage = nil
+                saveError = nil
                 successMessage = "Password updated successfully"
                 showingPasswordDialog = false
 
@@ -221,18 +218,11 @@ struct AccountInfoView: View {
 
         } catch {
             await MainActor.run {
-                if let apiError = error as? APIError {
-                    switch apiError.errorType {
-                    case .invalidCredentials:
-                        errorMessage = "Invalid password. Please check your password and try again."
-                    case .invalidPin:
-                        errorMessage = apiError.message
-                    default:
-                        errorMessage = "Failed to verify password: \(apiError.message)"
-                    }
-                } else {
-                    errorMessage = "Failed to verify password: \(error.localizedDescription)"
-                }
+                saveError = ActionError(
+                    action: "Update password",
+                    error: error,
+                    accountId: account.id
+                )
                 isLoading = false
                 successMessage = nil
             }
@@ -243,7 +233,7 @@ struct AccountInfoView: View {
         guard !newPin.isEmpty else { return }
 
         isLoading = true
-        errorMessage = nil
+        saveError = nil
 
         do {
             // We don't need to create a new Account struct, just test authentication
@@ -263,7 +253,7 @@ struct AccountInfoView: View {
                 BBAccount.updateAccount(account, password: account.password, pin: newPin, modelContext: modelContext)
                 newPin = ""
                 isLoading = false
-                errorMessage = nil
+                saveError = nil
                 successMessage = "PIN updated successfully"
                 showingPinDialog = false
 
@@ -275,18 +265,11 @@ struct AccountInfoView: View {
 
         } catch {
             await MainActor.run {
-                if let apiError = error as? APIError {
-                    switch apiError.errorType {
-                    case .invalidCredentials:
-                        errorMessage = "Invalid PIN. Please check your PIN and try again."
-                    case .invalidPin:
-                        errorMessage = apiError.message
-                    default:
-                        errorMessage = "Failed to verify PIN: \(apiError.message)"
-                    }
-                } else {
-                    errorMessage = "Failed to verify PIN: \(error.localizedDescription)"
-                }
+                saveError = ActionError(
+                    action: "Update PIN",
+                    error: error,
+                    accountId: account.id
+                )
                 isLoading = false
                 successMessage = nil
             }

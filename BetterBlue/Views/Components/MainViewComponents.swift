@@ -107,10 +107,10 @@ struct EmptyVehiclesView: View {
             }
 
             if let error = lastError {
-                Text(error.message)
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-                    .padding()
+                ErrorDetailsView(
+                    error: ActionError(action: "Load vehicles", error: error)
+                )
+                .padding(.horizontal)
 
                 Button("Try Again") {
                     Task {

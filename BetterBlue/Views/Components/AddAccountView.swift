@@ -57,13 +57,23 @@ struct AddAccountView: View {
     @State private var selectedBrand: Brand = .hyundai
     @State private var selectedRegion: Region = .usa
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    /// Populated when login or first vehicle-load fails so the form can
+    /// render a full `ErrorDetailsView` (headline + summary + technical
+    /// details collapsed by default).
+    @State private var saveError: ActionError?
 
     // MFA State
     @State private var mfaState = MFAFlowState()
     @State private var mfaAccount: BBAccount?
 
     @State private var fakeVehicles: [BBVehicle] = []
+
+    /// Debug-only: force the fake-account creation to fail so the
+    /// `ErrorDetailsView` card on this screen can be previewed without
+    /// needing a real Hyundai/Kia outage. Shown as a toggle under the
+    /// fake-vehicle configuration section when the fake brand is
+    /// selected.
+    @State private var simulateLoginFailure: Bool = false
 
     // Focus states for keyboard navigation
     @FocusState private var focusedField: AddAccountField?
@@ -85,11 +95,11 @@ struct AddAccountView: View {
             serviceConfigurationSection
             accountInformationSection
             fakeVehicleConfigurationSection
+            debugFailureSection
 
-            if let errorMessage {
+            if let saveError {
                 Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
+                    ErrorDetailsView(error: saveError)
                 }
             }
         }
@@ -262,9 +272,28 @@ struct AddAccountView: View {
         }
     }
 
+    /// Shown only for the fake brand (or when the current credentials
+    /// pattern-match the test account). Toggle simulates the login
+    /// throwing, so the on-screen `ErrorDetailsView` card can be
+    /// previewed without needing real API credentials.
+    @ViewBuilder
+    private var debugFailureSection: some View {
+        if selectedBrand == .fake || isTestAccount {
+            Section {
+                Toggle("Fail Account Creation", isOn: $simulateLoginFailure)
+            } header: {
+                Text("Debug")
+            } footer: {
+                Text("When on, tapping Add throws an `invalidCredentials` error before the fake client runs. Use this to preview the error card on this screen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func addAccount() async {
         isLoading = true
-        errorMessage = nil
+        saveError = nil
 
         let bbAccount = BBAccount(
             username: username,
@@ -274,37 +303,51 @@ struct AddAccountView: View {
             region: selectedRegion
         )
 
+        // Debug short-circuit: throw before we even hit the fake client so
+        // the error-details card on this screen renders against a known
+        // error shape. Only available for the fake brand (or test
+        // credentials) — no way to reach this for real Hyundai/Kia sign-in.
+        if simulateLoginFailure, selectedBrand == .fake || isTestAccount {
+            await MainActor.run {
+                saveError = ActionError(
+                    action: "Sign in to \(selectedBrand.displayName)",
+                    error: APIError.invalidCredentials(
+                        "Simulated account-creation failure (debug toggle on).",
+                        apiName: "FakeAPI"
+                    ),
+                    accountId: bbAccount.id
+                )
+                isLoading = false
+            }
+            return
+        }
+
         do {
             try await bbAccount.initialize(modelContext: modelContext)
             // If successful immediately:
             await saveAndFinish(account: bbAccount)
         } catch {
             await MainActor.run {
-                if let apiError = error as? APIError {
-                    switch apiError.errorType {
-                    case .requiresMFA:
-                        // Store pending account and start MFA flow
-                        self.mfaAccount = bbAccount
-                        mfaState.start(from: apiError, account: bbAccount) { [self] in
-                            await saveAndFinish(account: bbAccount)
-                        } onCancel: { [self] in
-                            isLoading = false
-                            mfaAccount = nil
-                        }
-                    case .invalidCredentials:
-                        errorMessage = "Invalid username or password. Please check your credentials and try again."
+                // MFA is handled out-of-band via the MFA sheet, not as an
+                // error — keep that branch separate so we don't render
+                // "Sign in failed" while the verification prompt is open.
+                if let apiError = error as? APIError, apiError.errorType == .requiresMFA {
+                    self.mfaAccount = bbAccount
+                    mfaState.start(from: apiError, account: bbAccount) { [self] in
+                        await saveAndFinish(account: bbAccount)
+                    } onCancel: { [self] in
                         isLoading = false
-                    case .invalidPin:
-                        errorMessage = apiError.message
-                        isLoading = false
-                    default:
-                        errorMessage = "Failed to authenticate: \(apiError.message)"
-                        isLoading = false
+                        mfaAccount = nil
                     }
-                } else {
-                    errorMessage = "Failed to authenticate: \(error.localizedDescription)"
-                    isLoading = false
+                    return
                 }
+
+                saveError = ActionError(
+                    action: "Sign in to \(selectedBrand.displayName)",
+                    error: error,
+                    accountId: bbAccount.id
+                )
+                isLoading = false
             }
         }
     }
@@ -330,11 +373,11 @@ struct AddAccountView: View {
             }
         } catch {
             await MainActor.run {
-                if let apiError = error as? APIError {
-                    errorMessage = "Failed to load vehicles: \(apiError.message)"
-                } else {
-                    errorMessage = "Failed to load vehicles: \(error.localizedDescription)"
-                }
+                saveError = ActionError(
+                    action: "Load vehicles",
+                    error: error,
+                    accountId: account.id
+                )
                 isLoading = false
             }
         }

@@ -24,7 +24,12 @@ struct VehicleCardView: View {
     @State private var showRefreshSuccess = false
     @State private var errorMessage: AttributedString?
     @State private var lastAPIError: APIError?
-    @State private var showingErrorHTTPLogs = false
+    /// Full error context for the most recent refresh failure. Populated
+    /// alongside `errorMessage`/`lastAPIError` so tapping the red banner
+    /// can surface a proper `ErrorDetailsView` (headline + summary +
+    /// technical details) instead of the old "dump every HTTP log" sheet.
+    @State private var lastActionError: ActionError?
+    @State private var showingErrorDetails = false
     @State private var refreshTask: Task<Void, Never>?
 
     // MFA re-authentication state
@@ -70,13 +75,14 @@ struct VehicleCardView: View {
                 // Error message card (only show if there's an error)
                 if let errorMessage {
                     Button {
-                        if let apiError = lastAPIError {
-                            if apiError.errorType == .requiresMFA {
-                                // Extract MFA info and show appropriate flow
-                                handleMFAError(apiError)
-                            } else {
-                                showingErrorHTTPLogs = true
-                            }
+                        if let apiError = lastAPIError, apiError.errorType == .requiresMFA {
+                            // Verification flow has its own dedicated sheet.
+                            handleMFAError(apiError)
+                        } else if lastActionError != nil {
+                            // Everything else surfaces the structured error
+                            // details (action + type + collapsible raw
+                            // response) rather than the full HTTP log dump.
+                            showingErrorDetails = true
                         }
                     } label: {
                         HStack {
@@ -85,7 +91,9 @@ struct VehicleCardView: View {
                                 .foregroundColor(.red)
                                 .tint(.blue)
                             Spacer()
-                            if lastAPIError?.errorType == .requiresMFA {
+                            // Chevron always shows when we can drill in:
+                            // either the MFA flow or the error-details sheet.
+                            if lastAPIError?.errorType == .requiresMFA || lastActionError != nil {
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
                                     .foregroundColor(.red.opacity(0.7))
@@ -107,6 +115,7 @@ struct VehicleCardView: View {
                         await MainActor.run {
                             errorMessage = nil
                             lastAPIError = nil
+                            lastActionError = nil
                             onSuccessfulRefresh?()
                         }
                     }
@@ -146,18 +155,15 @@ struct VehicleCardView: View {
         .onDisappear {
             refreshTask?.cancel()
         }
-        .sheet(isPresented: $showingErrorHTTPLogs) {
-            if let account = bbVehicle.account {
-                NavigationView {
-                    HTTPLogView(accountId: account.id, transition: transition)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Done") {
-                                    showingErrorHTTPLogs = false
-                                }
-                            }
-                        }
+        .sheet(isPresented: $showingErrorDetails) {
+            // Present the full details sheet directly — tapping the red
+            // banner should take the user straight to the error view
+            // rather than a tap-to-expand intermediate.
+            if let lastActionError {
+                ErrorDetailsSheet(error: lastActionError) {
+                    showingErrorDetails = false
                 }
+                .presentationDetents([.medium, .large])
             }
         }
         .mfaFlow(state: mfaState)
@@ -171,6 +177,7 @@ struct VehicleCardView: View {
             // Refresh status after successful MFA
             errorMessage = nil
             lastAPIError = nil
+            lastActionError = nil
             await refreshStatus()
         }
     }
@@ -198,6 +205,7 @@ struct VehicleCardView: View {
             showRefreshSuccess = false
             errorMessage = nil
             lastAPIError = nil
+            lastActionError = nil
         }
 
         do {
@@ -259,6 +267,18 @@ struct VehicleCardView: View {
         } else {
             lastAPIError = nil
             errorMessage = AttributedString("Failed to refresh: \(error.localizedDescription)")
+        }
+        // Populate the structured error alongside the banner string so the
+        // "tap for details" sheet has something to show. MFA gets its own
+        // flow so we skip the sheet for that case.
+        if lastAPIError?.errorType == .requiresMFA {
+            lastActionError = nil
+        } else {
+            lastActionError = ActionError(
+                action: "Refresh \(bbVehicle.displayName)",
+                error: error,
+                accountId: bbVehicle.account?.id
+            )
         }
         BBLogger.debug(.app, "VehicleCardView: Detailed error for vehicle \(bbVehicle.vin): \(error)")
     }

@@ -14,7 +14,7 @@ struct TripDetailsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var trips: [EVTripDetail] = []
     @State private var isLoading = true
-    @State private var errorMessage: String?
+    @State private var loadError: ActionError?
     @State private var appSettings = AppSettings.shared
     @State private var showEnergyBreakdown = false
 
@@ -22,8 +22,8 @@ struct TripDetailsView: View {
         Group {
             if isLoading {
                 loadingView
-            } else if let error = errorMessage {
-                errorView(error)
+            } else if let loadError {
+                errorView(loadError)
             } else if trips.isEmpty {
                 emptyView
             } else {
@@ -45,17 +45,15 @@ struct TripDetailsView: View {
         }
     }
 
-    private func errorView(_ error: String) -> some View {
+    private func errorView(_ error: ActionError) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.largeTitle)
                 .foregroundColor(.orange)
-            Text("Failed to load trips")
-                .font(.headline)
-            Text(error)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+
+            ErrorDetailsView(error: error)
+                .padding(.horizontal)
+
             Button("Try Again") {
                 Task {
                     await loadTripDetails()
@@ -240,10 +238,13 @@ struct TripDetailsView: View {
 
     private func loadTripDetails() async {
         isLoading = true
-        errorMessage = nil
+        loadError = nil
 
         guard let account = bbVehicle.account else {
-            errorMessage = "Vehicle account not found"
+            loadError = ActionError(
+                action: "Load trip history",
+                error: APIError(message: "Vehicle account not found")
+            )
             isLoading = false
             return
         }
@@ -252,11 +253,22 @@ struct TripDetailsView: View {
             if let fetchedTrips = try await account.fetchEVTripDetails(for: bbVehicle, modelContext: modelContext) {
                 trips = fetchedTrips
             } else {
-                errorMessage = "Trip details not available for this vehicle"
+                loadError = ActionError(
+                    action: "Load trip history",
+                    error: APIError(
+                        message: "Trip details are not available for this vehicle.",
+                        apiName: account.brandEnum.displayName
+                    ),
+                    accountId: account.id
+                )
             }
         } catch {
             BBLogger.error(.api, "TripDetailsView: Failed to fetch trip details: \(error)")
-            errorMessage = error.localizedDescription
+            loadError = ActionError(
+                action: "Load trip history",
+                error: error,
+                accountId: account.id
+            )
         }
 
         isLoading = false

@@ -28,7 +28,10 @@ final class MFAFlowState {
     var notifyType: String?
     var isResendingCode = false
     var isVerifying = false
-    var errorMessage: String?
+    /// Populated when a send/verify attempt fails. Rendered by the sheet
+    /// as a full `ErrorDetailsView` (headline + summary + collapsible
+    /// technical details) rather than a single opaque string.
+    var actionError: ActionError?
 
     private var account: BBAccount?
     private var onSuccess: (() async -> Void)?
@@ -69,7 +72,7 @@ final class MFAFlowState {
         email = userInfo["email"]
         phone = userInfo["phone"]
         code = ""
-        errorMessage = nil
+        actionError = nil
         navigationPath = NavigationPath()
 
         BBLogger.info(.mfa, "MFA flow started - email: \(email ?? "nil"), phone: \(phone ?? "nil")")
@@ -89,7 +92,10 @@ final class MFAFlowState {
 
     func sendCode(notifyType: String, isResend: Bool = false, showPickerFirst: Bool = true) {
         guard let account, let xid, let otpKey else {
-            errorMessage = "MFA context missing"
+            actionError = ActionError(
+                action: "Start verification",
+                error: APIError(message: "MFA context missing")
+            )
             return
         }
 
@@ -98,12 +104,12 @@ final class MFAFlowState {
         }
 
         Task {
+            let method: MFAMethod = notifyType == "EMAIL" ? .email : .sms
             do {
-                let method: MFAMethod = notifyType == "EMAIL" ? .email : .sms
                 try await account.sendMFA(otpKey: otpKey, xid: xid, method: method)
                 self.notifyType = notifyType
                 self.isResendingCode = false
-                self.errorMessage = nil
+                self.actionError = nil
 
                 if showPickerFirst {
                     // Navigate from method picker to verification
@@ -116,7 +122,14 @@ final class MFAFlowState {
                     navigationPath.append(MFANavigationDestination.verification)
                 }
             } catch {
-                self.errorMessage = "Failed to send code: \(error.localizedDescription)"
+                let actionName = method == .email
+                    ? "Send verification code by email"
+                    : "Send verification code by SMS"
+                self.actionError = ActionError(
+                    action: actionName,
+                    error: error,
+                    accountId: account.id
+                )
                 self.isResendingCode = false
                 // If we haven't shown the sheet yet, show it now with the error
                 if !isPresented {
@@ -130,7 +143,7 @@ final class MFAFlowState {
         guard let account, let xid, let otpKey else { return }
 
         isVerifying = true
-        errorMessage = nil
+        actionError = nil
 
         Task {
             do {
@@ -142,11 +155,11 @@ final class MFAFlowState {
                 await onSuccess?()
             } catch {
                 isVerifying = false
-                if let apiError = error as? APIError {
-                    errorMessage = "Verification failed: \(apiError.message)"
-                } else {
-                    errorMessage = "Verification failed: \(error.localizedDescription)"
-                }
+                actionError = ActionError(
+                    action: "Verify code",
+                    error: error,
+                    accountId: account.id
+                )
             }
         }
     }
@@ -155,7 +168,7 @@ final class MFAFlowState {
         isPresented = false
         navigationPath = NavigationPath()
         code = ""
-        errorMessage = nil
+        actionError = nil
         isVerifying = false
         onCancel?()
     }
@@ -236,10 +249,9 @@ struct MFAMethodPickerView: View {
                 Text("Send Code To")
             }
 
-            if let errorMessage = state.errorMessage {
+            if let actionError = state.actionError {
                 Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
+                    ErrorDetailsView(error: actionError)
                 }
             }
         }
@@ -300,10 +312,9 @@ struct MFAVerificationView: View {
                 .disabled(state.notifyType == nil || state.isResendingCode || state.isVerifying)
             }
 
-            if let errorMessage = state.errorMessage {
+            if let actionError = state.actionError {
                 Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
+                    ErrorDetailsView(error: actionError)
                 }
             }
         }

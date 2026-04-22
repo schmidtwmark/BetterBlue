@@ -37,6 +37,12 @@ struct VehicleControlButton: View {
     @State private var currentActionIndex: Array.Index = 0
     @State private var animatedDots = ""
     @State private var dotsTimer: Timer?
+    /// Full error context for the most recent failed action. Drives the
+    /// "Show last error…" item that's appended to the action menu when
+    /// set, plus the details sheet it opens. Kept around alongside the
+    /// compact chip state so users can drill in without losing the chip.
+    @State private var lastActionError: ActionError?
+    @State private var showingErrorDetails = false
     let bbVehicle: BBVehicle
 
     var currentAction: MainVehicleAction {
@@ -63,6 +69,16 @@ struct VehicleControlButton: View {
             quickActionButton
         }
         .fixedSize(horizontal: false, vertical: true)
+        .sheet(isPresented: $showingErrorDetails) {
+            // Jump straight to the full details sheet — the menu item is
+            // already an explicit "show me the error" affordance.
+            if let lastActionError {
+                ErrorDetailsSheet(error: lastActionError) {
+                    showingErrorDetails = false
+                }
+                .presentationDetents([.medium, .large])
+            }
+        }
     }
 
     // MARK: - Status Button (Left Side)
@@ -147,6 +163,18 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var actionMenuContent: some View {
+        // When the most recent command failed, surface a quick shortcut to
+        // the full error details. Compact chip stays as-is; users who want
+        // the raw response / HTTP log long-press and pick this item.
+        if lastActionError != nil {
+            Button {
+                showingErrorDetails = true
+            } label: {
+                Label("Show Last Error…", systemImage: "exclamationmark.triangle")
+            }
+            Divider()
+        }
+
         ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
             Button(action: {
                 currentTask = Task {
@@ -243,6 +271,9 @@ struct VehicleControlButton: View {
     private func handleActionSuccess(_ action: VehicleAction) {
         stopDotsAnimation()
         inProgressAction = nil
+        // Success clears the "Show Last Error…" shortcut so stale failures
+        // don't linger in the menu.
+        lastActionError = nil
 
         if let mainAction = action as? MainVehicleAction {
             let completedMessage = ButtonMessage.normal(mainAction.completedText)
@@ -286,6 +317,18 @@ struct VehicleControlButton: View {
         } else {
             message = .error(error.localizedDescription)
         }
+
+        // Record the full error context so the menu's "Show Last Error…"
+        // shortcut (and the attached sheet) can render the three-part
+        // treatment (action, type, technical details).
+        let actionLabel = (inProgressAction as? MainVehicleAction)?.completedText
+            ?? inProgressAction?.label
+            ?? currentAction.label
+        lastActionError = ActionError(
+            action: actionLabel,
+            error: error,
+            accountId: bbVehicle.account?.id
+        )
 
         inProgressAction = nil
         let errorMessage = message

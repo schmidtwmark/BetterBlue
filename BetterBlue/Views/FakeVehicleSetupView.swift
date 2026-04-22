@@ -260,12 +260,96 @@ struct FakeVehicleDetailView: View {
             } header: {
                 Text("Tire Pressure Warnings")
             }
+
+            debugFailureSection
         }
         .navigationTitle("Vehicle Details")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             loadVehicleData()
         }
+    }
+
+    // MARK: - Debug failure simulation
+    //
+    // Flipping any of these toggles writes to the vehicle's
+    // `debugConfiguration`. `SwiftDataFakeVehicleProvider` reads it at
+    // request time and throws a matching `APIError`. End-to-end that
+    // means you can force every error path in the app (login failure,
+    // status fetch failure, lock failure, etc.) against the fake client
+    // — and since all error surfaces now route through
+    // `ErrorDetailsView`, this is the fastest way to see the new error
+    // UI in action without a real Hyundai/Kia outage.
+
+    private var debugFailureSection: some View {
+        let bindings = debugBindings()
+        return Section {
+            Toggle("Login", isOn: bindings.login)
+            Toggle("Credential Validation", isOn: bindings.credential)
+            Toggle("Vehicle Fetch", isOn: bindings.vehicleFetch)
+            Toggle("Status Fetch", isOn: bindings.statusFetch)
+            Toggle("PIN Validation", isOn: bindings.pinValidation)
+
+            Divider()
+
+            Toggle("Lock Command", isOn: bindings.lock)
+            Toggle("Unlock Command", isOn: bindings.unlock)
+            Toggle("Start Climate", isOn: bindings.startClimate)
+            Toggle("Stop Climate", isOn: bindings.stopClimate)
+            Toggle("Start Charge", isOn: bindings.startCharge)
+            Toggle("Stop Charge", isOn: bindings.stopCharge)
+        } header: {
+            Text("Debug: Simulate Failures")
+        } footer: {
+            Text("Turn a toggle on, then perform the matching action. The fake API will throw — you'll see the updated error UI (headline, type, technical details disclosure).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Builds keypath-style bindings that read/write the optional
+    /// `debugConfiguration` on the vehicle. Allocates a default config
+    /// on first write so users don't have to press a "Create" button.
+    private func debugBindings() -> DebugToggleBindings {
+        func binding(for keyPath: WritableKeyPath<BBDebugConfiguration, Bool>) -> Binding<Bool> {
+            Binding(
+                get: { vehicle.debugConfiguration?[keyPath: keyPath] ?? false },
+                set: { newValue in
+                    var config = vehicle.debugConfiguration ?? BBDebugConfiguration()
+                    config[keyPath: keyPath] = newValue
+                    vehicle.debugConfiguration = config
+                    saveChanges()
+                }
+            )
+        }
+
+        return DebugToggleBindings(
+            login: binding(for: \.shouldFailLogin),
+            credential: binding(for: \.shouldFailCredentialValidation),
+            vehicleFetch: binding(for: \.shouldFailVehicleFetch),
+            statusFetch: binding(for: \.shouldFailStatusFetch),
+            pinValidation: binding(for: \.shouldFailPinValidation),
+            lock: binding(for: \.shouldFailLock),
+            unlock: binding(for: \.shouldFailUnlock),
+            startClimate: binding(for: \.shouldFailStartClimate),
+            stopClimate: binding(for: \.shouldFailStopClimate),
+            startCharge: binding(for: \.shouldFailStartCharge),
+            stopCharge: binding(for: \.shouldFailStopCharge)
+        )
+    }
+
+    private struct DebugToggleBindings {
+        let login: Binding<Bool>
+        let credential: Binding<Bool>
+        let vehicleFetch: Binding<Bool>
+        let statusFetch: Binding<Bool>
+        let pinValidation: Binding<Bool>
+        let lock: Binding<Bool>
+        let unlock: Binding<Bool>
+        let startClimate: Binding<Bool>
+        let stopClimate: Binding<Bool>
+        let startCharge: Binding<Bool>
+        let stopCharge: Binding<Bool>
     }
 
     private func loadVehicleData() {
