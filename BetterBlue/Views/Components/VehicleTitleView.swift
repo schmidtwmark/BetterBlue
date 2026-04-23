@@ -31,6 +31,12 @@ struct VehicleTitleView: View {
     @State private var showingTripDetails = false
     @State private var customVehicleName = ""
     @Namespace private var fallbackTransition
+    /// Namespace used for `matchedGeometryEffect` on the refresh button (so
+    /// it smoothly morphs from its collapsed position beside the title card
+    /// to its expanded position at the top-trailing of the expanded card)
+    /// and `glassEffectUnion` (so the two glass pills visually merge into
+    /// one shape when expanded).
+    @Namespace private var glassNs
 
     /// Fixed height for the quick action button
     private let buttonHeight: CGFloat = 52
@@ -46,16 +52,25 @@ struct VehicleTitleView: View {
         }
         return bbVehicle.location
     }
+    
+    
 
     var body: some View {
         PersistentModelGuard(model: bbVehicle) {
-            HStack(alignment: .bottom, spacing: 8) {
-                // Left side: Title card with expandable content
-                titleCard
-
-                // Right side: Refresh button (stays at bottom)
-                refreshButton
+            // GlassEffectContainer is required for `glassEffectUnion` to
+            // actually merge the title card's and refresh button's glass
+            // shapes when expanded. Known caveat (FB22549321): Menu morph
+            // animations look glitchy inside a GlassEffectContainer on
+            // iOS 26.1 — the long-press context menu is rare enough that
+            // we're accepting that visual trade-off for the expansion morph.
+            GlassEffectContainer {
+                if isExpanded {
+                    expandedLayout
+                } else {
+                    collapsedLayout
+                }
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isExpanded)
         .sheet(isPresented: $showingVehicleInfo) {
             NavigationView {
                 VehicleInfoView(bbVehicle: bbVehicle)
@@ -117,66 +132,107 @@ struct VehicleTitleView: View {
         }
     }
 
-    // MARK: - Title Card (Left Side)
+    // MARK: - Collapsed Layout
 
     @ViewBuilder
-    private var titleCard: some View {
+    private var collapsedLayout: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            collapsedTitleCard
+            refreshButton
+                .matchedGeometryEffect(id: "refreshButton", in: glassNs)
+        }
+    }
+
+    @ViewBuilder
+    private var collapsedTitleCard: some View {
         Menu {
             contextMenuContent
-            
         } label: {
-            
-            VStack(alignment: .leading, spacing: 0) {
-                // Header row - fixed height when collapsed
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(bbVehicle.displayName)
-                            .font(isExpanded ? .title2 : .headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        
-                        // VIN only shown when expanded
-                        if isExpanded {
-                            Text(bbVehicle.vin)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Last update time shown in header when collapsed
-                    if !isExpanded, let lastUpdated = bbVehicle.lastUpdated {
-                        Text(compactLastUpdated(lastUpdated))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Image(systemName: "chevron.down")
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bbVehicle.displayName)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                }
+
+                Spacer()
+
+                if let lastUpdated = bbVehicle.lastUpdated {
+                    Text(compactLastUpdated(lastUpdated))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
-                .padding()
-                .frame(height: isExpanded ? nil : buttonHeight, alignment: .leading)
-                .frame(minHeight: buttonHeight)
-                
-                // Expanded content
-                if isExpanded {
-                    expandedContent
                 }
             }
+            .padding()
+            .frame(height: buttonHeight, alignment: .leading)
             .vehicleCardGlassEffect()
             .contentShape(Rectangle())
-        }
-        primaryAction: {
+        } primaryAction: {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                 isExpanded.toggle()
             }
         }
     }
 
-    // MARK: - Refresh Button (Right Side)
+    // MARK: - Expanded Layout
+
+    @ViewBuilder
+    private var expandedLayout: some View {
+        // ZStack so the refresh button overlays at the top-trailing of the
+        // expanded card. The expanded title card reserves a `buttonHeight`-
+        // sized clear slot on the right of its header row so the overlaid
+        // button visually lands inside the card without colliding with text.
+        ZStack(alignment: .topTrailing) {
+            expandedTitleCard
+            refreshButton
+                .matchedGeometryEffect(id: "refreshButton", in: glassNs)
+                .padding(4)
+        }
+    }
+
+    @ViewBuilder
+    private var expandedTitleCard: some View {
+        Menu {
+            contextMenuContent
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(bbVehicle.displayName)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text(bbVehicle.vin)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Reserve space for the refresh button overlay — the
+                    // button itself is rendered by `expandedLayout`'s ZStack
+                    // above this view, not as a child of the Menu (so it can
+                    // receive its own taps without firing the Menu's
+                    // primaryAction / expand-toggle).
+                    Color.clear
+                        .frame(width: buttonHeight, height: buttonHeight)
+                }
+                expandedContent
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .vehicleCardGlassEffect()
+            .glassEffectUnion(id: "headerGroup", namespace: glassNs)
+            .contentShape(Rectangle())
+        } primaryAction: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+
+    // MARK: - Refresh Button
 
     @ViewBuilder
     private var refreshButton: some View {
@@ -199,6 +255,17 @@ struct VehicleTitleView: View {
             }
             .frame(width: buttonHeight, height: buttonHeight)
             .vehicleCardGlassEffect()
+            // Union only applied in the expanded state so the button's
+            // glass merges into the same shape as the expanded title card.
+            // When collapsed, we want the button to render as its own
+            // separate pill.
+            .modifier(
+                ConditionalGlassUnion(
+                    enabled: isExpanded,
+                    id: "headerGroup",
+                    namespace: glassNs
+                )
+            )
         }
         .buttonStyle(.plain)
         .disabled(isRefreshing)
@@ -322,7 +389,9 @@ struct VehicleTitleView: View {
                 )
             }
         }
-        .padding([.horizontal, .bottom])
+        // Note: no inner padding — `expandedTitleCard`'s outer VStack has
+        // `.padding()` all around, so adding horizontal/bottom here would
+        // double the inset.
     }
 
     private func buildDoorStatusText(doorOpen: VehicleStatus.DoorStatus) -> (text: String, isOpen: Bool) {
@@ -614,6 +683,27 @@ private struct HoodTrunkStatusRow: View {
             Image(systemName: "car.side.rear.open")
         } else {
             Image(systemName: "car.side")
+        }
+    }
+}
+
+// MARK: - Conditional Glass Union
+
+/// Applies `glassEffectUnion(id:namespace:)` only when `enabled` is true.
+/// Used so the refresh button's glass merges with the title card's glass
+/// when the card is expanded, but stays as its own separate pill when
+/// collapsed.
+private struct ConditionalGlassUnion: ViewModifier {
+    let enabled: Bool
+    let id: String
+    let namespace: Namespace.ID
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.glassEffectUnion(id: id, namespace: namespace)
+        } else {
+            content
         }
     }
 }
