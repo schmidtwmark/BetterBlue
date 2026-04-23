@@ -147,16 +147,20 @@ extension BBVehicle {
 
         // Update gas range and EV status, keeping existing values if new ones aren't provided
         // PHEVs can have both gasRange and evStatus simultaneously
-        if let gasRange = status.gasRange {
+        if [.gas, .phev].contains(fuelType),  let gasRange = status.gasRange {
             self.gasRange = gasRange
         }
-        if let evStatus = status.evStatus {
+        if [.electric, .phev].contains(fuelType), let evStatus = status.evStatus {
             self.evStatus = evStatus
         }
         // Only clear gas range for pure EVs (PHEVs retain both gas and EV range)
         if fuelType == .electric && status.evStatus != nil && status.gasRange == nil {
-            gasRange = nil
+            self.gasRange = nil
         }
+        if fuelType == .gas && status.evStatus == nil && status.gasRange != nil {
+            self.evStatus = nil
+        }
+        
         location = status.location
         lockStatus = status.lockStatus
         climateStatus = status.climateStatus
