@@ -105,7 +105,7 @@ struct AddAccountView: View {
         }
         .navigationTitle("Add Account")
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button("Add") {
                     Task {
                         await addAccount()
@@ -195,11 +195,15 @@ struct AddAccountView: View {
                 Text("Username")
                 Spacer()
                 TextField("", text: $username)
+                    #if os(iOS)
                     .autocapitalization(.none)
+                    #endif
                     .disableAutocorrection(true)
                     .multilineTextAlignment(.trailing)
                     .focused($focusedField, equals: .username)
+                    #if os(iOS)
                     .submitLabel(.next)
+                    #endif
                     .onSubmit {
                         focusedField = .password
                     }
@@ -211,7 +215,9 @@ struct AddAccountView: View {
                 SecureField("", text: $password)
                     .multilineTextAlignment(.trailing)
                     .focused($focusedField, equals: .password)
+                    #if os(iOS)
                     .submitLabel(selectedBrand == .hyundai ? .next : .done)
+                    #endif
                     .onSubmit {
                         if selectedBrand == .hyundai {
                             focusedField = .pin
@@ -228,10 +234,14 @@ struct AddAccountView: View {
                     Text("PIN")
                     Spacer()
                     SecureField("", text: $pin)
+                        #if os(iOS)
                         .keyboardType(.numberPad)
+                        #endif
                         .multilineTextAlignment(.trailing)
                         .focused($focusedField, equals: .pin)
+                        #if os(iOS)
                         .submitLabel(.done)
+                        #endif
                         .onSubmit {
                             Task {
                                 await addAccount()

@@ -18,7 +18,7 @@ struct ChargeLimitSettingsSheet: View {
         NavigationView {
             ChargeLimitSettingsContent(vehicle: vehicle, onSave: { dismiss() })
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .automatic) {
                         Button("Done") {
                             dismiss()
                         }
@@ -151,7 +151,9 @@ struct ChargeLimitSettingsContent: View {
             }
         }
         .navigationTitle("Charge Limits")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onChange(of: acLevel) {
             successMessage = nil
         }

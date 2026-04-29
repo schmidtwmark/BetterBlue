@@ -59,7 +59,7 @@ struct HTTPLogView: View {
         }
         .navigationTitle("HTTP Logs")
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Menu("Actions") {
                     Button("Filter", systemImage: "line.3.horizontal.decrease.circle") {
                         showingFilterSheet = true
@@ -287,7 +287,7 @@ private extension DateFormatter {
 
             // Insert sample logs into the context
             for (index, log) in sampleLogs.enumerated() {
-                let deviceType: DeviceType = [.iPhone, .iPad, .mac, .widget, .watch][index % 5]
+                let deviceType: DeviceType = [.iPhone, .iPad, .mac, .menuBar, .widget, .watch][index % 6]
                 let bbLog = BBHTTPLog(log: log, deviceType: deviceType)
                 context.insert(bbLog)
             }

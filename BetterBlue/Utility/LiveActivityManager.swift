@@ -5,7 +5,7 @@
 //  Created by Mark Schmidt on 12/13/25.
 //
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
 import BetterBlueKit
@@ -35,7 +35,7 @@ final class LiveActivityManager {
         AppLogger.liveActivity.info("Device token set: \(token.prefix(20), privacy: .public)...")
 
         // If we have active Live Activities, register with backend now
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if let activity = Activity<VehicleActivityAttributes>.activities.first, !isRegisteredWithBackend {
             let activityType = activity.content.state.activityType
             Task {
@@ -49,7 +49,7 @@ final class LiveActivityManager {
     func handleWakeupPush() async {
         AppLogger.liveActivity.info("Handling wakeup push...")
 
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         let activities = Activity<VehicleActivityAttributes>.activities
         guard !activities.isEmpty else {
             AppLogger.liveActivity.info("No active Live Activities to update")
@@ -101,7 +101,7 @@ final class LiveActivityManager {
     }
 
     func updateActivity(for vehicle: BBVehicle, status: VehicleStatus, modelContext: ModelContext) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
@@ -123,7 +123,7 @@ final class LiveActivityManager {
     }
 
     nonisolated func refreshActivity(for vin: String, status: VehicleStatus, incrementWakeup: Bool = false) async {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vin }) else {
             return
         }
@@ -148,7 +148,7 @@ final class LiveActivityManager {
     }
 
     nonisolated func setRefreshing(for vin: String, isRefreshing: Bool) async {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vin }) else {
             return
         }
@@ -171,7 +171,7 @@ final class LiveActivityManager {
 
     /// Start or stop the debug Live Activity based on the vehicle's debugLiveActivity flag
     func updateDebugActivity(for vehicle: BBVehicle) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
@@ -196,7 +196,7 @@ final class LiveActivityManager {
         climatePresetName: String? = nil,
         climatePresetIcon: String? = nil
     ) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard AppSettings.shared.liveActivitiesEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard let status = createStatusFromVehicle(vehicle) else { return }
@@ -267,7 +267,7 @@ final class LiveActivityManager {
         climatePresetName: String? = nil,
         climatePresetIcon: String? = nil
     ) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         let existingActivity = Activity<VehicleActivityAttributes>.activities.first { $0.attributes.vin == vehicle.vin }
 
         let contentState: VehicleActivityAttributes.ContentState
@@ -373,7 +373,7 @@ final class LiveActivityManager {
     }
 
     private func endActivity(for vehicle: BBVehicle) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         guard let existingActivity = Activity<VehicleActivityAttributes>.activities.first(where: { $0.attributes.vin == vehicle.vin }) else {
             return
         }
@@ -424,7 +424,7 @@ public enum LiveActivityType: String, Codable, Hashable, Sendable {
 
 // MARK: - Activity Attributes
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 public struct VehicleActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable, Sendable {
         public var status: VehicleStatus

@@ -8,6 +8,10 @@
 import BetterBlueKit
 import SwiftUI
 
+#if os(iOS)
+    import UIKit
+#endif
+
 struct JSONBodyView: View {
     let content: NSAttributedString
     @Binding var showingShareSheet: Bool
@@ -17,12 +21,15 @@ struct JSONBodyView: View {
             .font(.system(.caption, design: .monospaced))
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
+            #if os(iOS)
             .sheet(isPresented: $showingShareSheet) {
                 ShareSheet(activityItems: [content.string])
             }
+            #endif
     }
 }
 
+#if os(iOS)
 struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
 
@@ -32,6 +39,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }
+#endif
 
 struct HTTPLogFilterSheet: View {
     @Binding var selectedRequestTypes: Set<HTTPRequestType>
@@ -169,9 +177,11 @@ struct HTTPLogFilterSheet: View {
                 }
             }
             .navigationTitle("Filter Logs")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }

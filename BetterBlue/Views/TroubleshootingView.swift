@@ -55,7 +55,9 @@ struct TroubleshootingView: View {
             }
         }
         .navigationTitle("Troubleshooting")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

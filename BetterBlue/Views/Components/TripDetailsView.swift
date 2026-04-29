@@ -32,7 +32,9 @@ struct TripDetailsView: View {
                 }
             }
             .navigationTitle("Trip History")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .task {
                 await loadTripDetails()
             }
@@ -521,7 +523,9 @@ private struct TripDetailsPreviewWrapper: View {
             errorMessage: errorMessage
         )
         .navigationTitle("Trip History")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

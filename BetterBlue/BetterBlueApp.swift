@@ -11,10 +11,6 @@ import SwiftData
 import SwiftUI
 import UserNotifications
 
-extension Notification.Name {
-    static let fakeAccountConfigurationChanged = Notification.Name("FakeAccountConfigurationChanged")
-    static let selectVehicle = Notification.Name("SelectVehicle")
-}
 
 @main
 struct BetterBlueApp: App {

@@ -64,6 +64,8 @@ struct BackgroundSelectionView: View {
             }
         }
         .navigationTitle("Widget Background")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }

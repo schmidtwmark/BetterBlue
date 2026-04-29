@@ -148,7 +148,9 @@ struct AccountInfoView: View {
             }
         }
         .navigationTitle("Account Info")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .disabled(isLoading)
         .overlay {
             if isLoading {
@@ -168,7 +170,9 @@ struct AccountInfoView: View {
         }
         .alert("Change PIN", isPresented: $showingPinDialog) {
             SecureField("New PIN", text: $newPin)
+                #if os(iOS)
                 .keyboardType(.numberPad)
+                #endif
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 Task {

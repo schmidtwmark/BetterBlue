@@ -263,10 +263,10 @@ struct DiagnosticInfoView: View {
                         }
                     }
                 }
-                #if os(watchOS)
-                .listStyle(.automatic)
-                #else
+                #if os(iOS)
                 .listStyle(.insetGrouped)
+                #else
+                .listStyle(.automatic)
                 #endif
             } else {
                 VStack {
@@ -277,11 +277,13 @@ struct DiagnosticInfoView: View {
             }
         }
         .navigationTitle("Sync Diagnostics")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             if let diagnosticInfo = diagnosticInfo {
                 #if !os(watchOS)
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         ShareLink(
                             item: diagnosticInfo.formattedOutput,
                             subject: Text("BetterBlue Sync Diagnostics"),

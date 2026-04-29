@@ -43,6 +43,9 @@ struct VehicleControlButton: View {
     /// compact chip state so users can drill in without losing the chip.
     @State private var lastActionError: ActionError?
     @State private var showingErrorDetails = false
+    /// Drives the click-to-show actions popover on macOS. On iOS the
+    /// status button is a SwiftUI `Menu` so this state is unused.
+    @State private var showingActionPopover = false
     let bbVehicle: BBVehicle
 
     var currentAction: MainVehicleAction {
@@ -87,11 +90,37 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var statusButton: some View {
+        #if os(macOS)
+        // On macOS even `.menuStyle(.borderlessButton)` ends up stripping
+        // custom label modifiers (`.vehicleCardGlassEffect()` in
+        // particular), rendering the label as a flat NSPopUpButton-style
+        // text + chevron rather than the iPad-style glass card. To keep
+        // the visual identical to the rest of the app, use a plain
+        // Button with a popover for click and `.contextMenu` for
+        // right-click — the same pattern as the quick action button.
+        Button {
+            showingActionPopover = true
+        } label: {
+            statusButtonLabel
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showingActionPopover, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 0) {
+                actionMenuContent
+            }
+            .frame(minWidth: 220)
+            .padding(8)
+        }
+        .contextMenu {
+            actionMenuContent
+        }
+        #else
         Menu {
             actionMenuContent
         } label: {
             statusButtonLabel
         }
+        #endif
     }
 
     @ViewBuilder
@@ -129,12 +158,13 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var quickActionButton: some View {
-        Menu {
-            actionMenuContent
-        } label: {
-            quickActionButtonLabel
-        }
-        primaryAction: {
+        // Plain Button + .contextMenu (rather than Menu + primaryAction)
+        // so the custom glass-effect label renders verbatim on every
+        // platform. The long-press / right-click menu is attached via
+        // .contextMenu — works the same on iOS (long-press) and macOS
+        // (right-click or Control-click). Avoids the native AppKit
+        // popup-button chrome that Menu renders on macOS.
+        Button {
             if inProgressAction != nil {
                 cancelCurrentOperation()
             } else {
@@ -142,6 +172,12 @@ struct VehicleControlButton: View {
                     await performAction(action: currentAction)
                 }
             }
+        } label: {
+            quickActionButtonLabel
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            actionMenuContent
         }
     }
 
@@ -170,6 +206,7 @@ struct VehicleControlButton: View {
         // the raw response / HTTP log long-press and pick this item.
         if lastActionError != nil {
             Button {
+                showingActionPopover = false
                 showingErrorDetails = true
             } label: {
                 Label("Show Last Error…", systemImage: "exclamationmark.triangle")
@@ -179,6 +216,9 @@ struct VehicleControlButton: View {
 
         ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
             Button(action: {
+                // Dismiss the macOS popover (no-op on iOS, where this is
+                // already inside a Menu that auto-dismisses).
+                showingActionPopover = false
                 currentTask = Task {
                     await performAction(action: action)
                 }

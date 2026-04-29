@@ -92,7 +92,9 @@ struct ClimateSettingsContent: View {
             }
         }
         .navigationTitle("Climate Settings")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onChange(of: preset.climateOptions) { _, _ in
             savePreset(preset)
         }

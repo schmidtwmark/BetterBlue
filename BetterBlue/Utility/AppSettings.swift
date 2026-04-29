@@ -10,7 +10,7 @@ import Foundation
 import SwiftUI
 import WidgetKit
 
-#if canImport(ActivityKit)
+#if os(iOS) && canImport(ActivityKit)
     import ActivityKit
 #endif
 
@@ -106,6 +106,8 @@ class AppSettings {
     private let widgetRefreshIntervalKey = "WidgetRefreshInterval"
     private let debugModeEnabledKey = "DebugModeEnabled"
     private let liveActivitiesEnabledKey = "LiveActivitiesEnabled"
+    private let menuBarEnabledKey = "MenuBarEnabled"
+    private let showDockIconKey = "ShowDockIcon"
 
     var preferredDistanceUnit: Distance.Units {
         didSet {
@@ -158,6 +160,25 @@ class AppSettings {
         }
     }
 
+    /// Master toggle for the Mac menu bar app. When `true` on macCatalyst,
+    /// `BetterBlueApp` renders a `MenuBarExtra` per vehicle and starts the
+    /// `MenuBarRefreshManager` polling timer. Ignored on iOS.
+    var menuBarEnabled: Bool {
+        didSet {
+            userDefaults.set(menuBarEnabled, forKey: menuBarEnabledKey)
+        }
+    }
+
+    /// When `menuBarEnabled == true` on macCatalyst, controls whether the
+    /// app keeps a Dock icon. Default `false` — menu-bar-only accessory
+    /// mode is the expected default for this kind of utility. Ignored on
+    /// iOS.
+    var showDockIcon: Bool {
+        didSet {
+            userDefaults.set(showDockIcon, forKey: showDockIconKey)
+        }
+    }
+
     private init() {
         #if targetEnvironment(simulator)
             isSimulator = true
@@ -195,6 +216,11 @@ class AppSettings {
 
         // Live Activities is a beta feature, disabled by default
         liveActivitiesEnabled = userDefaults.bool(forKey: liveActivitiesEnabledKey)
+
+        // Mac menu bar app — both default to `false`. `UserDefaults.bool`
+        // returns `false` when the key is absent, which is what we want.
+        menuBarEnabled = userDefaults.bool(forKey: menuBarEnabledKey)
+        showDockIcon = userDefaults.bool(forKey: showDockIconKey)
 
         // Start sync store and listen for changes from other devices
         syncStore.performSync()
@@ -268,7 +294,7 @@ class AppSettings {
         WidgetCenter.shared.reloadAllTimelines()
 
         // Refresh all live activities to pick up the new unit settings
-        #if canImport(ActivityKit)
+        #if os(iOS) && canImport(ActivityKit)
             Task { @MainActor in
                 for activity in Activity<VehicleActivityAttributes>.activities {
                     let currentState = activity.content.state

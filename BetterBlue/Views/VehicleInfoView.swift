@@ -38,7 +38,9 @@ struct VehicleInfoView: View {
 
             Section("Custom Name") {
                 TextField("Vehicle Name", text: $customName)
+                    #if os(iOS)
                     .autocapitalization(.words)
+                    #endif
                     .onChange(of: customName) { _, newValue in
                         bbVehicle.customName = newValue.isEmpty ? nil : newValue
                         do {
@@ -50,6 +52,36 @@ struct VehicleInfoView: View {
             }
 
             VehicleWidgetConfigSection(bbVehicle: bbVehicle)
+
+            // Menu Bar Icon — shown on all platforms even though the Mac
+            // menu bar is the only surface that consumes it today. The
+            // setting travels with the vehicle via iCloud so a user who
+            // picks an icon on iPhone will see it reflected when they
+            // later enable the menu bar app on Mac.
+            Section {
+                Menu {
+                    ForEach(BBVehicle.availableMenuBarIcons, id: \.icon) { option in
+                        Button {
+                            bbVehicle.menuBarIconName = option.icon
+                            try? modelContext.save()
+                        } label: {
+                            Label(option.name, systemImage: option.icon)
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Menu Bar Icon")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Image(systemName: bbVehicle.menuBarIconName)
+                            .foregroundColor(.blue)
+                    }
+                }
+            } header: {
+                Text("Menu Bar")
+            } footer: {
+                Text("Icon used when the Mac menu bar app is enabled.")
+            }
 
             if let account = bbVehicle.account {
                 Section("Account Info") {
@@ -121,7 +153,7 @@ struct VehicleInfoView: View {
                 }
             }
 
-            #if DEBUG
+            #if DEBUG && os(iOS)
             Toggle("Debug Live Activity", isOn: Binding(
                 get: { bbVehicle.debugLiveActivity },
                 set: { newValue in
@@ -135,7 +167,9 @@ struct VehicleInfoView: View {
 
         }
         .navigationTitle("Vehicle Info")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .overlay(alignment: .top) {
             if showingCopiedMessage {
                 Text("VIN copied to clipboard")
@@ -149,7 +183,9 @@ struct VehicleInfoView: View {
             }
         }
         .navigationTitle("Vehicle Info")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear {
             customName = bbVehicle.customName ?? ""
             createDefaultPresetIfNeeded()

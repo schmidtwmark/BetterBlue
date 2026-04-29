@@ -9,7 +9,6 @@ import BetterBlueKit
 import Foundation
 import MapKit
 import SwiftData
-import UIKit
 
 extension BBVehicle {
     var coordinate: CLLocationCoordinate2D? {

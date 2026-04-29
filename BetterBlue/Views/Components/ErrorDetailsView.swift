@@ -132,16 +132,18 @@ struct ErrorDetailsSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .navigationTitle("Error Details")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 // Share on the leading side per request.
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     ShareLink(item: shareText) {
                         Image(systemName: "square.and.arrow.up")
                     }
                     .disabled(shareText.isEmpty)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done", action: onDismiss)
                 }
             }

@@ -166,7 +166,9 @@ struct MapCenteringDebugView: View {
             }
         }
         .navigationTitle("Map Centering Debug")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

@@ -1,5 +1,6 @@
 import BetterBlueKit
 import MapKit
+import SwiftData
 import SwiftUI
 
 struct SimpleMapView: View {

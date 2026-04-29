@@ -14,6 +14,15 @@ import WidgetKit
 struct MainView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    /// Drives the iPad/Mac split-view vs. iPhone overlay branching at the
+    /// top of `mainContent` (MAR-55). Compact width → existing overlay
+    /// path, untouched.
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    /// macCatalyst Settings window opens via `openWindow(id: "settings")`
+    /// instead of a sheet. Unused on iOS, but the binding is always
+    /// present — it's benign when `openWindow(id:)` points at a scene
+    /// that doesn't exist on the platform (the call no-ops).
+    @Environment(\.openWindow) private var openWindow
     @Query private var accounts: [BBAccount]
     @Query(
         filter: #Predicate<BBVehicle> { vehicle in !vehicle.isHidden },
@@ -52,23 +61,23 @@ struct MainView: View {
         static let minimumSignificantChange: Double = 0.0001 // ~11 meters
     }
 
-    /// Calculate the latitude offset needed to center the vehicle properly
-    /// - simplified to quarter screen offset
+    /// Calculate the latitude offset needed to center the vehicle properly.
+    /// On iPhone (compact width) the floating card overlay covers the bottom
+    /// of the screen, so we shift the camera up by ~1/4 of the screen so
+    /// the pin stays visible above the controls. On iPad / Mac (regular
+    /// width) the controls float in the bottom-trailing corner with empty
+    /// map space everywhere else, so we center on the vehicle directly
+    /// with no offset.
     private func calculateLatitudeOffset(
         for _: CLLocationCoordinate2D,
     ) -> Double {
-        // Simple approach: offset by 1/4 of the screen height (upward)
+        if hSizeClass == .regular {
+            return 0
+        }
         let quarterScreenOffset = screenHeight / 4
-
-        // Convert pixels to latitude degrees
         let latitudePerPixel = MapCenteringConfig.defaultSpan.latitudeDelta /
             screenHeight
-        let baseOffset = quarterScreenOffset * latitudePerPixel
-
-        // Add marker height compensation
-        let finalOffset = baseOffset
-
-        return finalOffset
+        return quarterScreenOffset * latitudePerPixel
     }
 
     /// Determine the optimal center coordinate for the map
@@ -179,6 +188,25 @@ struct MainView: View {
 
     @ViewBuilder
     private var mainContent: some View {
+        // On regular-width displays (iPad landscape, Mac Catalyst), swap
+        // the mobile overlay for a three-column split view. Compact width
+        // (iPhone, iPad-split-screen narrow) stays on the existing layout
+        // verbatim — no shared code with the split path so the iPhone
+        // experience is guaranteed unchanged (MAR-55).
+        if hSizeClass == .regular
+            && !accounts.isEmpty
+            && !displayedVehicles.isEmpty
+            && lastError == nil {
+            splitViewContent
+        } else {
+            compactContent
+        }
+    }
+
+    // MARK: - Compact (iPhone / narrow iPad) layout — original design
+
+    @ViewBuilder
+    private var compactContent: some View {
         NavigationStack {
             Group {
                 if accounts.isEmpty {
@@ -214,19 +242,130 @@ struct MainView: View {
                 }
             }
             .sheet(isPresented: $showingSettings) {
+                #if os(iOS)
                 SettingsView()
                     .navigationTransition(
                         .zoom(sourceID: "settings", in: transition),
                     )
+                #else
+                SettingsView()
+                #endif
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Settings", systemImage: "gearshape.fill") {
                         showingSettings = true
                     }.labelStyle(.iconOnly)
                 }
+                #if os(iOS)
                 .matchedTransitionSource(id: "settings", in: transition)
+                #endif
             }
+        }
+    }
+
+    // MARK: - Regular (iPad landscape / Mac) split view layout
+
+    @ViewBuilder
+    private var splitViewContent: some View {
+        NavigationSplitView {
+            // Sidebar: vehicle list, sorted by `BBVehicle.sortOrder` (the
+            // same `displayedVehicles` query the iPhone path uses, so the
+            // ordering matches across platforms once the SwiftData store
+            // syncs). No leading icon — the row is just the display name
+            // and the lock-state subtitle.
+            List(selection: Binding<Int?>(
+                get: { selectedVehicleIndex },
+                set: { newValue in
+                    if let newValue { selectedVehicleIndex = newValue }
+                }
+            )) {
+                ForEach(Array(displayedVehicles.enumerated()), id: \.element.id) { index, vehicle in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(vehicle.displayName)
+                            .font(.headline)
+                        if let lockStatus = vehicle.lockStatus {
+                            Text(lockStatus == .locked ? "Locked" : "Unlocked")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .tag(index)
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
+            #if os(iOS)
+            // iPad: settings button lives top-right of the detail
+            // pane (see the `.toolbar` on the detail column below).
+            // The sidebar has no toolbar action of its own.
+            #endif
+        } detail: {
+            // Detail: the iPhone experience, but the floating card
+            // anchors to the bottom-trailing corner (typical Mac
+            // floating-controls placement) with bottom padding so the
+            // card doesn't hug the window chrome.
+            ZStack {
+                SimpleMapView(
+                    currentVehicle: currentVehicle,
+                    mapRegion: $mapRegion,
+                )
+
+                if let vehicle = currentVehicle {
+                    VStack {
+                        Spacer()
+                            .allowsHitTesting(false)
+                        HStack(alignment: .bottom) {
+                            Spacer()
+                                .allowsHitTesting(false)
+                            VehicleCardView(
+                                bbVehicle: vehicle,
+                                bbVehicles: displayedVehicles,
+                                accounts: accounts,
+                                onVehicleSelected: { selected in
+                                    if let index = displayedVehicles.firstIndex(where: {
+                                        $0.vin == selected.vin
+                                    }) {
+                                        selectedVehicleIndex = index
+                                    }
+                                },
+                                onSuccessfulRefresh: {
+                                    lastError = nil
+                                },
+                            )
+                            // Key on VIN so SwiftUI tears down and
+                            // rebuilds the card when the user switches
+                            // vehicles in the sidebar. Without this, the
+                            // card's own `@State` properties — error
+                            // banner, in-flight refresh task, MFA state
+                            // — would leak from the previous selection.
+                            .id(vehicle.vin)
+                            .frame(maxWidth: 420)
+                        }
+                    }
+                    .padding(.bottom, 24)
+                    .padding(.trailing, 16)
+                }
+            }
+            .ignoresSafeArea()
+            #if os(iOS)
+            // iPad: Settings button lives in the detail pane's
+            // top-right toolbar, mirroring the iPhone gear-icon
+            // position. On macOS the native `Settings` scene already
+            // adds "Settings…" under the app menu (⌘,) — no in-window
+            // button needed.
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Settings", systemImage: "gearshape.fill") {
+                        showingSettings = true
+                    }
+                    .labelStyle(.iconOnly)
+                }
+            }
+            #endif
+        }
+        .navigationSplitViewStyle(.balanced)
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
         }
     }
 }

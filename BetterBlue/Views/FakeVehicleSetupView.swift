@@ -173,7 +173,9 @@ struct FakeVehicleDetailView: View {
                     Spacer()
                     TextField("", value: $latitude, format: .number.precision(.fractionLength(4)))
                         .multilineTextAlignment(.trailing)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                         .onChange(of: latitude) { _, _ in updateLocation() }
                 }
                 HStack {
@@ -181,7 +183,9 @@ struct FakeVehicleDetailView: View {
                     Spacer()
                     TextField("", value: $longitude, format: .number.precision(.fractionLength(4)))
                         .multilineTextAlignment(.trailing)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                         .onChange(of: longitude) { _, _ in updateLocation() }
                 }
             } header: {
@@ -264,7 +268,9 @@ struct FakeVehicleDetailView: View {
             debugFailureSection
         }
         .navigationTitle("Vehicle Details")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear {
             loadVehicleData()
         }

@@ -11,7 +11,12 @@ import SwiftData
 import SwiftUI
 
 /// User preference for charge port type (affects DC plug icon display)
-enum ChargePortType: String, Codable, CaseIterable {
+/// `nonisolated` so this plain-data enum's accessors don't pick up the
+/// macOS target's default-MainActor isolation. The enum is value-typed
+/// and stateless — there's no concurrency concern, and not being
+/// MainActor lets it be used from view-builder closures and other
+/// nonisolated contexts (`BBVehicle.plugIcon(for:)`).
+nonisolated enum ChargePortType: String, Codable, CaseIterable {
     case ccs1 = "CCS1"
     case ccs2 = "CCS2"
     case nacs = "NACS"
@@ -79,6 +84,11 @@ class BBVehicle {
     /// Override to show seat heat controls on older vehicles (generation < 3)
     /// Ignored for generation 3+ vehicles where seat heat controls are always shown
     var enableSeatHeatControls: Bool = false
+
+    /// SF Symbol name used to represent this vehicle in the Mac menu bar
+    /// app (MAR-52) and the iPad/Mac split-view sidebar (MAR-55). Defaults
+    /// to `car.fill`; user can pick an alternative via VehicleInfoView.
+    var menuBarIconName: String = "car.fill"
 
     var chargePortType: ChargePortType {
         get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
@@ -334,6 +344,22 @@ extension BBVehicle {
             customName! : model
     }
 
+    /// SF Symbol options for `menuBarIconName`. Same pattern as
+    /// `ClimatePreset.availableIcons`. Rendered as a monochrome template
+    /// image in the Mac menu bar, so all that varies per option is the
+    /// glyph itself.
+    static let availableMenuBarIcons: [(icon: String, name: String)] = [
+        ("car.fill", "Car"),
+        ("car.side.fill", "Car (side)"),
+        ("car.rear.fill", "Car (rear)"),
+        ("car.2.fill", "Two Cars"),
+        ("suv.side.fill", "SUV"),
+        ("van.side.fill", "Van"),
+        ("bolt.car.fill", "EV"),
+        ("steeringwheel", "Steering Wheel"),
+        ("key.fill", "Key"),
+    ]
+
     /// Returns the appropriate plug icon based on current charging state and user's port type preference
     func plugIcon(for plugType: VehicleStatus.PlugType?) -> Image {
         guard let plugType else {
@@ -360,6 +386,7 @@ extension BBVehicle: Encodable {
         case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
         case chargePortTypeRaw, debugConfiguration, debugLiveActivity, enableSeatHeatControls
+        case menuBarIconName
         case climatePresets
     }
 
@@ -400,6 +427,7 @@ extension BBVehicle: Encodable {
         try container.encodeIfPresent(debugConfiguration, forKey: .debugConfiguration)
         try container.encode(debugLiveActivity, forKey: .debugLiveActivity)
         try container.encode(enableSeatHeatControls, forKey: .enableSeatHeatControls)
+        try container.encode(menuBarIconName, forKey: .menuBarIconName)
 
         // Climate presets (relationship)
         try container.encode(safeClimatePresets, forKey: .climatePresets)

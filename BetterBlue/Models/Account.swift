@@ -312,7 +312,9 @@ extension BBAccount {
 
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken, cached: cached)
         }
+        #if os(iOS)
         LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
+        #endif
         return status
     }
 
@@ -428,6 +430,9 @@ extension BBAccount {
         }
 
         // Start Live Activity monitoring for long-running commands
+        // (iOS-only — `LiveActivityManager` and `LiveActivityType` aren't
+        // members of the macOS target since ActivityKit is iOS-exclusive).
+        #if os(iOS)
         let activityType: LiveActivityType = switch command {
         case .startClimate: .climate
         case .startCharge: .charging
@@ -443,6 +448,7 @@ extension BBAccount {
                 climatePresetIcon: climatePresetIcon
             )
         }
+        #endif
 
         let vehicle = bbVehicle.toVehicle()
         do {

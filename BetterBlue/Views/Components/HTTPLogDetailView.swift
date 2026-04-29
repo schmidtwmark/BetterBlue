@@ -88,9 +88,11 @@ struct HTTPLogDetailView: View {
             }
         }
         .navigationTitle("HTTP Log Details")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button {
                     shareContent = ShareableContent(content: generateLogJSON())
                 } label: {
@@ -98,9 +100,11 @@ struct HTTPLogDetailView: View {
                 }
             }
         }
+        #if os(iOS)
         .sheet(item: $shareContent) { item in
             ShareSheet(activityItems: [item.content])
         }
+        #endif
         .overlay(alignment: .top) {
             if let message = copiedMessage {
                 Text(message)
@@ -271,7 +275,7 @@ struct TapToCopyRow: View {
     }
 
     private func copyToClipboard() {
-        UIPasteboard.general.string = value
+        Pasteboard.copy(value)
 
         withAnimation(.easeInOut(duration: 0.3)) {
             copiedMessage = "\(label) copied to clipboard"

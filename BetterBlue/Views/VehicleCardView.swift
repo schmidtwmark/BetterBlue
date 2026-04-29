@@ -12,7 +12,15 @@ import SwiftUI
 import WidgetKit
 
 struct VehicleCardView: View {
-    @State var bbVehicle: BBVehicle
+    // `let` (not `@State`) so the view reflects the parent's current
+    // selection when the caller passes in a different vehicle. The Mac
+    // split view reuses one `VehicleCardView` instance and swaps this
+    // parameter when the user picks a vehicle in the sidebar; the
+    // iPhone/iPad layouts render one card per vehicle in a ForEach so
+    // the caller never mutates this for them. Observation of the
+    // underlying `@Model` still works — SwiftData drives re-renders
+    // when any property on the passed-in `BBVehicle` changes.
+    let bbVehicle: BBVehicle
     let bbVehicles: [BBVehicle]
     let accounts: [BBAccount]
     let onVehicleSelected: (BBVehicle) -> Void
@@ -104,9 +112,13 @@ struct VehicleCardView: View {
                                     .foregroundColor(.red.opacity(0.7))
                             }
                         }
+                        .padding()
+                        .vehicleCardGlassEffect()
+                        .contentShape(Rectangle())
                     }
-                    .padding()
-                    .vehicleCardGlassEffect()
+                    // `.plain` so the native macOS Button bezel doesn't
+                    // draw an extra border over the glass-effect label.
+                    .buttonStyle(.plain)
                 }
 
                 VehicleTitleView(

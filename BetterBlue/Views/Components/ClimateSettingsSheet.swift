@@ -43,20 +43,22 @@ struct ClimateSettingsSheet: View {
             }
             .tabViewStyle(.tabBarOnly)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
                 }
 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("New") {
                         createNewPreset()
                     }
                 }
             }
             .navigationTitle("Climate Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         .onAppear {
             createDefaultPresetIfNeeded()

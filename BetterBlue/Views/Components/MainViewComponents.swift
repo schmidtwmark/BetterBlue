@@ -50,7 +50,7 @@ struct EmptyAccountsView: View {
                 AddAccountView()
                     .toolbar {
                         ToolbarItem(
-                            placement: .topBarLeading,
+                            placement: .automatic,
                             content: {
                                 Button {
                                     showingAddAccount = false
@@ -61,15 +61,17 @@ struct EmptyAccountsView: View {
                         )
                     }
             }
+            #if os(iOS)
             .navigationTransition(
                 .zoom(sourceID: "add-account", in: transition),
             )
+            #endif
         }
         .sheet(isPresented: $showingTroubleshooting) {
             NavigationStack {
                 TroubleshootingView()
                     .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
+                        ToolbarItem(placement: .automatic) {
                             Button("Done") { showingTroubleshooting = false }
                         }
                     }

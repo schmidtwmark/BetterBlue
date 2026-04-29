@@ -8,7 +8,12 @@
 import BetterBlueKit
 import CoreLocation
 import SwiftUI
-import UIKit
+
+#if os(iOS)
+    import UIKit
+#elseif os(macOS)
+    import AppKit
+#endif
 
 enum MapApp: String, CaseIterable {
     case appleMaps = "Apple Maps"
@@ -98,72 +103,51 @@ enum NavigationHelper {
 
         BBLogger.debug(.app, "NavigationHelper: Opening \(app.rawValue) with URL: \(url.absoluteString)")
 
-        UIApplication.shared.open(url) { success in
-            if success {
-                BBLogger.info(.app, "NavigationHelper: Successfully opened \(app.rawValue)")
-            } else {
-                BBLogger.error(.app, "NavigationHelper: Failed to open \(app.rawValue) with URL: \(url.absoluteString)")
+        #if os(iOS)
+            UIApplication.shared.open(url) { success in
+                if success {
+                    BBLogger.info(.app, "NavigationHelper: Successfully opened \(app.rawValue)")
+                } else {
+                    BBLogger.error(
+                        .app,
+                        "NavigationHelper: Failed to open \(app.rawValue) with URL: \(url.absoluteString)"
+                    )
 
-                // If the app failed to open and it's not Apple Maps, try to open in Apple Maps as fallback
-                if app != .appleMaps {
-                    BBLogger.info(.app, "NavigationHelper: Falling back to Apple Maps...")
-                    if let appleUrl = MapApp.appleMaps.navigationURL(to: coordinate, destinationName: destinationName) {
-                        UIApplication.shared.open(appleUrl)
+                    // If the app failed to open and it's not Apple Maps, try to open in Apple Maps as fallback
+                    if app != .appleMaps {
+                        BBLogger.info(.app, "NavigationHelper: Falling back to Apple Maps...")
+                        if let appleUrl = MapApp.appleMaps.navigationURL(
+                            to: coordinate,
+                            destinationName: destinationName
+                        ) {
+                            UIApplication.shared.open(appleUrl)
+                        }
                     }
                 }
             }
-        }
-    }
-
-    /// Show action sheet to choose which map app to use for navigation
-    /// - Parameters:
-    ///   - coordinate: The destination coordinate
-    ///   - destinationName: Optional name for the destination
-    ///   - presentingViewController: The view controller to present the action sheet from
-    @MainActor static func showNavigationOptions(to coordinate: CLLocationCoordinate2D,
-                                                 destinationName: String? = nil,
-                                                 from presentingViewController: UIViewController) {
-        let availableApps = availableMapApps
-
-        guard !availableApps.isEmpty else {
-            let alert = UIAlertController(
-                title: "No Map Apps",
-                message: "No supported map applications are installed on this device.",
-                preferredStyle: .alert,
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            presentingViewController.present(alert, animated: true)
-            return
-        }
-
-        let actionSheet = UIAlertController(
-            title: "Navigate to Vehicle",
-            message: "Choose which app to use for navigation",
-            preferredStyle: .actionSheet,
-        )
-
-        for app in availableApps {
-            let action = UIAlertAction(title: app.rawValue, style: .default) { _ in
-                navigate(using: app, to: coordinate, destinationName: destinationName)
+        #elseif os(macOS)
+            // NSWorkspace.open returns immediately. We don't get a fallback
+            // signal the way iOS does, so the Apple Maps fallback is
+            // best-effort: if NSWorkspace returns false synchronously, try
+            // again with the Apple Maps URL.
+            let opened = NSWorkspace.shared.open(url)
+            if opened {
+                BBLogger.info(.app, "NavigationHelper: Successfully opened \(app.rawValue)")
+            } else {
+                BBLogger.error(
+                    .app,
+                    "NavigationHelper: Failed to open \(app.rawValue) with URL: \(url.absoluteString)"
+                )
+                if app != .appleMaps,
+                   let appleUrl = MapApp.appleMaps.navigationURL(
+                       to: coordinate,
+                       destinationName: destinationName
+                   ) {
+                    BBLogger.info(.app, "NavigationHelper: Falling back to Apple Maps...")
+                    NSWorkspace.shared.open(appleUrl)
+                }
             }
-            actionSheet.addAction(action)
-        }
-
-        actionSheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        // For iPad
-        if let popover = actionSheet.popoverPresentationController {
-            popover.sourceView = presentingViewController.view
-            popover.sourceRect = CGRect(
-                x: presentingViewController.view.bounds.midX,
-                y: presentingViewController.view.bounds.midY,
-                width: 0,
-                height: 0,
-            )
-            popover.permittedArrowDirections = []
-        }
-
-        presentingViewController.present(actionSheet, animated: true)
+        #endif
     }
 }
 

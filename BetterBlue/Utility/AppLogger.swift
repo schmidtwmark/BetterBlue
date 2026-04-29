@@ -22,7 +22,11 @@ import OSLog
 ///   2. Select your device (connect via cable or same network)
 ///   3. Filter by "com.markschmidt.BetterBlue" or category name
 ///   4. Make sure to enable "Include Info Messages" and "Include Debug Messages" in Action menu
-enum AppLogger {
+/// `nonisolated` so the static `Logger` properties don't pick up the
+/// macOS target's default-MainActor isolation. `OSLog.Logger` is
+/// thread-safe and `OSLogSink.log(...)` is invoked from any task,
+/// often off the main actor.
+nonisolated enum AppLogger {
     private static let subsystem = "com.markschmidt.BetterBlue"
 
     /// Live Activity related logs

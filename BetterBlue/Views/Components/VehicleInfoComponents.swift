@@ -46,7 +46,7 @@ struct VehicleBasicInfoSection: View {
     }
 
     private func copyVINToClipboard() {
-        UIPasteboard.general.string = bbVehicle.vin
+        Pasteboard.copy(bbVehicle.vin)
 
         withAnimation(.easeInOut(duration: 0.3)) {
             showingCopiedMessage = true

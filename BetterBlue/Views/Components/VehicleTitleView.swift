@@ -75,7 +75,7 @@ struct VehicleTitleView: View {
             NavigationView {
                 VehicleInfoView(bbVehicle: bbVehicle)
                     .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
+                        ToolbarItem(placement: .automatic) {
                             Button("Done") { showingVehicleInfo = false }
                         }
                     }
@@ -86,7 +86,7 @@ struct VehicleTitleView: View {
                 NavigationView {
                     AccountInfoView(account: account)
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
+                            ToolbarItem(placement: .automatic) {
                                 Button("Done") { showingAccountInfo = false }
                             }
                         }
@@ -98,7 +98,7 @@ struct VehicleTitleView: View {
                 NavigationView {
                     HTTPLogView(accountId: account.id, transition: transition)
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
+                            ToolbarItem(placement: .automatic) {
                                 Button("Done") { showingHTTPLogs = false }
                             }
                         }
@@ -110,9 +110,11 @@ struct VehicleTitleView: View {
                 NavigationView {
                     FakeVehicleDetailView(vehicle: bbVehicle)
                         .navigationTitle("Configure Vehicle")
+                        #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
+                        #endif
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
+                            ToolbarItem(placement: .automatic) {
                                 Button("Done") { showingVehicleConfiguration = false }
                             }
                         }
@@ -123,7 +125,7 @@ struct VehicleTitleView: View {
                 NavigationView {
                     TripDetailsView(bbVehicle: bbVehicle)
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
+                            ToolbarItem(placement: .automatic) {
                                 Button("Done") { showingTripDetails = false }
                             }
                         }
@@ -145,8 +147,17 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var collapsedTitleCard: some View {
-        Menu {
-            contextMenuContent
+        // Using Button + .contextMenu (rather than Menu + primaryAction)
+        // because macCatalyst's runtime strips complex custom content
+        // from Menu labels — on Mac the expanded card would end up with
+        // a single-line title instead of the full VStack of status rows
+        // we actually built. Button renders the label verbatim on every
+        // platform; the long-press menu is attached via .contextMenu
+        // and works identically (right-click on Mac, long-press on iOS).
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -168,10 +179,10 @@ struct VehicleTitleView: View {
             .frame(height: buttonHeight, alignment: .leading)
             .vehicleCardGlassEffect()
             .contentShape(Rectangle())
-        } primaryAction: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                isExpanded.toggle()
-            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            contextMenuContent
         }
     }
 
@@ -193,8 +204,12 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var expandedTitleCard: some View {
-        Menu {
-            contextMenuContent
+        // Same Button + .contextMenu pattern as the collapsed card — see
+        // comment on `collapsedTitleCard` for why we avoid SwiftUI Menu.
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
@@ -211,10 +226,10 @@ struct VehicleTitleView: View {
                     Spacer()
 
                     // Reserve space for the refresh button overlay — the
-                    // button itself is rendered by `expandedLayout`'s ZStack
-                    // above this view, not as a child of the Menu (so it can
-                    // receive its own taps without firing the Menu's
-                    // primaryAction / expand-toggle).
+                    // button itself is rendered by `expandedLayout`'s
+                    // ZStack above this view, not as a child here, so it
+                    // can receive its own taps without firing the
+                    // expand-toggle.
                     Color.clear
                         .frame(width: buttonHeight, height: buttonHeight)
                 }
@@ -225,10 +240,10 @@ struct VehicleTitleView: View {
             .vehicleCardGlassEffect()
             .glassEffectUnion(id: "headerGroup", namespace: glassNs)
             .contentShape(Rectangle())
-        } primaryAction: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                isExpanded.toggle()
-            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            contextMenuContent
         }
     }
 

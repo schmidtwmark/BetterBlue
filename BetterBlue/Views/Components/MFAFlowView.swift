@@ -256,7 +256,9 @@ struct MFAMethodPickerView: View {
             }
         }
         .navigationTitle("Verify Account")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -281,7 +283,9 @@ struct MFAVerificationView: View {
                     .foregroundColor(.secondary)
 
                 TextField("Verification Code", text: $state.code)
+                    #if os(iOS)
                     .keyboardType(.numberPad)
+                    #endif
                     .textContentType(.oneTimeCode)
                     .focused($codeFieldFocused)
                     .onSubmit {
@@ -319,7 +323,9 @@ struct MFAVerificationView: View {
             }
         }
         .navigationTitle("Enter Code")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .navigationBarBackButtonHidden(!state.canChangeMethod)
         .toolbar {
             if !state.canChangeMethod {
