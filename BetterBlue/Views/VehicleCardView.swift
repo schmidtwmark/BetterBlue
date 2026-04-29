@@ -69,84 +69,84 @@ struct VehicleCardView: View {
         // I would love to use a GlassEffectContainer to synchronize the colors of the glass buttons, but in 26.1 apple broke menu morphing in GlassEffectContainers
         // I could spend some time reimplementing menus to perform the transition (gross) but this is fine for now
         // Feedback FB22549321 contains details for this issue
-//        GlassEffectContainer {
+        GlassEffectContainer {
         // Guard so that a detached (post-delete) `BBVehicle` can't be
         // rendered — any persisted-property access would trap. Short-
         // circuits all child views too (VehicleTitleView, LockButton,
         // ClimateButton, ChargingButton, EVRangeDisplayCard).
-        PersistentModelGuard(model: bbVehicle) {
-            VStack(spacing: 8) {
-                Spacer(minLength: 0)
-                // Error message card (only show if there's an error)
-                if let errorMessage {
-                    Button {
-                        if let apiError = lastAPIError, apiError.errorType == .requiresMFA {
-                            // Verification flow has its own dedicated sheet.
-                            handleMFAError(apiError)
-                        } else if lastActionError != nil {
-                            // Everything else surfaces the structured error
-                            // details (action + type + collapsible raw
-                            // response) rather than the full HTTP log dump.
-                            showingErrorDetails = true
-                        }
-                    } label: {
-                        HStack {
-                            Text(errorMessage)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .tint(.blue)
-                            Spacer()
-                            // Chevron always shows when we can drill in:
-                            // either the MFA flow or the error-details sheet.
-                            if lastAPIError?.errorType == .requiresMFA || lastActionError != nil {
-                                Image(systemName: "chevron.right")
+            PersistentModelGuard(model: bbVehicle) {
+                VStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    // Error message card (only show if there's an error)
+                    if let errorMessage {
+                        Button {
+                            if let apiError = lastAPIError, apiError.errorType == .requiresMFA {
+                                // Verification flow has its own dedicated sheet.
+                                handleMFAError(apiError)
+                            } else if lastActionError != nil {
+                                // Everything else surfaces the structured error
+                                // details (action + type + collapsible raw
+                                // response) rather than the full HTTP log dump.
+                                showingErrorDetails = true
+                            }
+                        } label: {
+                            HStack {
+                                Text(errorMessage)
                                     .font(.caption)
-                                    .foregroundColor(.red.opacity(0.7))
+                                    .foregroundColor(.red)
+                                    .tint(.blue)
+                                Spacer()
+                                // Chevron always shows when we can drill in:
+                                // either the MFA flow or the error-details sheet.
+                                if lastAPIError?.errorType == .requiresMFA || lastActionError != nil {
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.red.opacity(0.7))
+                                }
                             }
                         }
+                        .padding()
+                        .vehicleCardGlassEffect()
                     }
-                    .padding()
-                    .vehicleCardGlassEffect()
-                }
-
-                VehicleTitleView(
-                    bbVehicle: bbVehicle,
-                    bbVehicles: bbVehicles,
-                    onVehicleSelected: onVehicleSelected,
-                    accounts: accounts,
-                    transition: transition,
-                    onRefresh: {
-                        // Clear errors on successful refresh from title view
-                        await MainActor.run {
-                            errorMessage = nil
-                            lastAPIError = nil
-                            lastActionError = nil
-                            onSuccessfulRefresh?()
+                    
+                    VehicleTitleView(
+                        bbVehicle: bbVehicle,
+                        bbVehicles: bbVehicles,
+                        onVehicleSelected: onVehicleSelected,
+                        accounts: accounts,
+                        transition: transition,
+                        onRefresh: {
+                            // Clear errors on successful refresh from title view
+                            await MainActor.run {
+                                errorMessage = nil
+                                lastAPIError = nil
+                                lastActionError = nil
+                                onSuccessfulRefresh?()
+                            }
                         }
+                    )
+                    
+                    // Vehicle status info
+                    // EV Range Display (if available)
+                    if let evStatus = safeEvStatus {
+                        EVRangeDisplayCard(evStatus: evStatus)
                     }
-                )
-
-                // Vehicle status info
-                // EV Range Display (if available)
-                if let evStatus = safeEvStatus {
-                    EVRangeDisplayCard(evStatus: evStatus)
+                    
+                    // Charging Control Button (if EV)
+                    if safeEvStatus != nil {
+                        ChargingButton(bbVehicle: bbVehicle, transition: transition)
+                    }
+                    
+                    // Gas Range Card (if available)
+                    if let gasRange = safeGasRange {
+                        GasRangeCardView(gasRange: gasRange)
+                    }
+                    
+                    // Controls Row - Lock and Climate buttons side by side
+                    LockButton(bbVehicle: bbVehicle, transition: transition)
+                    ClimateButton(bbVehicle: bbVehicle, transition: transition)
                 }
-
-                // Charging Control Button (if EV)
-                if safeEvStatus != nil {
-                    ChargingButton(bbVehicle: bbVehicle, transition: transition)
-                }
-
-                // Gas Range Card (if available)
-                if let gasRange = safeGasRange {
-                    GasRangeCardView(gasRange: gasRange)
-                }
-
-                // Controls Row - Lock and Climate buttons side by side
-                LockButton(bbVehicle: bbVehicle, transition: transition)
-                ClimateButton(bbVehicle: bbVehicle, transition: transition)
             }
-//        }
         .padding(.horizontal)
         .task {
             await refreshStatus()

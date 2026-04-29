@@ -12,6 +12,12 @@ enum DeviceType: String, Codable, CaseIterable {
     case iPhone
     case iPad
     case mac = "Mac"
+    // `.menuBar` lands in main as a forward-compat declaration only — the
+    // Mac menu bar app itself lives on the `mac-app` branch. We keep the
+    // case here so SwiftData/CloudKit can decode any `BBHTTPLog` rows that
+    // were synced from a device running the menu bar build; without it,
+    // loading those rows crashes the HTTP Log view.
+    case menuBar = "Menu Bar"
     case widget = "Widget"
     case watch = "Watch"
     case liveActivity = "Live Activity"
@@ -21,6 +27,7 @@ enum DeviceType: String, Codable, CaseIterable {
         case .iPhone: return "iPhone"
         case .iPad: return "iPad"
         case .mac: return "Mac"
+        case .menuBar: return "Menu Bar"
         case .widget: return "Widget"
         case .watch: return "Watch"
         case .liveActivity: return "Live Activity"

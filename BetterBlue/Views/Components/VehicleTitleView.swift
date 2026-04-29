@@ -145,8 +145,10 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var collapsedTitleCard: some View {
-        Menu {
-            contextMenuContent
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -168,10 +170,9 @@ struct VehicleTitleView: View {
             .frame(height: buttonHeight, alignment: .leading)
             .vehicleCardGlassEffect()
             .contentShape(Rectangle())
-        } primaryAction: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                isExpanded.toggle()
-            }
+        }
+        .contextMenu {
+            contextMenuContent
         }
     }
 
@@ -193,8 +194,10 @@ struct VehicleTitleView: View {
 
     @ViewBuilder
     private var expandedTitleCard: some View {
-        Menu {
-            contextMenuContent
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                isExpanded.toggle()
+            }
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
@@ -225,10 +228,8 @@ struct VehicleTitleView: View {
             .vehicleCardGlassEffect()
             .glassEffectUnion(id: "headerGroup", namespace: glassNs)
             .contentShape(Rectangle())
-        } primaryAction: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                isExpanded.toggle()
-            }
+        }.contextMenu {
+            contextMenuContent
         }
     }
 
@@ -287,11 +288,15 @@ struct VehicleTitleView: View {
             }
 
             // User tapped refresh: force a real-time poll so the response
-            // reflects the vehicle's current state, not the backend cache.
+            // reflects the vehicle's current state, not the backend
+            // cache. Also force a vehicle list refresh so any metadata
+            // that's drifted (model name, fuelType, vehicleKey, odometer)
+            // is brought up to date in the same gesture.
             try await account.fetchAndUpdateVehicleStatus(
                 for: bbVehicle,
                 modelContext: modelContext,
-                cached: false
+                cached: false,
+                forceVehicleListRefresh: true
             )
 
             await MainActor.run {

@@ -22,7 +22,8 @@ struct APIClientFactoryConfiguration {
         modelContext: ModelContext,
         logSink: HTTPLogSink? = nil,
         rememberMeToken: String? = nil,
-        deviceId: String? = nil
+        deviceId: String? = nil,
+        onRememberMeTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil
     ) {
         apiConfiguration = APIClientConfiguration(
             region: region,
@@ -33,7 +34,8 @@ struct APIClientFactoryConfiguration {
             accountId: accountId,
             logSink: logSink,
             rememberMeToken: rememberMeToken,
-            deviceId: deviceId
+            deviceId: deviceId,
+            onRememberMeTokenRotated: onRememberMeTokenRotated
         )
         self.modelContext = modelContext
     }
@@ -61,7 +63,12 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
     // Use BetterBlueKit factory for real API clients
     BBLogger.info(.api, "APIClientFactory: Creating \(effectiveBrand.displayName) API client for \(configuration.apiConfiguration.region.rawValue)")
 
-    // Create a configuration with the effective brand
+    // Create a configuration with the effective brand. Forward every
+    // field from the caller's configuration — `deviceId`, `redactPII`,
+    // and the rotation callback are all load-bearing for Kia session
+    // stability and were silently dropped by an earlier version of
+    // this code, which caused Kia to treat each `initialize()` as a
+    // brand-new device and demand MFA again.
     let effectiveConfiguration = APIClientConfiguration(
         region: configuration.apiConfiguration.region,
         brand: effectiveBrand,
@@ -70,7 +77,10 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         pin: configuration.apiConfiguration.pin,
         accountId: configuration.apiConfiguration.accountId,
         logSink: configuration.apiConfiguration.logSink,
-        rememberMeToken: configuration.apiConfiguration.rememberMeToken
+        rememberMeToken: configuration.apiConfiguration.rememberMeToken,
+        redactPII: configuration.apiConfiguration.redactPII,
+        deviceId: configuration.apiConfiguration.deviceId,
+        onRememberMeTokenRotated: configuration.apiConfiguration.onRememberMeTokenRotated
     )
 
     do {

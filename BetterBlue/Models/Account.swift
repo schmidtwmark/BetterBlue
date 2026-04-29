@@ -21,6 +21,12 @@ class BBAccount {
     var rememberMeToken: String?
     var serializedAuthToken: String?
     var deviceId: String?
+    /// Timestamp of the most recent successful `fetchVehicles` call.
+    /// Used by `fetchAndUpdateVehicleStatus` to decide whether the
+    /// vehicle list (model name, fuelType, generation, vehicleKey,
+    /// odometer) is stale enough to refetch alongside the next status
+    /// request. Nil means it's never been fetched on this device.
+    var lastVehiclesFetch: Date?
 
     @Relationship(deleteRule: .cascade) var vehicles: [BBVehicle]? = []
 
@@ -126,6 +132,33 @@ extension BBAccount {
                 deviceId = UUID().uuidString.uppercased()
             }
 
+            // Hand the API client a way to write back any rotated
+            // rmToken. We can't capture `self` directly — `BBAccount`
+            // is a SwiftData @Model and the closure outlives this
+            // method — so the callback re-fetches the account by id
+            // and persists the new value through the same context.
+            let accountId = id
+            let onRotate: @MainActor @Sendable (String) -> Void = { newToken in
+                let descriptor = FetchDescriptor<BBAccount>(
+                    predicate: #Predicate { $0.id == accountId }
+                )
+                guard let account = try? modelContext.fetch(descriptor).first else {
+                    BBLogger.warning(
+                        .auth,
+                        "BBAccount: rmToken rotated but matching account not found"
+                    )
+                    return
+                }
+                guard account.rememberMeToken != newToken else { return }
+                account.rememberMeToken = newToken
+                do {
+                    try modelContext.save()
+                    BBLogger.info(.auth, "BBAccount: persisted rotated rmToken")
+                } catch {
+                    BBLogger.error(.auth, "BBAccount: failed to save rotated rmToken: \(error)")
+                }
+            }
+
             let configuration = APIClientFactoryConfiguration(
                 region: regionEnum,
                 brand: brandEnum,
@@ -136,7 +169,8 @@ extension BBAccount {
                 modelContext: modelContext,
                 logSink: logSink,
                 rememberMeToken: rememberMeToken,
-                deviceId: deviceId
+                deviceId: deviceId,
+                onRememberMeTokenRotated: onRotate
             )
             api = createAPIClient(configuration: configuration)
         }
@@ -218,9 +252,29 @@ extension BBAccount {
     }
 
     /// Determines if an error should trigger a full re-authentication.
-    /// All API errors except MFA-related ones should invalidate the session.
+    ///
+    /// Only errors that genuinely indicate the session is no longer
+    /// valid should clear the auth token and trigger a fresh `login()`
+    /// (which on Kia means another `authUser` call, and after enough
+    /// of those Kia's anti-fraud logic challenges the rmToken and
+    /// forces MFA again). Transient failures — server errors,
+    /// concurrent-request rejections, network blips — are surfaced to
+    /// the caller without touching the session.
     private func shouldReauthenticate(for error: APIError) -> Bool {
-        error.errorType != .requiresMFA
+        switch error.errorType {
+        case .invalidCredentials,
+             .invalidVehicleSession,
+             .failedRetryLogin,
+             .kiaInvalidRequest:
+            return true
+        case .requiresMFA,
+             .invalidPin,
+             .serverError,
+             .concurrentRequest,
+             .regionNotSupported,
+             .general:
+            return false
+        }
     }
 
     @MainActor
@@ -316,12 +370,52 @@ extension BBAccount {
         return status
     }
 
+    /// Maximum age of the cached vehicle list before
+    /// `fetchAndUpdateVehicleStatus` will re-fetch vehicles alongside
+    /// the requested status. Two hours covers the day-to-day staleness
+    /// (model name, fuelType, generation, vehicleKey, odometer) without
+    /// adding meaningful traffic — vehicle metadata barely changes.
+    static let vehicleListMaxAge: TimeInterval = 2 * 3600
+
     @MainActor
     func fetchAndUpdateVehicleStatus(
         for vehicle: BBVehicle,
         modelContext: ModelContext,
-        cached: Bool = true
+        cached: Bool = true,
+        forceVehicleListRefresh: Bool = false
     ) async throws {
+        // Decide whether to also refresh the vehicle list. Manual user
+        // refreshes always do (`forceVehicleListRefresh: true`). Background
+        // / widget reads only do when the list is older than the threshold.
+        let isStale: Bool = {
+            guard let last = lastVehiclesFetch else { return true }
+            return Date().timeIntervalSince(last) > Self.vehicleListMaxAge
+        }()
+
+        if forceVehicleListRefresh || isStale {
+            do {
+                BBLogger.info(
+                    .api,
+                    "BBAccount: refreshing vehicle list before status (force=\(forceVehicleListRefresh), stale=\(isStale))"
+                )
+                try await loadVehicles(modelContext: modelContext)
+            } catch {
+                if forceVehicleListRefresh {
+                    // The user explicitly asked for fresh data — don't
+                    // silently skip past a list-fetch failure.
+                    throw error
+                } else {
+                    // Best-effort on automatic paths: log and proceed
+                    // with a stale list so the user still gets a status
+                    // update from the periodic poll.
+                    BBLogger.warning(
+                        .api,
+                        "BBAccount: vehicle list refresh failed during background poll, falling back to cached list: \(error)"
+                    )
+                }
+            }
+        }
+
         let status = try await fetchVehicleStatus(for: vehicle, modelContext: modelContext, cached: cached)
         vehicle.updateStatus(with: status)
     }
@@ -383,6 +477,10 @@ extension BBAccount {
             }
             self.vehicles?.append(newVehicle)
         }
+
+        // Mark the list as fresh — drives the staleness check in
+        // `fetchAndUpdateVehicleStatus(forceVehicleListRefresh:)`.
+        lastVehiclesFetch = Date()
 
         do {
             try modelContext.save()

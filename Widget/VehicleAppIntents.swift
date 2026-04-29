@@ -143,11 +143,15 @@ struct RefreshVehicleStatusIntent: AppIntent {
             throw IntentError.vehicleNotFound
         }
 
-        // Explicit user-invoked refresh intent → force real-time poll.
+        // Explicit user-invoked refresh intent → force real-time poll
+        // AND a vehicle list refresh so a Siri / Control Center refresh
+        // catches any metadata drift just like the in-app refresh
+        // button does.
         try await account.fetchAndUpdateVehicleStatus(
             for: bbVehicle,
             modelContext: context,
-            cached: false
+            cached: false,
+            forceVehicleListRefresh: true
         )
 
         let unit = AppSettings.shared.preferredDistanceUnit

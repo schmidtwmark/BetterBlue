@@ -87,10 +87,8 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var statusButton: some View {
-        Menu {
+        statusButtonLabel.contextMenu {
             actionMenuContent
-        } label: {
-            statusButtonLabel
         }
     }
 
@@ -129,12 +127,7 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var quickActionButton: some View {
-        Menu {
-            actionMenuContent
-        } label: {
-            quickActionButtonLabel
-        }
-        primaryAction: {
+        Button {
             if inProgressAction != nil {
                 cancelCurrentOperation()
             } else {
@@ -142,6 +135,10 @@ struct VehicleControlButton: View {
                     await performAction(action: currentAction)
                 }
             }
+        } label: {
+            quickActionButtonLabel
+        }.contextMenu {
+            actionMenuContent
         }
     }
 
