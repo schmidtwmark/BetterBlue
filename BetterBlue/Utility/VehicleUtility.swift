@@ -30,7 +30,7 @@ extension BBVehicle {
             generation: generation,
             odometer: odometer,
             vehicleKey: vehicleKey,
-            ccs2Supported: ccs2Supported
+            marketOptions: marketOptions
         )
     }
 }

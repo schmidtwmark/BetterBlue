@@ -111,19 +111,13 @@ extension BBAccount {
             BBLogger.info(.auth, "BBAccount: MFA is pending, re-throwing MFA error")
             throw mfaError
         }
-
+        
         // If a specific device type is requested, always reinitialize the API client
         if api == nil || deviceType != nil {
             let logSink = if let deviceType {
                 HTTPLogSinkManager.shared.createLogSink(for: deviceType)
             } else {
                 HTTPLogSinkManager.shared.createLogSink()
-            }
-
-            // Generate a stable device ID for Kia accounts so the rmToken stays valid
-            // across API client re-initializations
-            if deviceId == nil {
-                deviceId = UUID().uuidString.uppercased()
             }
 
             let configuration = APIClientFactoryConfiguration(
@@ -153,6 +147,11 @@ extension BBAccount {
             guard let api else {
                 throw APIError(message: "API client not initialized")
             }
+            // Generate a stable device ID (UUID) or do region/brand specific implementation
+            if deviceId == nil {
+                deviceId = try await api.registerDevice()
+            }
+
             authToken = try await api.login()
             // Clear any pending MFA error on successful login
             pendingMFAError = nil

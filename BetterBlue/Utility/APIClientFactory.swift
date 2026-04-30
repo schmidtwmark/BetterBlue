@@ -70,7 +70,8 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         pin: configuration.apiConfiguration.pin,
         accountId: configuration.apiConfiguration.accountId,
         logSink: configuration.apiConfiguration.logSink,
-        rememberMeToken: configuration.apiConfiguration.rememberMeToken
+        rememberMeToken: configuration.apiConfiguration.rememberMeToken,
+        deviceId: configuration.apiConfiguration.deviceId
     )
 
     do {

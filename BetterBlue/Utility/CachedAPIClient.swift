@@ -67,6 +67,11 @@ class CachedAPIClient: APIClientProtocol {
         return try await task.value
     }
 
+    func registerDevice() async throws -> String? {
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding registerDevice request")
+        return try await underlyingClient.registerDevice()
+    }
+
     func fetchVehicles(authToken: AuthToken) async throws -> [Vehicle] {
         let requestKey = RequestKey.fetchVehicles
         let cacheKey = CacheKey.fetchVehicles
