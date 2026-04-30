@@ -48,6 +48,7 @@ class BBVehicle {
     var accountId: UUID = UUID()
     var fuelTypeRaw: String = FuelType.gas.rawValue
     var generation: Int = 0
+    var ccs2Supported: Bool = false
     var odometer: Distance = Distance(length: 0, units: .miles)
 
     // VehicleStatus fields (all optional since status might not be fetched)
@@ -108,6 +109,7 @@ class BBVehicle {
         accountId = vehicle.accountId
         fuelType = vehicle.fuelType
         generation = vehicle.generation
+        ccs2Supported = vehicle.ccs2Supported
         odometer = vehicle.odometer
 
         // Initialize status fields as nil
@@ -355,7 +357,7 @@ extension BBVehicle {
 
 extension BBVehicle: Encodable {
     enum CodingKeys: String, CodingKey {
-        case id, vin, regId, model, accountId, fuelTypeRaw, generation, odometer
+        case id, vin, regId, model, accountId, fuelTypeRaw, generation, ccs2Supported, odometer
         case lastUpdated, syncDate, gasRange, evStatus, location, lockStatus, climateStatus
         case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
@@ -374,6 +376,7 @@ extension BBVehicle: Encodable {
         try container.encode(accountId, forKey: .accountId)
         try container.encode(fuelTypeRaw, forKey: .fuelTypeRaw)
         try container.encode(generation, forKey: .generation)
+        try container.encode(ccs2Supported, forKey: .ccs2Supported)
         try container.encode(odometer, forKey: .odometer)
 
         // Status fields
