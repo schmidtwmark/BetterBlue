@@ -136,6 +136,20 @@ class BBVehicle {
 // MARK: - Status Management
 
 extension BBVehicle {
+    /// Returns true when `to` is more specific than `from` along the
+    /// `gas → electric → phev` axis. Used by `updateStatus` to one-way
+    /// upgrade a misclassified `fuelType` once a status payload reveals
+    /// the real powertrain — without ever demoting (e.g. a PHEV momentarily
+    /// returning evStatus only shouldn't flip back to electric).
+    fileprivate func isFuelTypeUpgrade(from: FuelType, to: FuelType) -> Bool {
+        switch (from, to) {
+        case (.gas, .electric), (.gas, .phev), (.electric, .phev):
+            return true
+        default:
+            return false
+        }
+    }
+
     @MainActor
     func updateStatus(with status: VehicleStatus) {
         // Wake up any waiting status change tasks (cancel them so they can restart immediately)
@@ -145,9 +159,41 @@ extension BBVehicle {
         lastUpdated = status.lastUpdated
         syncDate = status.syncDate
 
-        // Update gas range and EV status, keeping existing values if new ones aren't provided
-        // PHEVs can have both gasRange and evStatus simultaneously
-        if [.gas, .phev].contains(fuelType),  let gasRange = status.gasRange {
+        // ----- Self-heal `fuelType` from status payload shape -----
+        //
+        // Borrowed from `hyundai_kia_connect_api`'s `KiaUvoApiUSA`
+        // `_update_vehicle_properties`: when the vehicles-list parser
+        // can't authoritatively classify the powertrain (Kia USA only
+        // confirms `fuelType == 4` as EV; everything else falls into
+        // `.gas` as a conservative default), the status response's
+        // structure is the source of truth.
+        //
+        //   - `evStatus` present                ⇒ has a high-voltage battery
+        //   - `evStatus` + `gasRange` present   ⇒ PHEV
+        //   - `evStatus` only                   ⇒ pure EV
+        //   - `gasRange` only                   ⇒ pure ICE
+        //
+        // We only ever UPGRADE specificity (gas → electric → phev) so
+        // a one-off missing field in a status response can't demote a
+        // vehicle we already know is a PHEV back to electric or gas.
+        let inferredType: FuelType?
+        switch (status.evStatus, status.gasRange) {
+        case (.some, .some): inferredType = .phev
+        case (.some, .none): inferredType = .electric
+        case (.none, .some): inferredType = .gas
+        case (.none, .none): inferredType = nil
+        }
+        if let inferredType, isFuelTypeUpgrade(from: fuelType, to: inferredType) {
+            BBLogger.info(
+                .api,
+                "BBVehicle: self-heal fuelType \(fuelType.rawValue) → \(inferredType.rawValue) for VIN \(vin) based on status payload shape"
+            )
+            fuelType = inferredType
+        }
+
+        // Update gas range and EV status, keeping existing values if new ones aren't provided.
+        // PHEVs can have both gasRange and evStatus simultaneously.
+        if [.gas, .phev].contains(fuelType), let gasRange = status.gasRange {
             self.gasRange = gasRange
         }
         if [.electric, .phev].contains(fuelType), let evStatus = status.evStatus {
