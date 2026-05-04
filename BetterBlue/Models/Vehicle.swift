@@ -90,6 +90,8 @@ class BBVehicle {
         set { fuelTypeRaw = newValue.rawValue }
     }
 
+    var marketOptions: VehicleMarketOptions = VehicleMarketOptions.generic
+
     // Optional vehicle key for Kia vehicles
     @Transient var vehicleKey: String?
 
@@ -109,6 +111,7 @@ class BBVehicle {
         fuelType = vehicle.fuelType
         generation = vehicle.generation
         odometer = vehicle.odometer
+        marketOptions = vehicle.marketOptions
 
         // Initialize status fields as nil
         lastUpdated = nil
@@ -355,7 +358,7 @@ extension BBVehicle {
 
 extension BBVehicle: Encodable {
     enum CodingKeys: String, CodingKey {
-        case id, vin, regId, model, accountId, fuelTypeRaw, generation, odometer
+        case id, vin, regId, model, accountId, fuelTypeRaw, generation, odometer, marketOptions
         case lastUpdated, syncDate, gasRange, evStatus, location, lockStatus, climateStatus
         case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
@@ -375,6 +378,7 @@ extension BBVehicle: Encodable {
         try container.encode(fuelTypeRaw, forKey: .fuelTypeRaw)
         try container.encode(generation, forKey: .generation)
         try container.encode(odometer, forKey: .odometer)
+        try container.encode(marketOptions, forKey: .marketOptions)
 
         // Status fields
         try container.encodeIfPresent(lastUpdated, forKey: .lastUpdated)

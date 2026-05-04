@@ -551,6 +551,7 @@ struct FakeVehicleDetailView: View {
             let testAccount = BBAccount(
                 username: "test@example.com",
                 password: "password",
+                refreshToken: "",
                 pin: "1234",
                 brand: .fake,
                 region: .usa

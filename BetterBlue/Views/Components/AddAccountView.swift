@@ -53,6 +53,7 @@ struct AddAccountView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var username = ""
     @State private var password = ""
+    @State private var refreshToken = ""
     @State private var pin = ""
     @State private var selectedBrand: Brand = .hyundai
     @State private var selectedRegion: Region = .usa
@@ -79,7 +80,7 @@ struct AddAccountView: View {
     @FocusState private var focusedField: AddAccountField?
 
     enum AddAccountField: CaseIterable {
-        case username, password, pin
+        case username, password, pin, refreshToken
     }
 
     private var availableBrands: [Brand] {
@@ -240,6 +241,22 @@ struct AddAccountView: View {
                 }
             }
 
+            if selectedBrand == .hyundai && selectedRegion == .europe {
+                HStack {
+                    Text("Refresh Token")
+                    Spacer()
+                    SecureField("", text: $refreshToken)
+                        .multilineTextAlignment(.trailing)
+                        .focused($focusedField, equals: .refreshToken)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            Task {
+                                await addAccount()
+                            }
+                        }
+                }
+            }
+
         } header: {
             Text("Account Information")
         } footer: {
@@ -298,6 +315,7 @@ struct AddAccountView: View {
         let bbAccount = BBAccount(
             username: username,
             password: password,
+            refreshToken: refreshToken,
             pin: pin,
             brand: selectedBrand,
             region: selectedRegion

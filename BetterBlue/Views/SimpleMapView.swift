@@ -81,6 +81,7 @@ struct VehicleMapMarker: View {
             let testAccount = BBAccount(
                 username: "test@example.com",
                 password: "password",
+                refreshToken: "",
                 pin: "1234",
                 brand: .hyundai,
                 region: .usa

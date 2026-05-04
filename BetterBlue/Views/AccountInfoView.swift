@@ -23,6 +23,7 @@ struct AccountInfoView: View {
     @State private var successMessage: String?
     @State private var showingPasswordDialog = false
     @State private var showingPinDialog = false
+    @State private var doTokenDeletion = false
     @State private var fakeVehicles: [BBVehicle] = []
     @Namespace private var fallbackTransition
 
@@ -78,6 +79,14 @@ struct AccountInfoView: View {
                     }
                     .matchedTransitionSource(
                         id: "change-pin",
+                        in: transition ?? fallbackTransition,
+                    )
+                }
+                if account.brandEnum == .hyundai && account.regionEnum == .europe {
+                    Button("Delete Refresh Token"){
+                        doTokenDeletion.toggle()
+                    }.matchedTransitionSource(
+                        id: "delete-refresh-token",
                         in: transition ?? fallbackTransition,
                     )
                 }
@@ -177,6 +186,14 @@ struct AccountInfoView: View {
             }
             .disabled(newPin.isEmpty)
         }
+        .alert("Delete Refresh Token", isPresented: $doTokenDeletion) {
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                Task {
+                    await deleteRefreshToken()
+                }
+            }
+        }
         .onAppear {
             fakeVehicles = account.safeVehicles
         }
@@ -195,6 +212,7 @@ struct AccountInfoView: View {
             let testAccount = BBAccount(
                 username: account.username,
                 password: newPassword,
+                refreshToken: "",
                 pin: account.pin,
                 brand: account.brandEnum,
                 region: account.regionEnum,
@@ -229,6 +247,24 @@ struct AccountInfoView: View {
         }
     }
 
+    private func deleteRefreshToken() async {
+        isLoading = true
+        saveError = nil
+
+            await MainActor.run {
+                BBAccount.deleteRefreshToken(account, modelContext: modelContext)
+                isLoading = false
+                saveError = nil
+                successMessage = "Refresh Token removed successfully"
+                doTokenDeletion = false
+
+                // Auto-dismiss success message after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    successMessage = nil
+                }
+            }
+    }
+
     private func savePin() async {
         guard !newPin.isEmpty else { return }
 
@@ -242,6 +278,7 @@ struct AccountInfoView: View {
             let testAccount = BBAccount(
                 username: account.username,
                 password: account.password,
+                refreshToken: account.refreshToken,
                 pin: newPin,
                 brand: account.brandEnum,
                 region: account.regionEnum,
@@ -283,6 +320,7 @@ struct AccountInfoView: View {
             let testAccount = BBAccount(
                 username: "test@example.com",
                 password: "password",
+                refreshToken: "",
                 pin: "1234",
                 brand: .hyundai,
                 region: .usa
