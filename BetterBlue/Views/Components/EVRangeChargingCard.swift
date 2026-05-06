@@ -148,7 +148,8 @@ struct EVRangeChargingCard: View {
                 isCharging: isCharging,
                 chargeSpeed: chargeSpeed,
                 chargeTimeRemaining: chargeTimeRemaining,
-                targetSOC: evStatus?.currentTargetSOC
+                targetSOC: evStatus?.currentTargetSOC,
+                chargingColor: bbVehicle.chargingColor
             )
 
             // Bottom row: Status messages

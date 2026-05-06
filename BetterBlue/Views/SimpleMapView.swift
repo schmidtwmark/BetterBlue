@@ -53,7 +53,7 @@ struct VehicleMapMarker: View {
             )
         } label: {
             Circle()
-                .fill(Color.blue)
+                .fill(vehicle.primaryColor)
                 .overlay(
                     Circle()
                         .stroke(Color.white, lineWidth: 3),

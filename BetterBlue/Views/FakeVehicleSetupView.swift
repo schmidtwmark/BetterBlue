@@ -283,27 +283,31 @@ struct FakeVehicleDetailView: View {
 
     private var debugFailureSection: some View {
         let bindings = debugBindings()
-        return Section {
-            Toggle("Login", isOn: bindings.login)
-            Toggle("Credential Validation", isOn: bindings.credential)
-            Toggle("Vehicle Fetch", isOn: bindings.vehicleFetch)
-            Toggle("Status Fetch", isOn: bindings.statusFetch)
-            Toggle("PIN Validation", isOn: bindings.pinValidation)
+        return Group {
+            Section {
+                Toggle("Login", isOn: bindings.login)
+                Toggle("Credential Validation", isOn: bindings.credential)
+                Toggle("Vehicle Fetch", isOn: bindings.vehicleFetch)
+                Toggle("Status Fetch", isOn: bindings.statusFetch)
+                Toggle("PIN Validation", isOn: bindings.pinValidation)
+            } header: {
+                Text("Login Flow Failures")
+            }
 
-            Divider()
-
-            Toggle("Lock Command", isOn: bindings.lock)
-            Toggle("Unlock Command", isOn: bindings.unlock)
-            Toggle("Start Climate", isOn: bindings.startClimate)
-            Toggle("Stop Climate", isOn: bindings.stopClimate)
-            Toggle("Start Charge", isOn: bindings.startCharge)
-            Toggle("Stop Charge", isOn: bindings.stopCharge)
-        } header: {
-            Text("Debug: Simulate Failures")
-        } footer: {
-            Text("Turn a toggle on, then perform the matching action. The fake API will throw — you'll see the updated error UI (headline, type, technical details disclosure).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Section {
+                Toggle("Lock Command", isOn: bindings.lock)
+                Toggle("Unlock Command", isOn: bindings.unlock)
+                Toggle("Start Climate", isOn: bindings.startClimate)
+                Toggle("Stop Climate", isOn: bindings.stopClimate)
+                Toggle("Start Charge", isOn: bindings.startCharge)
+                Toggle("Stop Charge", isOn: bindings.stopCharge)
+            } header: {
+                Text("Command Failures")
+            } footer: {
+                Text("Turn a toggle on, then perform the matching action. The fake API will throw — you'll see the updated error UI (headline, type, technical details disclosure).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

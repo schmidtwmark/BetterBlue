@@ -184,22 +184,38 @@ struct WatchVehicleCarouselView: View {
     }
 
     var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(Array(vehicles.enumerated()), id: \.element.id) { _, vehicle in
+        Group {
+            if vehicles.count <= 1 {
+                // Only one vehicle: skip the horizontal pager entirely so
+                // the inner ScrollView is the outermost ScrollView and
+                // therefore gets the digital crown. Otherwise the crown
+                // would have nothing to do (a one-page horizontal pager
+                // can't scroll anywhere).
+                if let vehicle = vehicles.first {
                     WatchVehicleView(vehicle: vehicle)
-                        .containerRelativeFrame(.horizontal)
+                }
+            } else {
+                // Multi-vehicle: keep the horizontal paging carousel —
+                // its drag-tracked offset drives the smooth gradient
+                // interpolation between vehicle pages.
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(Array(vehicles.enumerated()), id: \.element.id) { _, vehicle in
+                            WatchVehicleView(vehicle: vehicle)
+                                .containerRelativeFrame(.horizontal)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .onScrollGeometryChange(for: Double.self) { geometry in
+                    let pageWidth = geometry.containerSize.width
+                    let offset = geometry.contentOffset.x / pageWidth
+                    return offset
+                } action: { offset, _ in
+                    scrollOffset = offset
                 }
             }
-            .scrollTargetLayout()
-        }
-        .scrollTargetBehavior(.paging)
-        .onScrollGeometryChange(for: Double.self) { geometry in
-            let pageWidth = geometry.containerSize.width
-            let offset = geometry.contentOffset.x / pageWidth
-            return offset
-        } action: { offset, _ in
-            scrollOffset = offset
         }
         .background(
             LinearGradient(

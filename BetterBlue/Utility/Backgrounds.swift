@@ -86,6 +86,19 @@ extension BBVehicle {
                 Color(red: 0.95, green: 0.95, blue: 0.95),
                 Color(red: 0.98, green: 0.98, blue: 0.98)
             ],
+        ),
+        // Tuned to visually match the dark-mode appearance of the
+        // glass-effect quick-action buttons (`vehicleCardGlassEffect`).
+        // Solid (not material) since widget backgrounds can't render
+        // SwiftUI materials — the gradient nudges from `systemGray6`-ish
+        // to `systemGray5`-ish so the surface still has subtle depth.
+        BackgroundOption(
+            name: "darkGlass",
+            displayName: "Dark Glass",
+            gradient: [
+                Color(red: 0.11, green: 0.11, blue: 0.12),
+                Color(red: 0.17, green: 0.17, blue: 0.18)
+            ],
         )
     ]
 

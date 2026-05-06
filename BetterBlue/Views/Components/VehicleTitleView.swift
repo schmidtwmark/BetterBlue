@@ -251,7 +251,7 @@ struct VehicleTitleView: View {
                         .foregroundColor(.green)
                 } else {
                     Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.blue)
+                        .foregroundColor(bbVehicle.primaryColor)
                 }
             }
             .frame(width: buttonHeight, height: buttonHeight)

@@ -129,7 +129,7 @@ struct VehicleCardView: View {
                     // Vehicle status info
                     // EV Range Display (if available)
                     if let evStatus = safeEvStatus {
-                        EVRangeDisplayCard(evStatus: evStatus)
+                        EVRangeDisplayCard(evStatus: evStatus, chargingColor: bbVehicle.chargingColor)
                     }
                     
                     // Charging Control Button (if EV)

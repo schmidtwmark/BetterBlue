@@ -10,6 +10,10 @@ import SwiftUI
 
 struct EVRangeDisplayCard: View {
     let evStatus: VehicleStatus.EVStatus
+    /// Tint forwarded to the underlying progress view so the bar matches
+    /// the vehicle's customized charging color. Defaults to green when
+    /// no vehicle context is available.
+    var chargingColor: Color = .green
     @State private var appSettings = AppSettings.shared
 
     var formattedRange: String {
@@ -61,7 +65,8 @@ struct EVRangeDisplayCard: View {
             isCharging: isCharging,
             chargeSpeed: chargeSpeed,
             chargeTimeRemaining: chargeTimeRemaining,
-            targetSOC: evStatus.currentTargetSOC
+            targetSOC: evStatus.currentTargetSOC,
+            chargingColor: chargingColor
         )
         .padding()
         .vehicleCardGlassEffect()

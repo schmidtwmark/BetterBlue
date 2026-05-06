@@ -19,6 +19,10 @@ struct EVChargingProgressView: View {
     let chargeTimeRemaining: String?
     let targetSOC: Double?
     let showHeader: Bool
+    /// Tint used for the actively-charging progress fill and the pulsing
+    /// header icon. Callers pass the vehicle's customizable
+    /// `chargingColor` so the bar matches the rest of the app's accents.
+    let chargingColor: Color
 
     init(
         icon: Image? = nil,
@@ -28,7 +32,8 @@ struct EVChargingProgressView: View {
         chargeSpeed: String?,
         chargeTimeRemaining: String?,
         targetSOC: Double?,
-        showHeader: Bool = true
+        showHeader: Bool = true,
+        chargingColor: Color = .green
     ) {
         self.icon = icon
         self.formattedRange = formattedRange
@@ -38,6 +43,7 @@ struct EVChargingProgressView: View {
         self.chargeTimeRemaining = chargeTimeRemaining
         self.targetSOC = targetSOC
         self.showHeader = showHeader
+        self.chargingColor = chargingColor
     }
 
     var body: some View {
@@ -48,7 +54,7 @@ struct EVChargingProgressView: View {
                     if let icon {
                         icon
                             .font(.title2)
-                            .foregroundColor(isCharging ? .green : .primary)
+                            .foregroundColor(isCharging ? chargingColor : .primary)
                             .symbolEffect(.pulse, isActive: isCharging)
                             .frame(width: 28)
                     }
@@ -93,7 +99,7 @@ struct EVChargingProgressView: View {
 
                 // Foreground progress
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.green)
+                    .fill(chargingColor)
                     .frame(
                         width: geometry.size.width * (Double(batteryPercentage) / 100.0),
                         height: 32

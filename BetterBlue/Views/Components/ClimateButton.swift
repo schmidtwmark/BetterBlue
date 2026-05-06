@@ -77,6 +77,11 @@ struct ClimateButton: View {
 
     @ViewBuilder
     private var activeBody: some View {
+        // The user-customizable "Start Climate" color drives both the
+        // off-state quick-action button (tap to start) and the running-
+        // state status icon (visual confirmation that climate is on).
+        let climateColor = bbVehicle.startClimateColor
+
         let startClimate = MainVehicleAction(
             action: { statusUpdater in
                 try await setClimate(true, statusUpdater: statusUpdater)
@@ -87,7 +92,7 @@ struct ClimateButton: View {
             completedText: climateStartedText,
             color: .secondary,
             stateLabel: "Climate Off",
-            quickActionColor: .blue,
+            quickActionColor: climateColor,
             menuIcon: Image(systemName: "fan")
         )
 
@@ -99,7 +104,7 @@ struct ClimateButton: View {
             label: "Stop Climate",
             inProgressLabel: "Stopping Climate",
             completedText: "Climate control stopped",
-            color: .blue,
+            color: climateColor,
             stateLabel: climateRunningText.isEmpty ? "Climate Running" : climateRunningText,
             quickActionColor: .secondary,
             shouldRotate: true,

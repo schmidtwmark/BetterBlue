@@ -55,6 +55,12 @@ struct ChargingButton: View {
 
     @ViewBuilder
     private var activeBody: some View {
+        // User-customizable charging color drives the bolt icon, the
+        // "ready to charge" plugged-in state, and the actively-charging
+        // status icon. Stays grey when unplugged so the disabled state
+        // still reads correctly regardless of palette.
+        let chargingColor = bbVehicle.chargingColor
+
         let startCharging = MainVehicleAction(
             action: { statusUpdater in
                 try await setCharge(true, statusUpdater: statusUpdater)
@@ -63,9 +69,9 @@ struct ChargingButton: View {
             label: "Start Charge",
             inProgressLabel: "Starting Charge",
             completedText: "Charging started",
-            color: isPluggedIn ? .blue : .secondary,
+            color: isPluggedIn ? chargingColor : .secondary,
             stateLabel: notChargingStateLabel,
-            quickActionColor: .green,
+            quickActionColor: chargingColor,
             menuIcon: Image(systemName: "bolt.fill")
         )
         let stopCharging = MainVehicleAction(
@@ -76,7 +82,7 @@ struct ChargingButton: View {
             label: "Stop Charge",
             inProgressLabel: "Stopping Charge",
             completedText: "Charge stopped",
-            color: .green,
+            color: chargingColor,
             stateLabel: "Charging",
             quickActionColor: .secondary,
             shouldPulse: true,

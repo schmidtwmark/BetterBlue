@@ -41,8 +41,19 @@ struct VehicleEntity: AppEntity {
     var rangeText: String
     var batteryPercentage: Double?
     var backgroundColorName: String
+    var primaryColorName: String?
+    var chargingColorName: String?
+    var lockColorName: String?
+    var unlockColorName: String?
+    var startClimateColorName: String?
     var timestamp: Date
     var presets: [ClimatePresetEntity] = []
+
+    var primaryColor: Color { CustomColor.color(forName: primaryColorName, default: "blue") }
+    var chargingColor: Color { CustomColor.color(forName: chargingColorName, default: "green") }
+    var lockColor: Color { CustomColor.color(forName: lockColorName, default: "red") }
+    var unlockColor: Color { CustomColor.color(forName: unlockColorName, default: "green") }
+    var startClimateColor: Color { CustomColor.color(forName: startClimateColorName, default: "blue") }
 
     var selectedPreset: ClimatePresetEntity? {
         presets.first(where: \.isSelected)
@@ -71,6 +82,11 @@ struct VehicleEntity: AppEntity {
         batteryPercentage: Double?,
         timestamp: Date,
         backgroundColorName: String = "default",
+        primaryColorName: String? = nil,
+        chargingColorName: String? = nil,
+        lockColorName: String? = nil,
+        unlockColorName: String? = nil,
+        startClimateColorName: String? = nil,
         presets: [ClimatePresetEntity] = []
     ) {
         self.id = id
@@ -81,6 +97,11 @@ struct VehicleEntity: AppEntity {
         self.batteryPercentage = batteryPercentage
         self.timestamp = timestamp
         self.backgroundColorName = backgroundColorName
+        self.primaryColorName = primaryColorName
+        self.chargingColorName = chargingColorName
+        self.lockColorName = lockColorName
+        self.unlockColorName = unlockColorName
+        self.startClimateColorName = startClimateColorName
         self.presets = presets
     }
 
@@ -90,6 +111,11 @@ struct VehicleEntity: AppEntity {
         vin = bbVehicle.vin
         fuelType = bbVehicle.fuelType
         backgroundColorName = bbVehicle.backgroundColorName
+        primaryColorName = bbVehicle.primaryColorName
+        chargingColorName = bbVehicle.chargingColorName
+        lockColorName = bbVehicle.lockColorName
+        unlockColorName = bbVehicle.unlockColorName
+        startClimateColorName = bbVehicle.startClimateColorName
         timestamp = bbVehicle.lastUpdated ?? Date()
 
         // Use safe property accessors to prevent context detachment

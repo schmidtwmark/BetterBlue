@@ -300,7 +300,9 @@ final class LiveActivityManager {
             let attributes = VehicleActivityAttributes(
                 vehicleName: vehicle.displayName,
                 vin: vehicle.vin,
-                vehicleId: vehicle.id
+                vehicleId: vehicle.id,
+                startClimateColorName: vehicle.startClimateColorName,
+                chargingColorName: vehicle.chargingColorName
             )
             do {
                 _ = try Activity.request(
@@ -461,11 +463,25 @@ public struct VehicleActivityAttributes: ActivityAttributes {
     public var vehicleName: String
     public var vin: String
     public var vehicleId: UUID
+    /// Per-vehicle accent colors. Captured at activity-start time so the
+    /// Live Activity can render in the user's chosen palette without doing
+    /// SwiftData lookups in the widget process. Already-running activities
+    /// won't reflect changes until the activity is restarted.
+    public var startClimateColorName: String?
+    public var chargingColorName: String?
 
-    public init(vehicleName: String, vin: String, vehicleId: UUID) {
+    public init(
+        vehicleName: String,
+        vin: String,
+        vehicleId: UUID,
+        startClimateColorName: String? = nil,
+        chargingColorName: String? = nil
+    ) {
         self.vehicleName = vehicleName
         self.vin = vin
         self.vehicleId = vehicleId
+        self.startClimateColorName = startClimateColorName
+        self.chargingColorName = chargingColorName
     }
 }
 #endif

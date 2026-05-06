@@ -32,6 +32,15 @@ struct LockButton: View {
 
     @ViewBuilder
     private var activeBody: some View {
+        // Color mapping (state-anchored, not action-anchored): the
+        // status-side icon shows the CURRENT state's color, the
+        // quick-action button shows the color of the action it would
+        // perform (i.e. the destination state).
+        //   Locked   → status icon = lockColor,  quick = unlockColor
+        //   Unlocked → status icon = unlockColor, quick = lockColor
+        let lockColor = bbVehicle.lockColor
+        let unlockColor = bbVehicle.unlockColor
+
         let unlock = MainVehicleAction(
             action: { statusUpdater in
                 try await setLock(false, statusUpdater: statusUpdater)
@@ -40,9 +49,9 @@ struct LockButton: View {
             label: "Unlock",
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
-            color: .red,
+            color: lockColor,
             stateLabel: "Locked",
-            quickActionColor: .green,
+            quickActionColor: unlockColor,
             menuIcon: Image(systemName: "lock.open.fill")
         )
         let lock = MainVehicleAction(
@@ -53,9 +62,9 @@ struct LockButton: View {
             label: "Lock",
             inProgressLabel: "Locking",
             completedText: "Locked",
-            color: .green,
+            color: unlockColor,
             stateLabel: "Unlocked",
-            quickActionColor: .red,
+            quickActionColor: lockColor,
             menuIcon: Image(systemName: "lock.fill")
         )
 

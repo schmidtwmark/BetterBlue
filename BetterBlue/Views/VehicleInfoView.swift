@@ -49,7 +49,7 @@ struct VehicleInfoView: View {
                     }
             }
 
-            VehicleWidgetConfigSection(bbVehicle: bbVehicle)
+            VehicleCustomizationSection(bbVehicle: bbVehicle)
 
             if let account = bbVehicle.account {
                 Section("Account Info") {

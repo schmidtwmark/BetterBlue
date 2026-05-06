@@ -23,7 +23,10 @@ struct VehicleActivityWidget: Widget {
                         Image(systemName: context.state.climatePresetIcon ?? "fan")
                             .font(.headline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+                            .foregroundColor(CustomColor.color(
+                                forName: context.attributes.startClimateColorName,
+                                default: "blue"
+                            ))
                             .padding(.leading, 8)
                     } else {
                         Text(formattedRange(for: context.state.status))
@@ -67,7 +70,10 @@ struct VehicleActivityWidget: Widget {
                     Image(systemName: context.state.climatePresetIcon ?? "fan")
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundColor(.blue)
+                        .foregroundColor(CustomColor.color(
+                            forName: context.attributes.startClimateColorName,
+                            default: "blue"
+                        ))
                 } else {
                     Text(formattedRange(for: context.state.status))
                         .font(.caption2)
@@ -97,7 +103,10 @@ struct VehicleActivityWidget: Widget {
                 } else if context.state.activityType == .climate {
                     Image(systemName: context.state.climatePresetIcon ?? "fan")
                         .font(.caption2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(CustomColor.color(
+                            forName: context.attributes.startClimateColorName,
+                            default: "blue"
+                        ))
                 } else {
                     Text("\(batteryPercentage(for: context.state.status))%")
                         .font(.caption2)
@@ -166,7 +175,11 @@ struct DynamicIslandExpandedContentView: View {
                     chargeSpeed: chargeSpeed,
                     chargeTimeRemaining: chargeTimeRemaining,
                     targetSOC: evStatus?.currentTargetSOC,
-                    showHeader: false
+                    showHeader: false,
+                    chargingColor: CustomColor.color(
+                        forName: context.attributes.chargingColorName,
+                        default: "green"
+                    )
                 )
             }
 
@@ -418,7 +431,11 @@ struct VehicleActivityContentView: View {
                     isCharging: true,
                     chargeSpeed: chargeSpeed,
                     chargeTimeRemaining: chargeTimeRemaining,
-                    targetSOC: evStatus?.currentTargetSOC
+                    targetSOC: evStatus?.currentTargetSOC,
+                    chargingColor: CustomColor.color(
+                        forName: context.attributes.chargingColorName,
+                        default: "green"
+                    )
                 )
             }
 
@@ -427,7 +444,10 @@ struct VehicleActivityContentView: View {
                 HStack(spacing: 12) {
                     Image(systemName: context.state.climatePresetIcon ?? "fan")
                         .font(.title2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(CustomColor.color(
+                            forName: context.attributes.startClimateColorName,
+                            default: "blue"
+                        ))
 
                     if let presetName = context.state.climatePresetName {
                         Text("\(presetName) Climate Preset Active")

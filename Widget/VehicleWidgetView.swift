@@ -157,7 +157,7 @@ struct VehicleHeaderView: View {
                 // Medium widget: icon, range, dot, percentage
                 HStack(spacing: 4) {
                     Image(systemName: vehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
-                        .foregroundColor(vehicle.fuelType.hasElectricCapability ? .green : .orange)
+                        .foregroundColor(vehicle.fuelType.hasElectricCapability ? vehicle.chargingColor : .orange)
                         .font(.caption)
 
                     Text(vehicle.rangeText)
@@ -198,17 +198,19 @@ struct VehicleButtonsView: View {
 
     var buttonData: [VehicleButtonData] {
         [
-            VehicleButtonData(label: "Lock", shortLabel: "Lock", icon: "lock.fill", color: .red, intent: {
+            VehicleButtonData(label: "Lock", shortLabel: "Lock", icon: "lock.fill", color: vehicle.lockColor, intent: {
                 let intent = LockVehicleControlIntent()
                 intent.vehicle = vehicle
                 return intent
             }),
-            VehicleButtonData(label: "Unlock", shortLabel: "Unlock", icon: "lock.open.fill", color: .green, intent: {
+            VehicleButtonData(label: "Unlock", shortLabel: "Unlock", icon: "lock.open.fill",
+                              color: vehicle.unlockColor, intent: {
                 let intent = UnlockVehicleControlIntent()
                 intent.vehicle = vehicle
                 return intent
             }),
-            VehicleButtonData(label: "Start Climate", shortLabel: "Start", icon: "fan", color: .blue, intent: {
+            VehicleButtonData(label: "Start Climate", shortLabel: "Start", icon: "fan",
+                              color: vehicle.startClimateColor, intent: {
                 let intent = StartClimateControlIntent()
                 intent.preset = vehicle.selectedPreset
                 return intent

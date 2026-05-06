@@ -80,6 +80,28 @@ class BBVehicle {
     /// Ignored for generation 3+ vehicles where seat heat controls are always shown
     var enableSeatHeatControls: Bool = false
 
+    // MARK: - Per-vehicle accent colors
+    //
+    // All five default to `nil` so old SwiftData rows decode without a
+    // migration; the resolver in `CustomColors.color(forName:default:)`
+    // returns a sensible default whenever the stored name is missing.
+    // Stored as String (palette name) instead of Color because SwiftUI
+    // `Color` isn't natively persistable.
+
+    /// Refresh button + map pin tint. Default: blue.
+    var primaryColorName: String?
+    /// Charging bolt + "Stop Charge" button color. Default: green.
+    var chargingColorName: String?
+    /// Color shown when the vehicle is locked (status icon + tap-to-lock
+    /// quick action). Default: red.
+    var lockColorName: String?
+    /// Color shown when the vehicle is unlocked (status icon +
+    /// tap-to-unlock quick action). Default: green.
+    var unlockColorName: String?
+    /// Climate quick-action button + "Stop Climate" status color.
+    /// Default: blue.
+    var startClimateColorName: String?
+
     var chargePortType: ChargePortType {
         get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
         set { chargePortTypeRaw = newValue.rawValue }
@@ -380,6 +402,33 @@ extension BBVehicle {
             customName! : model
     }
 
+    // MARK: - Per-vehicle accent colors (resolved)
+
+    /// Refresh button + map pin tint.
+    var primaryColor: Color {
+        CustomColor.color(forName: primaryColorName, default: "blue")
+    }
+
+    /// Bolt icon when initiating charge / "Stop Charge" button.
+    var chargingColor: Color {
+        CustomColor.color(forName: chargingColorName, default: "green")
+    }
+
+    /// Color shown when the vehicle is locked.
+    var lockColor: Color {
+        CustomColor.color(forName: lockColorName, default: "red")
+    }
+
+    /// Color shown when the vehicle is unlocked.
+    var unlockColor: Color {
+        CustomColor.color(forName: unlockColorName, default: "green")
+    }
+
+    /// Climate start action color.
+    var startClimateColor: Color {
+        CustomColor.color(forName: startClimateColorName, default: "blue")
+    }
+
     /// Returns the appropriate plug icon based on current charging state and user's port type preference
     func plugIcon(for plugType: VehicleStatus.PlugType?) -> Image {
         guard let plugType else {
@@ -406,6 +455,7 @@ extension BBVehicle: Encodable {
         case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
         case chargePortTypeRaw, debugConfiguration, debugLiveActivity, enableSeatHeatControls
+        case primaryColorName, chargingColorName, lockColorName, unlockColorName, startClimateColorName
         case climatePresets
     }
 
@@ -446,6 +496,13 @@ extension BBVehicle: Encodable {
         try container.encodeIfPresent(debugConfiguration, forKey: .debugConfiguration)
         try container.encode(debugLiveActivity, forKey: .debugLiveActivity)
         try container.encode(enableSeatHeatControls, forKey: .enableSeatHeatControls)
+
+        // Per-vehicle accent colors
+        try container.encodeIfPresent(primaryColorName, forKey: .primaryColorName)
+        try container.encodeIfPresent(chargingColorName, forKey: .chargingColorName)
+        try container.encodeIfPresent(lockColorName, forKey: .lockColorName)
+        try container.encodeIfPresent(unlockColorName, forKey: .unlockColorName)
+        try container.encodeIfPresent(startClimateColorName, forKey: .startClimateColorName)
 
         // Climate presets (relationship)
         try container.encode(safeClimatePresets, forKey: .climatePresets)

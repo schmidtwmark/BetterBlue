@@ -15,6 +15,12 @@ struct WatchVehicleView: View {
     @State private var isRefreshing = false
     @State private var lastRefreshDate: Date?
     @State private var showingSettings = false
+    /// Single error-sheet anchor for the whole vehicle page. Both
+    /// refresh failures (here) and action failures (forwarded from
+    /// child WatchVehicleButtons) write here, but only when it's
+    /// currently nil — so a new failure can never replace a sheet that
+    /// is already presenting.
+    @State private var lastError: WatchActionError?
     @Query private var allVehicles: [BBVehicle]
     @Environment(\.modelContext) private var modelContext
 
@@ -67,6 +73,12 @@ struct WatchVehicleView: View {
     }
 
     // VehicleAction instances
+    //
+    // The status icon is anchored to the *current* vehicle state (not the
+    // action's destination), so the colors here pair with the action's
+    // `stateLabel` to match the iOS LockButton convention:
+    //   • lockAction is shown when the car is currently UNLOCKED → use unlockColor
+    //   • unlockAction is shown when the car is currently LOCKED → use lockColor
     private var lockAction: MainVehicleAction {
         MainVehicleAction(
             action: { statusUpdater in
@@ -76,7 +88,7 @@ struct WatchVehicleView: View {
             label: "Lock",
             inProgressLabel: "Locking",
             completedText: "Locked",
-            color: .red,
+            color: currentVehicle.unlockColor,
             stateLabel: "Unlocked"
         )
     }
@@ -90,7 +102,7 @@ struct WatchVehicleView: View {
             label: "Unlock",
             inProgressLabel: "Unlocking",
             completedText: "Unlocked",
-            color: .green,
+            color: currentVehicle.lockColor,
             stateLabel: "Locked"
         )
     }
@@ -118,7 +130,7 @@ struct WatchVehicleView: View {
             label: "Stop Climate",
             inProgressLabel: "Stopping",
             completedText: "Stopped",
-            color: .blue,
+            color: currentVehicle.startClimateColor,
             stateLabel: "Climate Running",
             shouldRotate: true
         )
@@ -147,7 +159,7 @@ struct WatchVehicleView: View {
             label: "Stop Charge",
             inProgressLabel: "Stopping",
             completedText: "Stopped",
-            color: .green,
+            color: currentVehicle.chargingColor,
             stateLabel: "Charging",
             shouldPulse: true
         )
@@ -156,66 +168,51 @@ struct WatchVehicleView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
-                //                // Vehicle name at the top
-                VStack {
-                    // Status info with inline refresh button
-                    HStack(spacing: 4) {
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                HStack {
-                                    Text(currentVehicle.displayName)
-                                        .font(.headline)
-                                        .fontWeight(.bold)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                }
-                                HStack {
-                                    Image(systemName: currentVehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
-                                        .foregroundColor(currentVehicle.fuelType.hasElectricCapability ? .green : .orange)
-                                        .font(.caption)
-
-                                    Text(rangeText)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                }
-                                if let lastUpdated = currentVehicle.lastUpdated {
-                                    HStack {
-                                        Text(formatUpdateTime(lastUpdated))
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                        Spacer()
-                                    }
-                                }
-                            }
+                // Header doubles as the refresh affordance: a tap on the
+                // title triggers a status refresh. While the refresh is
+                // in-flight the "last updated" line swaps for an inline
+                // ProgressView so the user sees something is happening
+                // without having to look elsewhere on the screen.
+                Button {
+                    Task { await refreshStatus() }
+                } label: {
+                    VStack(spacing: 4) {
+                        HStack {
+                            Text(currentVehicle.displayName)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.primary)
+                            Spacer()
                         }
-                        .buttonStyle(.plain)
+                        HStack {
+                            Image(systemName: currentVehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
+                                .foregroundColor(currentVehicle.fuelType.hasElectricCapability ? currentVehicle.chargingColor : .orange)
+                                .font(.caption)
 
-                        Spacer()
-
-                        // Inline refresh button
-                        Button {
-                            Task {
-                                await refreshStatus()
-                            }
-                        } label: {
+                            Text(rangeText)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        HStack {
                             if isRefreshing {
                                 ProgressView()
-                                    .scaleEffect(0.7)
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .scaleEffect(0.6)
+                                Text("Refreshing…")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            } else if let lastUpdated = currentVehicle.lastUpdated {
+                                Text(formatUpdateTime(lastUpdated))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
+                            Spacer()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .frame(width: 30, height: 30)
-                        .disabled(isRefreshing)
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
 
                 // Context-sensitive action buttons
                 VStack(spacing: 8) {
@@ -225,6 +222,7 @@ struct WatchVehicleView: View {
                         allActions: [lockAction, unlockAction],
                         menuLabel: "Door Actions",
                         vehicle: vehicle,
+                        sharedError: $lastError,
                     )
 
                     // Climate button (context-sensitive)
@@ -233,6 +231,7 @@ struct WatchVehicleView: View {
                         allActions: [startClimateAction, stopClimateAction],
                         menuLabel: "Climate Actions",
                         vehicle: vehicle,
+                        sharedError: $lastError,
                     )
 
                     // Charge button (only for plugged-in electric vehicles)
@@ -242,9 +241,32 @@ struct WatchVehicleView: View {
                             allActions: [startChargeAction, stopChargeAction],
                             menuLabel: "Charge Actions",
                             vehicle: vehicle,
+                            sharedError: $lastError,
                         )
                     }
                 }
+
+                // Settings button at the very bottom of the scroll view —
+                // the title tap is the refresh affordance, so settings
+                // gets its own row that the user scrolls down to reach.
+                Button {
+                    showingSettings = true
+                } label: {
+                    // Matches WatchVehicleButton's spacing/sizing so the
+                    // gear lines up with the action-button icons above.
+                    HStack(spacing: 8) {
+                        Image(systemName: "gear")
+                            .frame(width: 24, height: 24)
+                        Text("Settings")
+                            .fontWeight(.medium)
+                        Spacer(minLength: 0)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             .padding()
         }
@@ -259,6 +281,15 @@ struct WatchVehicleView: View {
         }
         .sheet(isPresented: $showingSettings) {
             WatchVehicleSettingsView(vehicle: currentVehicle)
+        }
+        // One shared error sheet for refresh + every action button on
+        // this page. `item:` form means the sheet only mounts when an
+        // error exists; dismissing nils it out, freeing the slot for
+        // the next failure.
+        .sheet(item: $lastError) { actionError in
+            WatchErrorSheet(error: actionError) {
+                lastError = nil
+            }
         }
         //        .navigationTitle(vehicle.displayName)
     }
@@ -312,7 +343,12 @@ struct WatchVehicleView: View {
             lastRefreshDate = Date()
 
         } catch {
-            print("❌ [WatchVehicle] Failed to refresh status: \(error)")
+            BBLogger.warning(.app, "WatchVehicle: failed to refresh status: \(error)")
+            // Don't stomp on an already-visible error sheet — the user
+            // is still reading the previous failure.
+            if lastError == nil {
+                lastError = WatchActionError(action: "Refresh", error: error)
+            }
         }
     }
 
@@ -384,6 +420,10 @@ struct WatchVehicleButton: View {
     let allActions: [MainVehicleAction]
     let menuLabel: String
     let vehicle: BBVehicle
+    /// Page-level error slot owned by `WatchVehicleView`. We only ever
+    /// write to it when it's currently nil, so an existing sheet never
+    /// gets blown away by a new failure.
+    @Binding var sharedError: WatchActionError?
 
     @State private var inProgressAction: MainVehicleAction?
     @State private var currentTask: Task<Void, Never>?
@@ -391,23 +431,36 @@ struct WatchVehicleButton: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Group {
-                if inProgressAction != nil {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    currentAction.icon
-                        .spin(currentAction.shouldRotate)
-                        .pulse(currentAction.shouldPulse)
-                        .foregroundColor(currentAction.color)
+            // Anchor the icon's layout box with a fixed-size Color.clear
+            // and render the (possibly animating) icon as an overlay.
+            // - Explicit `.font(.body)` keeps the symbol's intrinsic
+            //   size stable so spin/pulse can't grow it past the box.
+            // - `.geometryGroup()` (watchOS 10+) isolates this subtree's
+            //   layout from parent transaction propagation, which is
+            //   what was making the entire row bob with the animation.
+            Color.clear
+                .frame(width: 24, height: 24)
+                .overlay {
+                    if inProgressAction != nil {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        currentAction.icon
+                            .font(.body)
+                            .foregroundColor(currentAction.color)
+                            .spin(currentAction.shouldRotate)
+                            .pulse(currentAction.shouldPulse)
+                    }
                 }
-            }
-            .frame(width: 24, height: 24)
+                .geometryGroup()
 
             Text(inProgressAction?.inProgressLabel ?? currentAction.stateLabel)
                 .fontWeight(.medium)
                 .lineLimit(1)
-            Spacer()
+                // Watch screens are narrow; let labels like "Climate
+                // Running" or "Unlocking" shrink instead of truncating.
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 0)
             if inProgressAction != nil {
                 ZStack {
                     Circle()
@@ -468,9 +521,21 @@ struct WatchVehicleButton: View {
                     inProgressAction = nil
                 }
             } catch {
-                print("❌ [WatchVehicleButton] Action failed: \(error)")
+                BBLogger.warning(.app, "WatchVehicleButton: action failed: \(error)")
                 await MainActor.run {
                     inProgressAction = nil
+                    // Match the iOS catch site: prefer the action's
+                    // completedText (verb-noun like "Lock vehicle"),
+                    // fall back to the menu label. Only set if the
+                    // page-level slot is currently empty so we don't
+                    // displace an already-visible error sheet.
+                    if sharedError == nil {
+                        // Imperative `label` ("Lock", "Start Climate")
+                        // reads grammatically after "Failed to …" in
+                        // the sheet headline; `completedText` would
+                        // give "Failed to locked." which is wrong.
+                        sharedError = WatchActionError(action: action.label, error: error)
+                    }
                 }
             }
         }
