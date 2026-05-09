@@ -35,7 +35,7 @@ struct VehicleInfoView: View {
                 bbVehicle: bbVehicle,
                 showingCopiedMessage: $showingCopiedMessage
             )
-
+            
             Section("Custom Name") {
                 TextField("Vehicle Name", text: $customName)
                     .autocapitalization(.words)
@@ -48,9 +48,10 @@ struct VehicleInfoView: View {
                         }
                     }
             }
-
+            
             VehicleCustomizationSection(bbVehicle: bbVehicle)
-
+            
+            
             if let account = bbVehicle.account {
                 Section("Account Info") {
                     NavigationLink(account.username, destination: AccountInfoView(
@@ -58,26 +59,19 @@ struct VehicleInfoView: View {
                     ))
                 }
             }
-
-            // Climate Settings (only for older vehicles)
+            
+            // Climate Settings — toggles + info button extracted into
+            // shared components so the same controls back the toolbar
+            // half-sheet on `ClimateSettingsContent` for older vehicles.
             if bbVehicle.generation < 3 {
                 Section {
-                    Toggle(isOn: Binding(
-                        get: { bbVehicle.enableSeatHeatControls },
-                        set: { newValue in
-                            bbVehicle.enableSeatHeatControls = newValue
-                            try? modelContext.save()
-                        }
-                    )) {
-                        HStack {
-                            Text("Seat Heat Controls")
-                            SeatHeatInfoButton()
-                        }
-                    }
+                    ClimateSettingsToggles(bbVehicle: bbVehicle)
                 } header: {
-                    Text("Climate Settings")
-                } footer: {
-                    Text("Enable seat heating and cooling controls for vehicles that support them.")
+                    HStack {
+                        Text("Climate Settings")
+                        Spacer()
+                        ClimateSettingsInfoButton()
+                    }
                 }
             }
 
@@ -173,34 +167,6 @@ struct VehicleInfoView: View {
             } catch {
                 BBLogger.error(.app, "Failed to create default preset: \(error)")
             }
-        }
-    }
-}
-
-// MARK: - Seat Heat Info Button
-
-private struct SeatHeatInfoButton: View {
-    @State private var showingInfo = false
-
-    var body: some View {
-        Button {
-            showingInfo = true
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundColor(.blue)
-        }
-        .buttonStyle(.plain)
-        .alert("Seat Heat Controls", isPresented: $showingInfo) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                "Seat heating and cooling controls are automatically available for newer " +
-                "vehicles (generation 3+). Some older vehicles also support these features " +
-                "but require manual enabling.\n\n" +
-                "If your vehicle has heated or ventilated seats, you can enable this option " +
-                "to show seat controls in your climate presets. If your vehicle doesn't " +
-                "support these features, the controls will have no effect."
-            )
         }
     }
 }

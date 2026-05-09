@@ -70,14 +70,6 @@ struct ClimateSettingsContent: View {
                         .disabled(preset.isSelected)
                     }
                 }
-                if vehicle.account?.regionEnum != .usa {
-                    Picker("Climate Duration", selection: $preset.climateOptions.duration) {
-                        Text("5 minutes").tag(5)
-                        Text("10 minutes").tag(10)
-                        Text("20 minutes").tag(20)
-                    }
-                    .pickerStyle(.menu)
-                }
             }
 
             climateControlsSection
@@ -203,6 +195,24 @@ struct ClimateSettingsContent: View {
             )
             .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.rearDefrostEnabled)
             .listRowInsets(EdgeInsets())
+            if vehicle.showClimateDuration || vehicle.generation >= 3 {
+                HStack(spacing: 16) {
+                    Image(systemName: "clock")
+                        .font(.title2)
+                        .foregroundColor(Color.secondary)
+                        .frame(width: 32)
+                    Picker("Climate Duration", selection: $preset.climateOptions.duration) {
+                        Text("5 minutes").tag(5)
+                        Text("10 minutes").tag(10)
+                        Text("20 minutes").tag(20)
+                    }
+                    .pickerStyle(.menu)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .animation(.easeInOut(duration: 0.2), value: preset.climateOptions.rearDefrostEnabled)
+                .listRowInsets(EdgeInsets())
+            }
         }
 
         // Heated Steering Wheel Section

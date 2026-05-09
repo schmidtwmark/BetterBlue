@@ -729,7 +729,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -747,7 +747,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -763,7 +763,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -781,7 +781,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -797,7 +797,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -809,7 +809,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -832,7 +832,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -844,7 +844,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -867,7 +867,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
@@ -879,7 +879,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -899,7 +899,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
@@ -911,7 +911,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -930,7 +930,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_TEAM = C2UW47HS8X;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
@@ -942,7 +942,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp.WatchWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -963,7 +963,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEVELOPMENT_TEAM = C2UW47HS8X;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
@@ -975,7 +975,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.5.0;
+				MARKETING_VERSION = 2026.5.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp.WatchWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

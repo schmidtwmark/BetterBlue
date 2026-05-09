@@ -80,6 +80,14 @@ class BBVehicle {
     /// Ignored for generation 3+ vehicles where seat heat controls are always shown
     var enableSeatHeatControls: Bool = false
 
+    /// Per-vehicle toggle for the climate duration picker. `nil` = use
+    /// the regional default (non-USA shows the picker, USA hides it
+    /// because the API ignores the duration field there); `true`/
+    /// `false` pin the visibility regardless of region. Lives next to
+    /// `enableSeatHeatControls` because both are "I know my car better
+    /// than the heuristic" overrides.
+    var showClimateDurationOverride: Bool?
+
     // MARK: - Per-vehicle accent colors
     //
     // All five default to `nil` so old SwiftData rows decode without a
@@ -102,13 +110,64 @@ class BBVehicle {
     /// Default: blue.
     var startClimateColorName: String?
 
+    // MARK: - Fuel-type override
+    //
+    // The Kia/Hyundai vehicle-list endpoints don't always return a
+    // reliable powertrain marker (Kia USA in particular only confirms
+    // `fuelType == 4` as EV; everything else falls into `.gas`). The
+    // self-heal in `updateStatus` infers the real type from the status
+    // payload's shape, but the API can still mis-shape its own response
+    // — e.g. issue #41 has a real EV that returns both an `evStatus`
+    // and a phantom `gasRange` (length matching the EV range), which
+    // promotes the vehicle to PHEV and won't demote even after
+    // re-adding the account.
+    //
+    // This stored override lets the user pin the powertrain manually.
+    // `nil` = trust the inferred value (default behaviour).
+    var fuelTypeOverrideRaw: String?
+
     var chargePortType: ChargePortType {
         get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
         set { chargePortTypeRaw = newValue.rawValue }
     }
 
+    /// User override for the inferred powertrain. `nil` means "use
+    /// whatever the API/self-heal decided". Setting it to a non-nil
+    /// value pins `fuelType` to that choice; clearing it (set to nil)
+    /// returns control to the inferred value.
+    var fuelTypeOverride: FuelType? {
+        get {
+            guard let raw = fuelTypeOverrideRaw else { return nil }
+            return FuelType(rawValue: raw)
+        }
+        set { fuelTypeOverrideRaw = newValue?.rawValue }
+    }
+
+    /// Effective "show climate duration picker" decision. Reads the
+    /// override when pinned, otherwise infers from generation + region:
+    /// generation-3+ vehicles honor the duration field globally, and
+    /// non-USA vehicles of any generation also honor it. Pre-gen-3 USA
+    /// vehicles default off because the API ignores duration there.
+    /// Account is optional because newly-created vehicles may not be
+    /// wired up yet; treat the absent case as "show" to match the more
+    /// common default outside the USA.
+    var showClimateDuration: Bool {
+        if let override = showClimateDurationOverride { return override }
+        if generation >= 3 { return true }
+        return account?.regionEnum != .usa
+    }
+
+    /// Powertrain that the rest of the app should use. Reads the
+    /// override when the user has pinned one, otherwise falls back to
+    /// the self-healed `fuelTypeRaw`. The setter still writes to
+    /// `fuelTypeRaw` so the inferred value continues to track API
+    /// hints — clearing the override later just reveals whatever the
+    /// inference has converged on.
     var fuelType: FuelType {
-        get { FuelType(rawValue: fuelTypeRaw) ?? .gas }
+        get {
+            if let override = fuelTypeOverride { return override }
+            return FuelType(rawValue: fuelTypeRaw) ?? .gas
+        }
         set { fuelTypeRaw = newValue.rawValue }
     }
 
@@ -158,6 +217,26 @@ class BBVehicle {
 // MARK: - Status Management
 
 extension BBVehicle {
+    /// Apply the off-axis-range cleanup that follows from a fuel-type
+    /// override change. Call after the user picks a new override (or
+    /// clears it). `updateStatus` already gates writes on the effective
+    /// `fuelType`, but stale `gasRange`/`evStatus` set BEFORE the
+    /// override was applied won't go away on their own — this method
+    /// nukes the irrelevant fields up-front so the UI updates without
+    /// waiting for the next status fetch.
+    @MainActor
+    func normalizeRangesForCurrentFuelType() {
+        switch fuelType {
+        case .gas:
+            evStatus = nil
+        case .electric:
+            gasRange = nil
+        case .phev:
+            // PHEV legitimately keeps both — nothing to clear.
+            break
+        }
+    }
+
     /// Returns true when `to` is more specific than `from` along the
     /// `gas → electric → phev` axis. Used by `updateStatus` to one-way
     /// upgrade a misclassified `fuelType` once a status payload reveals
@@ -456,6 +535,8 @@ extension BBVehicle: Encodable {
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
         case chargePortTypeRaw, debugConfiguration, debugLiveActivity, enableSeatHeatControls
         case primaryColorName, chargingColorName, lockColorName, unlockColorName, startClimateColorName
+        case fuelTypeOverrideRaw
+        case showClimateDurationOverride
         case climatePresets
     }
 
@@ -503,6 +584,12 @@ extension BBVehicle: Encodable {
         try container.encodeIfPresent(lockColorName, forKey: .lockColorName)
         try container.encodeIfPresent(unlockColorName, forKey: .unlockColorName)
         try container.encodeIfPresent(startClimateColorName, forKey: .startClimateColorName)
+
+        // Fuel-type override (nil = inferred). Useful in debug exports
+        // for diagnosing reports like #41 where the inferred type is
+        // wrong and the user has pinned it manually.
+        try container.encodeIfPresent(fuelTypeOverrideRaw, forKey: .fuelTypeOverrideRaw)
+        try container.encodeIfPresent(showClimateDurationOverride, forKey: .showClimateDurationOverride)
 
         // Climate presets (relationship)
         try container.encode(safeClimatePresets, forKey: .climatePresets)
