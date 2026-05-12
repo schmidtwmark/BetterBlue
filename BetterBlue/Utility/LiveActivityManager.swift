@@ -327,6 +327,18 @@ final class LiveActivityManager {
             return
         }
 
+        // Only charging and debug get backend wakeup pushes. Climate
+        // activities are short-lived and driven by the foregrounded
+        // app's polling — registering them just stuffs the wakeup
+        // table with rows that don't need long-term refresh. The
+        // backend now rejects them with 400 too.
+        guard activityType == .charging || activityType == .debug else {
+            AppLogger.liveActivity.info(
+                "Skipping backend registration for short-lived activity type: \(activityType.rawValue, privacy: .public)"
+            )
+            return
+        }
+
         guard let url = URL(string: "\(liveActivityBackendURL)/wakeup") else { return }
 
         var request = URLRequest(url: url)

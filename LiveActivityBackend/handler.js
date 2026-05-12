@@ -35,12 +35,14 @@ function getAPNsProvider() {
     return apnProvider;
 }
 
-// Wakeup intervals in minutes by activity type
+// Wakeup intervals in minutes by activity type. Anything not listed
+// here is rejected at registration time (see registerWakeUp). Climate
+// was a testing-only path and is no longer accepted server-side.
 const WAKEUP_INTERVALS = {
     'debug': 1,      // 1 minute for debug
     'charging': 5,   // 5 minutes for charging
-    'default': 5     // Default fallback
 };
+const SUPPORTED_ACTIVITY_TYPES = new Set(Object.keys(WAKEUP_INTERVALS));
 
 // API Handler: Register device for wakeup pushes
 exports.registerWakeUp = async (event) => {
@@ -56,12 +58,29 @@ exports.registerWakeUp = async (event) => {
             };
         }
 
+        // Default to 'charging' for legacy clients that don't send the
+        // type. Reject anything else not in our supported set so that
+        // stale / experimental types (e.g. 'climate') can't take up
+        // backend slots.
+        const resolvedType = activityType || 'charging';
+        if (!SUPPORTED_ACTIVITY_TYPES.has(resolvedType)) {
+            console.warn(`⚠️ Rejected register: unsupported activityType "${resolvedType}"`);
+            return {
+                statusCode: 400,
+                headers: { 'Access-Control-Allow-Origin': '*' },
+                body: JSON.stringify({
+                    error: `Unsupported activityType: ${resolvedType}`,
+                    supported: Array.from(SUPPORTED_ACTIVITY_TYPES)
+                })
+            };
+        }
+
         // Store the push token with activity type for interval-based wakeups
         await dynamodb.put({
             TableName: TABLE_NAME,
             Item: {
                 pushToken: pushToken,
-                activityType: activityType || 'charging',
+                activityType: resolvedType,
                 startTime: Date.now(),
                 lastPushTime: 0,
                 wakeupCount: 0,
@@ -69,8 +88,8 @@ exports.registerWakeUp = async (event) => {
             }
         }).promise();
 
-        const interval = WAKEUP_INTERVALS[activityType] || WAKEUP_INTERVALS['default'];
-        console.log(`✅ Registered device for wakeup pushes: ${pushToken.substring(0, 20)}... (type: ${activityType || 'charging'}, interval: ${interval}min)`);
+        const interval = WAKEUP_INTERVALS[resolvedType];
+        console.log(`✅ Registered device for wakeup pushes: ${pushToken.substring(0, 20)}... (type: ${resolvedType}, interval: ${interval}min)`);
 
         return {
             statusCode: 200,
@@ -142,12 +161,20 @@ exports.sendWakeUps = async () => {
             ExpressionAttributeValues: { ':status': 'active' }
         }).promise();
 
-        console.log(`📋 Found ${result.Items.length} registered devices`);
+        // Per-invocation device count is the only steady-state log we
+        // keep — useful for trend graphs, ~1.4k lines/day. The
+        // per-device "wakeup #N sent" line was the bulk of CloudWatch
+        // spend; we now only log on failures or expirations.
+        let sentCount = 0;
+        let skippedCount = 0;
+        let removedCount = 0;
 
         const promises = result.Items.map(async (registration) => {
             const tokenShort = registration.pushToken.substring(0, 8);
             const activityType = registration.activityType || 'charging';
-            const intervalMinutes = WAKEUP_INTERVALS[activityType] || WAKEUP_INTERVALS['default'];
+            // Fallback to 5 min for any legacy / now-rejected type still
+            // sitting in the table — they'll auto-expire at 8h.
+            const intervalMinutes = WAKEUP_INTERVALS[activityType] || 5;
 
             try {
                 const minutesSinceStart = (now - registration.startTime) / (1000 * 60);
@@ -159,13 +186,14 @@ exports.sendWakeUps = async () => {
                         TableName: TABLE_NAME,
                         Key: { pushToken: registration.pushToken }
                     }).promise();
-                    console.log(`⏰ Expired registration ${tokenShort}...`);
+                    removedCount++;
                     return;
                 }
 
                 // Check if enough time has passed based on activity type interval
                 if (registration.lastPushTime && minutesSinceLastPush < intervalMinutes) {
                     // Skip this device - not time yet
+                    skippedCount++;
                     return;
                 }
 
@@ -191,7 +219,7 @@ exports.sendWakeUps = async () => {
                         UpdateExpression: 'SET lastPushTime = :now, wakeupCount = :count',
                         ExpressionAttributeValues: { ':now': now, ':count': newCount }
                     }).promise();
-                    console.log(`✅ ${tokenShort}: wakeup #${newCount} sent (type: ${activityType}, interval: ${intervalMinutes}min, age: ${minutesSinceStart.toFixed(1)}min)`);
+                    sentCount++;
                 }
 
                 if (apnsResult.failed.length > 0) {
@@ -218,7 +246,12 @@ exports.sendWakeUps = async () => {
 
         await Promise.all(promises);
 
-        return { statusCode: 200, body: `Sent wakeups to ${result.Items.length} devices` };
+        // Single aggregated line per cron tick — gives steady-state
+        // visibility without the per-device fanout that was driving
+        // CloudWatch costs to 89% of total spend.
+        console.log(`📋 ${result.Items.length} active · sent ${sentCount} · skipped ${skippedCount} · expired ${removedCount}`);
+
+        return { statusCode: 200, body: `Sent wakeups to ${sentCount}/${result.Items.length} devices` };
     } catch (error) {
         console.error('❌ Error in sendWakeUps:', error);
         return { statusCode: 500, body: error.message };

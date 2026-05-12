@@ -8,7 +8,9 @@
     "aws-sdk": "^2.1542.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dashboard": "node dashboard.js",
+    "dashboard:prod": "node dashboard.js --stage prod"
   },
   "keywords": [],
   "author": "",
