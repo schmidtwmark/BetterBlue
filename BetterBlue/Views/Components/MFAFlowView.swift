@@ -91,7 +91,13 @@ final class MFAFlowState {
     }
 
     func sendCode(notifyType: String, isResend: Bool = false, showPickerFirst: Bool = true) {
-        guard let account, let xid, let otpKey else {
+        // `otpKey` is intentionally NOT required here. Kia USA returns
+        // an otpKey in the initial challenge, but Hyundai Canada only
+        // issues one *after* `mfa/sendotp` runs (i.e. as a result of
+        // the very call we're about to make). The SDK's per-region
+        // `sendMFACode` impls that don't need a pre-existing otpKey
+        // simply ignore the value we pass.
+        guard let account, let xid else {
             actionError = ActionError(
                 action: "Start verification",
                 error: APIError(message: "MFA context missing")
@@ -106,7 +112,7 @@ final class MFAFlowState {
         Task {
             let method: MFAMethod = notifyType == "EMAIL" ? .email : .sms
             do {
-                try await account.sendMFA(otpKey: otpKey, xid: xid, method: method)
+                try await account.sendMFA(otpKey: otpKey ?? "", xid: xid, method: method)
                 self.notifyType = notifyType
                 self.isResendingCode = false
                 self.actionError = nil
@@ -140,14 +146,19 @@ final class MFAFlowState {
     }
 
     func verify() {
-        guard let account, let xid, let otpKey else { return }
+        // Same rationale as `sendCode`: regions that issue otpKey
+        // mid-flow (Hyundai Canada) keep it stashed inside the SDK
+        // client, not in this view-model. Accept a missing otpKey at
+        // the iOS layer; the per-region SDK enforces what it actually
+        // needs.
+        guard let account, let xid else { return }
 
         isVerifying = true
         actionError = nil
 
         Task {
             do {
-                try await account.verifyMFA(otpKey: otpKey, xid: xid, otp: code)
+                try await account.verifyMFA(otpKey: otpKey ?? "", xid: xid, otp: code)
                 isPresented = false
                 navigationPath = NavigationPath()
                 code = ""
