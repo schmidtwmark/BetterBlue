@@ -87,7 +87,17 @@ struct VehicleControlButton: View {
 
     @ViewBuilder
     private var statusButton: some View {
-        statusButtonLabel.contextMenu {
+        Button {
+            if inProgressAction != nil {
+                cancelCurrentOperation()
+            } else {
+                currentTask = Task {
+                    await performAction(action: currentAction)
+                }
+            }
+        } label: {
+           statusButtonLabel
+        }.contextMenu {
             actionMenuContent
         }
     }
