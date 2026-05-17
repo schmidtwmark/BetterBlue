@@ -58,6 +58,8 @@ struct AddAccountView: View {
     @State private var selectedBrand: Brand = .hyundai
     @State private var selectedRegion: Region = .usa
     @State private var isLoading = false
+    @State private var useToken: Bool = false
+    @State private var showTokenInfo: Bool = false
     /// Populated when login or first vehicle-load fails so the form can
     /// render a full `ErrorDetailsView` (headline + summary + technical
     /// details collapsed by default).
@@ -114,7 +116,7 @@ struct AddAccountView: View {
                 }
                 .disabled(
                     username.isEmpty
-                        || password.isEmpty
+                        || password.isEmpty && refreshToken.isEmpty
                         || (selectedBrand != .kia
                             && selectedBrand != .fake
                             && pin.isEmpty)
@@ -206,22 +208,69 @@ struct AddAccountView: View {
                     }
             }
 
-            HStack {
-                Text("Password")
-                Spacer()
-                SecureField("", text: $password)
-                    .multilineTextAlignment(.trailing)
-                    .focused($focusedField, equals: .password)
-                    .submitLabel(selectedBrand == .hyundai ? .next : .done)
-                    .onSubmit {
-                        if selectedBrand == .hyundai {
-                            focusedField = .pin
-                        } else {
-                            Task {
-                                await addAccount()
+
+            if selectedBrand == .hyundai && selectedRegion == .europe {
+                HStack {
+                    Button {
+                                showTokenInfo.toggle()
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.title2)
+                            }.popover(isPresented: $showTokenInfo) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    let link = "[GitHub Project Page](https://github.com/TMA84/bluelink-refresh-token/blob/main/README.md)"
+                                        Text("Feature Details").font(.headline)
+                                        Text("The Refresh-Token is an generated key to access the hyundai api on multiple devices.")
+                                        Text("You dont need to enter a password when using this key.")
+                                        if let openSourceString = try? AttributedString(
+                                            markdown: "Information on how to get such a key can be found on the \(link).") {
+                                            Text(openSourceString).tint(.blue)
+                                        }
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: 300)
+                                    .presentationDetents([.height(320)])
+                            }
+                    Toggle("Refresh-Token/Password", isOn: $useToken)
+                }
+            }
+
+            if !useToken {
+                HStack {
+                    Text("Password")
+                    Spacer()
+                    SecureField("", text: $password)
+                        .multilineTextAlignment(.trailing)
+                        .focused($focusedField, equals: .password)
+                        .submitLabel(selectedBrand == .hyundai ? .next : .done)
+                        .onSubmit {
+                            if selectedBrand == .hyundai {
+                                focusedField = .pin
+                            } else {
+                                Task {
+                                    await addAccount()
+                                }
                             }
                         }
-                    }
+                }
+            } else {
+                HStack {
+                    Text("Refresh Token")
+                    Spacer()
+                    SecureField("", text: $refreshToken)
+                        .multilineTextAlignment(.trailing)
+                        .focused($focusedField, equals: .refreshToken)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            if selectedBrand == .hyundai {
+                                focusedField = .pin
+                            } else {
+                                Task {
+                                    await addAccount()
+                                }
+                            }
+                        }
+                }
             }
 
             if selectedBrand == .hyundai {
@@ -232,22 +281,6 @@ struct AddAccountView: View {
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
                         .focused($focusedField, equals: .pin)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            Task {
-                                await addAccount()
-                            }
-                        }
-                }
-            }
-
-            if selectedBrand == .hyundai && selectedRegion == .europe {
-                HStack {
-                    Text("Refresh Token")
-                    Spacer()
-                    SecureField("", text: $refreshToken)
-                        .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .refreshToken)
                         .submitLabel(.done)
                         .onSubmit {
                             Task {

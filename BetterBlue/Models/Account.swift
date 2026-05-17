@@ -128,12 +128,6 @@ extension BBAccount {
                 HTTPLogSinkManager.shared.createLogSink()
             }
 
-            // Generate a stable device ID for Kia accounts so the rmToken stays valid
-            // across API client re-initializations
-            if deviceId == nil {
-                deviceId = UUID().uuidString.uppercased()
-            }
-
             // Hand the API client a way to write back any rotated
             // rmToken. We can't capture `self` directly — `BBAccount`
             // is a SwiftData @Model and the closure outlives this
@@ -191,6 +185,8 @@ extension BBAccount {
                 throw APIError(message: "API client not initialized")
             }
             // Generate a stable device ID (UUID) or do region/brand specific implementation
+            // default UUID
+            // -> api.configuration is updated with new id
             if deviceId == nil {
                 deviceId = try await api.registerDevice()
             }
@@ -688,30 +684,17 @@ extension BBAccount {
     }
 
     @MainActor
-    static func updateAccount(_ account: BBAccount, password: String, pin: String, modelContext: ModelContext) {
+    static func updateAccount(_ account: BBAccount, password: String, pin: String,
+                              refreshToken: String, modelContext: ModelContext) {
         account.password = password
         account.pin = pin
-        account.refreshToken = account.refreshToken
+        account.refreshToken = refreshToken
 
         do {
             try modelContext.save()
             BBLogger.info(.api, "BBAccount: Updated account in SwiftData")
         } catch {
             BBLogger.error(.api, "BBAccount: Failed to update account in SwiftData: \(error)")
-        }
-    }
-
-    @MainActor
-    static func deleteRefreshToken(_ account: BBAccount, modelContext: ModelContext) {
-        account.refreshToken = ""
-        account.api = nil
-        account.authToken = nil
-
-        do {
-            try modelContext.save()
-            BBLogger.info(.api, "BBAccount: Removed refresh token from Account")
-        } catch {
-            BBLogger.error(.api, "BBAccount: Failed to Removed refresh token from Account: \(error)")
         }
     }
 

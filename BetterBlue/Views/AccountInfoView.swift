@@ -16,6 +16,7 @@ struct AccountInfoView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var newPassword: String = ""
     @State private var newPin: String = ""
+    @State private var newToken: String = ""
     @State private var isLoading = false
     /// Set when a save attempt fails so the form can render a full
     /// `ErrorDetailsView`. Cleared before each attempt and on success.
@@ -23,7 +24,7 @@ struct AccountInfoView: View {
     @State private var successMessage: String?
     @State private var showingPasswordDialog = false
     @State private var showingPinDialog = false
-    @State private var doTokenDeletion = false
+    @State private var showingRefreshTDialog = false
     @State private var fakeVehicles: [BBVehicle] = []
     @Namespace private var fallbackTransition
 
@@ -83,10 +84,11 @@ struct AccountInfoView: View {
                     )
                 }
                 if account.brandEnum == .hyundai && account.regionEnum == .europe {
-                    Button("Delete Refresh Token"){
-                        doTokenDeletion.toggle()
+                    Button("Change Refresh Token"){
+                        newToken = ""
+                        showingRefreshTDialog.toggle()
                     }.matchedTransitionSource(
-                        id: "delete-refresh-token",
+                        id: "change-refresh-token",
                         in: transition ?? fallbackTransition,
                     )
                 }
@@ -173,7 +175,7 @@ struct AccountInfoView: View {
                     await savePassword()
                 }
             }
-            .disabled(newPassword.isEmpty)
+            .disabled(newPassword.isEmpty && account.refreshToken.isEmpty)
         }
         .alert("Change PIN", isPresented: $showingPinDialog) {
             SecureField("New PIN", text: $newPin)
@@ -186,11 +188,12 @@ struct AccountInfoView: View {
             }
             .disabled(newPin.isEmpty)
         }
-        .alert("Delete Refresh Token", isPresented: $doTokenDeletion) {
+        .alert("Change Refresh Token", isPresented: $showingRefreshTDialog) {
+            SecureField("New Refresh Token", text: $newToken)
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 Task {
-                    await deleteRefreshToken()
+                    await saveRefreshToken()
                 }
             }
         }
@@ -199,6 +202,21 @@ struct AccountInfoView: View {
         }
     }
 
+    fileprivate func checkNewAccountData(password: String = "", pin: String = "",
+                                         refreshToken: String = "") async throws {
+        // We don't need to create a new Account struct, just test authentication
+        // Test the new credentials by trying to authenticate
+        let testAccount = BBAccount(
+            username: account.username,
+            password: password,
+            refreshToken: refreshToken,
+            pin: pin,
+            brand: account.brandEnum,
+            region: account.regionEnum,
+        )
+        try await testAccount.initialize(modelContext: modelContext)
+    }
+    
     private func savePassword() async {
         guard !newPassword.isEmpty else { return }
 
@@ -206,22 +224,12 @@ struct AccountInfoView: View {
         saveError = nil
 
         do {
-            // We don't need to create a new Account struct, just test authentication
-
-            // Test the new credentials by trying to authenticate
-            let testAccount = BBAccount(
-                username: account.username,
-                password: newPassword,
-                refreshToken: "",
-                pin: account.pin,
-                brand: account.brandEnum,
-                region: account.regionEnum,
-            )
-            try await testAccount.initialize(modelContext: modelContext)
+            try await checkNewAccountData(password: newPassword, pin: account.pin)
 
             // If successful, update the account
             await MainActor.run {
-                BBAccount.updateAccount(account, password: newPassword, pin: account.pin, modelContext: modelContext)
+                BBAccount.updateAccount(account, password: newPassword, pin: account.pin,
+                                        refreshToken: account.refreshToken, modelContext: modelContext)
                 newPassword = ""
                 isLoading = false
                 saveError = nil
@@ -247,22 +255,39 @@ struct AccountInfoView: View {
         }
     }
 
-    private func deleteRefreshToken() async {
+    private func saveRefreshToken() async {
         isLoading = true
         saveError = nil
 
+        do {
+            try await checkNewAccountData(password: account.password, refreshToken: newToken)
+
             await MainActor.run {
-                BBAccount.deleteRefreshToken(account, modelContext: modelContext)
+                BBAccount.updateAccount(account, password: account.password, pin: account.pin,
+                                        refreshToken: newToken, modelContext: modelContext)
                 isLoading = false
                 saveError = nil
-                successMessage = "Refresh Token removed successfully"
-                doTokenDeletion = false
+                successMessage = "Refresh Token updated successfully"
+                showingRefreshTDialog = false
 
                 // Auto-dismiss success message after 3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     successMessage = nil
                 }
             }
+
+
+        } catch {
+            await MainActor.run {
+                saveError = ActionError(
+                    action: "Update refresh token",
+                    error: error,
+                    accountId: account.id
+                )
+                isLoading = false
+                successMessage = nil
+            }
+        }
     }
 
     private func savePin() async {
@@ -275,19 +300,12 @@ struct AccountInfoView: View {
             // We don't need to create a new Account struct, just test authentication
 
             // Test the new credentials by trying to authenticate
-            let testAccount = BBAccount(
-                username: account.username,
-                password: account.password,
-                refreshToken: account.refreshToken,
-                pin: newPin,
-                brand: account.brandEnum,
-                region: account.regionEnum,
-            )
-            try await testAccount.initialize(modelContext: modelContext)
+            try await checkNewAccountData(password: account.password, pin: newPin)
 
             // If successful, update the account
             await MainActor.run {
-                BBAccount.updateAccount(account, password: account.password, pin: newPin, modelContext: modelContext)
+                BBAccount.updateAccount(account, password: account.password, pin: newPin,
+                                        refreshToken: account.refreshToken, modelContext: modelContext)
                 newPin = ""
                 isLoading = false
                 saveError = nil
