@@ -46,58 +46,104 @@ final class LiveActivityManager {
     }
 
     /// Handle a wakeup push from the backend - fetch fresh data and update all Live Activities
+    ///
+    /// Restructured to minimise SwiftData lock hold time during the
+    /// background wakeup window. The old shape held the container's
+    /// `mainContext` for the entire loop body, which kept a SQLite
+    /// connection live across multiple seconds of HTTP — exactly the
+    /// pattern that trips RunningBoard's 0xdead10cc kill if iOS
+    /// suspends us mid-request. The new shape:
+    ///
+    ///   1. Snapshots only the active live-activity VINs (Sendable
+    ///      strings) so we don't iterate `Activity.activities` from
+    ///      inside a SwiftData scope.
+    ///   2. For each VIN, opens a *fresh* `ModelContext` in a tight
+    ///      `do { … }` block. Fetch → HTTP → save → drop. SwiftData
+    ///      releases that context's tracking state at scope exit;
+    ///      saves complete promptly because change sets are small.
+    ///   3. Saves explicitly with `try context.save()` so writes flush
+    ///      before the context drops (the default fresh context does
+    ///      not autosave the way `mainContext` does).
+    ///   4. Defers the `refreshActivity(…)` ActivityKit update until
+    ///      *after* the SwiftData scope, so there's no chance of the
+    ///      live-activity push holding open the SQLite connection.
     func handleWakeupPush() async {
         AppLogger.liveActivity.info("Handling wakeup push...")
 
         #if canImport(ActivityKit)
-        let activities = Activity<VehicleActivityAttributes>.activities
-        guard !activities.isEmpty else {
+        // Snapshot just the VINs — Sendable strings — so iteration
+        // happens outside any SwiftData scope.
+        let activityVINs = Activity<VehicleActivityAttributes>.activities.map { $0.attributes.vin }
+        guard !activityVINs.isEmpty else {
             AppLogger.liveActivity.info("No active Live Activities to update")
             return
         }
 
-        // Get the model container to fetch vehicle data
+        // Open one container for the whole call (creating one per
+        // iteration is wasteful — it'd reinit the SQLite connection
+        // pool each time). Per-iteration `ModelContext` instances
+        // share this container but scope their own change tracking.
         guard let container = try? createSharedModelContainer() else {
             AppLogger.liveActivity.error("Failed to create model container")
             return
         }
 
-        let context = container.mainContext
-
-        for activity in activities {
-            let vin = activity.attributes.vin
+        for vin in activityVINs {
             AppLogger.liveActivity.info("Updating Live Activity for VIN: \(vin.prefix(8), privacy: .public)...")
 
+            // Per-iteration scope: fresh context, save, drop at end.
+            // Holding the context across the HTTP boundary is
+            // unavoidable for now (BBAccount.fetchVehicleStatus takes
+            // a ModelContext for HTTP logging + token persistence),
+            // but limiting the change-tracking window to one activity
+            // at a time keeps each save fast and short.
+            let status: VehicleStatus?
             do {
-                // Fetch the vehicle
-                let predicate = #Predicate<BBVehicle> { $0.vin == vin }
-                var descriptor = FetchDescriptor(predicate: predicate)
-                descriptor.fetchLimit = 1
-
-                guard let vehicle = try context.fetch(descriptor).first,
-                      let account = vehicle.account else {
-                    AppLogger.liveActivity.error("Vehicle or account not found for VIN: \(vin.prefix(8), privacy: .public)")
-                    continue
-                }
-
-                // Initialize account with Live Activity device type for HTTP logging
-                try await account.initialize(modelContext: context, deviceType: .liveActivity)
-
-                // Fetch fresh status (async call)
-                let status = try await account.fetchVehicleStatus(for: vehicle, modelContext: context)
-
-                // Update vehicle with new status
-                vehicle.updateStatus(with: status)
-
-                // Update the Live Activity with increment wakeup count
-                await refreshActivity(for: vin, status: status, incrementWakeup: true)
-
-                AppLogger.liveActivity.info("Updated Live Activity for \(vin.prefix(8), privacy: .public)")
+                status = try await updateVehicleStatus(vin: vin, container: container)
             } catch {
                 AppLogger.liveActivity.error("Error updating Live Activity for \(vin.prefix(8), privacy: .public): \(error)")
+                status = nil
+            }
+
+            // ActivityKit refresh is independent of SwiftData — do it
+            // outside the per-iteration context scope so the push
+            // doesn't extend the lock-hold window.
+            if let status {
+                await refreshActivity(for: vin, status: status, incrementWakeup: true)
+                AppLogger.liveActivity.info("Updated Live Activity for \(vin.prefix(8), privacy: .public)")
             }
         }
         #endif
+    }
+
+    /// Per-activity SwiftData scope. Opens a fresh `ModelContext`,
+    /// fetches the vehicle, fires the HTTP refresh, persists, and
+    /// returns the new status to the caller. The context drops when
+    /// this function returns, so SwiftData releases its change-
+    /// tracking state immediately rather than carrying it across
+    /// every other activity in the same push batch.
+    private func updateVehicleStatus(
+        vin: String,
+        container: ModelContainer
+    ) async throws -> VehicleStatus? {
+        let context = ModelContext(container)
+
+        let predicate = #Predicate<BBVehicle> { $0.vin == vin }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
+
+        guard let vehicle = try context.fetch(descriptor).first,
+              let account = vehicle.account else {
+            AppLogger.liveActivity.error("Vehicle or account not found for VIN: \(vin.prefix(8), privacy: .public)")
+            return nil
+        }
+
+        try await account.initialize(modelContext: context, deviceType: .liveActivity)
+        let status = try await account.fetchVehicleStatus(for: vehicle, modelContext: context)
+
+        vehicle.updateStatus(with: status)
+        try context.save()
+        return status
     }
 
     func updateActivity(for vehicle: BBVehicle, status: VehicleStatus, modelContext: ModelContext) {

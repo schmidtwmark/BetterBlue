@@ -181,7 +181,20 @@ struct MainView: View {
     private var mainContent: some View {
         NavigationStack {
             Group {
-                if accounts.isEmpty {
+                if scenePhase != .active {
+                    // Background body renders can trigger SwiftData
+                    // fetches (via @Query) that hold a SQLite file
+                    // lock across suspension and trip RunningBoard's
+                    // 0xdead10cc kill. Render a no-op view while we
+                    // aren't active so the body never reads any of
+                    // the @Query properties (`accounts`,
+                    // `displayedVehicles`). The .onAppear / .task /
+                    // .onReceive modifiers attached to mainContent
+                    // stay live and resume work when we flip back to
+                    // .active. Color.clear (vs EmptyView) keeps the
+                    // layout dimensions stable across the transition.
+                    Color.clear
+                } else if accounts.isEmpty {
                     // Show only the no accounts view when there are no accounts
                     EmptyAccountsView(transition: transition)
                 } else if displayedVehicles.isEmpty || lastError != nil {
