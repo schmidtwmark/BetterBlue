@@ -39,6 +39,13 @@ extension MainView {
                     modelContext: modelContext
                 )
                 vehicle.updateStatus(with: status)
+                // Save BEFORE reloading widget timelines. The widget
+                // extension runs in a separate process against the
+                // same SQLite store; if we reload without saving,
+                // it sees a stale `lastUpdated`, fails the 30-min
+                // freshness check, and fires its own redundant HTTP
+                // refresh (often once per visible widget instance).
+                try modelContext.save()
 
                 await MainActor.run {
                     WidgetCenter.shared.reloadAllTimelines()

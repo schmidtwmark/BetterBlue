@@ -392,6 +392,11 @@ extension MainView {
                         modelContext: modelContext,
                     )
                     bbVehicle.updateStatus(with: status)
+                    // Save before reloading widget timelines so the
+                    // widget process sees the fresh `lastUpdated` and
+                    // doesn't re-fire its own HTTP fetch. See the
+                    // detailed note in MainViewRefresh.refreshStatus.
+                    try? modelContext.save()
 
                     await MainActor.run {
                         WidgetCenter.shared.reloadTimelines(
