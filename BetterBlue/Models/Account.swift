@@ -14,6 +14,7 @@ class BBAccount {
     var id: UUID = UUID()
     var username: String = ""
     var password: String = ""
+    var refreshToken: String = ""
     var pin: String = ""
     var brand: String = "" // Store as string, convert to/from Brand enum
     var region: String = "" // Store as string, convert to/from Region enum
@@ -71,10 +72,11 @@ class BBAccount {
         }
     }
 
-    init(username: String, password: String, pin: String, brand: Brand, region: Region) {
+    init(username: String, password: String, refreshToken: String, pin: String, brand: Brand, region: Region) {
         id = UUID()
         self.username = username
         self.password = password
+        self.refreshToken = refreshToken
         self.pin = pin
         self.brand = brand.rawValue
         self.region = region.rawValue
@@ -126,12 +128,6 @@ extension BBAccount {
                 HTTPLogSinkManager.shared.createLogSink()
             }
 
-            // Generate a stable device ID for Kia accounts so the rmToken stays valid
-            // across API client re-initializations
-            if deviceId == nil {
-                deviceId = UUID().uuidString.uppercased()
-            }
-
             // Hand the API client a way to write back any rotated
             // rmToken. We can't capture `self` directly — `BBAccount`
             // is a SwiftData @Model and the closure outlives this
@@ -164,6 +160,7 @@ extension BBAccount {
                 brand: brandEnum,
                 username: username,
                 password: password,
+                refreshToken: refreshToken.isEmpty ? nil : refreshToken,
                 pin: pin,
                 accountId: id,
                 modelContext: modelContext,
@@ -187,7 +184,20 @@ extension BBAccount {
             guard let api else {
                 throw APIError(message: "API client not initialized")
             }
+            // Generate a stable device ID (UUID) or do region/brand specific implementation
+            // default UUID
+            // -> api.configuration is updated with new id
+            if deviceId == nil {
+                deviceId = try await api.registerDevice()
+            }
+
             authToken = try await api.login()
+
+            // persist refresh token in Account (can be used for login when token expired)
+            if let token = authToken {
+                refreshToken = token.refreshToken
+            }
+
             // Clear any pending MFA error on successful login
             pendingMFAError = nil
         } catch let error as APIError where error.errorType == .requiresMFA {
@@ -674,9 +684,11 @@ extension BBAccount {
     }
 
     @MainActor
-    static func updateAccount(_ account: BBAccount, password: String, pin: String, modelContext: ModelContext) {
+    static func updateAccount(_ account: BBAccount, password: String, pin: String,
+                              refreshToken: String, modelContext: ModelContext) {
         account.password = password
         account.pin = pin
+        account.refreshToken = refreshToken
 
         do {
             try modelContext.save()
@@ -705,7 +717,7 @@ extension BBAccount {
 
 extension BBAccount: Encodable {
     enum CodingKeys: String, CodingKey {
-        case id, username, password, pin, brand, region, dateCreated
+        case id, username, password, refreshToken, pin, brand, region, dateCreated
         case rememberMeToken, serializedAuthToken, vehicles
     }
 
@@ -715,6 +727,7 @@ extension BBAccount: Encodable {
         try container.encode(id, forKey: .id)
         try container.encode(username, forKey: .username)
         try container.encode(password, forKey: .password)
+        try container.encode(refreshToken, forKey: .refreshToken)
         try container.encode(pin, forKey: .pin)
         try container.encode(brand, forKey: .brand)
         try container.encode(region, forKey: .region)
