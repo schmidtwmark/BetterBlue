@@ -171,7 +171,8 @@ class BBVehicle {
         set { fuelTypeRaw = newValue.rawValue }
     }
 
-    var marketOptions: VehicleMarketOptions = VehicleMarketOptions.generic
+    var maybeMarketOptions: VehicleMarketOptions? = nil
+    var marketOptions: VehicleMarketOptions { maybeMarketOptions ?? .generic }
 
     // Optional vehicle key for Kia vehicles
     @Transient var vehicleKey: String?
@@ -192,7 +193,7 @@ class BBVehicle {
         fuelType = vehicle.fuelType
         generation = vehicle.generation
         odometer = vehicle.odometer
-        marketOptions = vehicle.marketOptions
+        maybeMarketOptions = vehicle.marketOptions
 
         // Initialize status fields as nil
         lastUpdated = nil
