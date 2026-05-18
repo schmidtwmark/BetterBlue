@@ -26,6 +26,16 @@ struct AccountInfoView: View {
     @State private var showingPinDialog = false
     @State private var showingRefreshTDialog = false
     @State private var fakeVehicles: [BBVehicle] = []
+    /// Hyundai Europe only. Mirrors the same flag in `AddAccountView`
+    /// — when true the credentials section surfaces "Change Refresh
+    /// Token" instead of "Change Password". Initialised on appear
+    /// from the account's stored state (refresh-token mode if a
+    /// refresh token is present).
+    @State private var useToken: Bool = false
+    /// Drives the explainer sheet that fronts the switch INTO
+    /// refresh-token mode. Switching back to password is instant —
+    /// only the "into" direction needs the consent step.
+    @State private var showingRefreshTokenInfo: Bool = false
     @Namespace private var fallbackTransition
 
     private var hasPasswordChanges: Bool {
@@ -64,14 +74,30 @@ struct AccountInfoView: View {
             }
 
             Section {
-                Button("Change Password") {
-                    newPassword = ""
-                    showingPasswordDialog = true
+                // For Hyundai EU the credential row tracks the
+                // header-button mode: refresh-token mode hides the
+                // password row entirely, and vice versa. For every
+                // other region/brand `useToken` stays false so the
+                // password row is always the one shown.
+                if useToken {
+                    Button("Change Refresh Token") {
+                        newToken = ""
+                        showingRefreshTDialog = true
+                    }
+                    .matchedTransitionSource(
+                        id: "change-refresh-token",
+                        in: transition ?? fallbackTransition,
+                    )
+                } else {
+                    Button("Change Password") {
+                        newPassword = ""
+                        showingPasswordDialog = true
+                    }
+                    .matchedTransitionSource(
+                        id: "change-password",
+                        in: transition ?? fallbackTransition,
+                    )
                 }
-                .matchedTransitionSource(
-                    id: "change-password",
-                    in: transition ?? fallbackTransition,
-                )
 
                 if account.brandEnum != .kia, account.brandEnum != .fake {
                     Button("Change PIN") {
@@ -83,17 +109,31 @@ struct AccountInfoView: View {
                         in: transition ?? fallbackTransition,
                     )
                 }
-                if account.brandEnum == .hyundai && account.regionEnum == .europe {
-                    Button("Change Refresh Token"){
-                        newToken = ""
-                        showingRefreshTDialog.toggle()
-                    }.matchedTransitionSource(
-                        id: "change-refresh-token",
-                        in: transition ?? fallbackTransition,
-                    )
-                }
             } header: {
-                Text("Credentials")
+                HStack {
+                    Text("Credentials")
+                    Spacer()
+                    // Mirrors AddAccountView's header button. Only
+                    // Hyundai EU supports refresh-token auth, so
+                    // hide the affordance for everyone else.
+                    if account.brandEnum == .hyundai && account.regionEnum == .europe {
+                        Button {
+                            if useToken {
+                                // Switching back to password is the
+                                // common direction — no confirmation.
+                                useToken = false
+                            } else {
+                                // Switching INTO refresh-token mode
+                                // opens the explainer sheet first.
+                                showingRefreshTokenInfo = true
+                            }
+                        } label: {
+                            Text(useToken ? "Use Password" : "Use Refresh Token")
+                        }
+                        .font(.caption)
+                        .textCase(nil)
+                    }
+                }
             }
 
             if AppSettings.shared.debugModeEnabled {
@@ -197,8 +237,26 @@ struct AccountInfoView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingRefreshTokenInfo) {
+            RefreshTokenInfoSheet {
+                useToken = true
+                // Opening the "Change Refresh Token" dialog
+                // immediately after confirming saves the user a tap
+                // — they just signaled intent to switch, so they're
+                // about to paste a token anyway.
+                newToken = ""
+                DispatchQueue.main.async {
+                    showingRefreshTDialog = true
+                }
+            }
+        }
         .onAppear {
             fakeVehicles = account.safeVehicles
+            // Match the UI mode to the account's current auth state.
+            // An EU account that already has a refresh token starts
+            // in refresh-token mode; everyone else starts in password
+            // mode (and stays there — the header button is hidden).
+            useToken = !account.refreshToken.isEmpty
         }
     }
 
@@ -332,7 +390,7 @@ struct AccountInfoView: View {
     }
 }
 
-#Preview {
+#Preview("Hyundai USA") {
     struct PreviewWrapper: View {
         var body: some View {
             let testAccount = BBAccount(
@@ -342,6 +400,59 @@ struct AccountInfoView: View {
                 pin: "1234",
                 brand: .hyundai,
                 region: .usa
+            )
+
+            NavigationView {
+                AccountInfoView(account: testAccount)
+            }
+            .modelContainer(for: [BBAccount.self, BBVehicle.self])
+        }
+    }
+    return PreviewWrapper()
+}
+
+#Preview("Hyundai Europe (Refresh Token)") {
+    struct PreviewWrapper: View {
+        var body: some View {
+            // Non-empty refreshToken so `.onAppear` initialises
+            // `useToken = true` — this is the preview that exercises
+            // the header "Use Password" button, the "Change Refresh
+            // Token" credentials row, and the explainer sheet's
+            // entry point. Use a representative-looking opaque blob
+            // for the token field; nothing in the preview actually
+            // tries to authenticate with it.
+            let testAccount = BBAccount(
+                username: "test@example.eu",
+                password: "",
+                refreshToken: "eyJhbGciOiJIUzI1NiJ9.preview-token.signature",
+                pin: "1234",
+                brand: .hyundai,
+                region: .europe
+            )
+
+            NavigationView {
+                AccountInfoView(account: testAccount)
+            }
+            .modelContainer(for: [BBAccount.self, BBVehicle.self])
+        }
+    }
+    return PreviewWrapper()
+}
+
+#Preview("Hyundai Europe (Password)") {
+    struct PreviewWrapper: View {
+        var body: some View {
+            // Empty refreshToken → `useToken` stays false on appear,
+            // so the header button reads "Use Refresh Token" and
+            // tapping it opens the explainer sheet. This is the
+            // preview for the switch-INTO-token flow.
+            let testAccount = BBAccount(
+                username: "test@example.eu",
+                password: "password",
+                refreshToken: "",
+                pin: "1234",
+                brand: .hyundai,
+                region: .europe
             )
 
             NavigationView {

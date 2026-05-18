@@ -58,8 +58,15 @@ struct AddAccountView: View {
     @State private var selectedBrand: Brand = .hyundai
     @State private var selectedRegion: Region = .usa
     @State private var isLoading = false
+    /// Hyundai Europe only. When true the user signs in with a
+    /// pre-generated refresh token instead of a password.
     @State private var useToken: Bool = false
-    @State private var showTokenInfo: Bool = false
+    /// Drives the "Use Refresh Token" confirmation sheet. We require
+    /// an explicit confirm step because switching INTO refresh-token
+    /// mode is the rare path — most users don't know what one is and
+    /// could tap it accidentally. Switching back to Password mode is
+    /// instant (no sheet).
+    @State private var showingRefreshTokenInfo: Bool = false
     /// Populated when login or first vehicle-load fails so the form can
     /// render a full `ErrorDetailsView` (headline + summary + technical
     /// details collapsed by default).
@@ -136,6 +143,18 @@ struct AddAccountView: View {
             }
         }
         .mfaFlow(state: mfaState)
+        .sheet(isPresented: $showingRefreshTokenInfo) {
+            RefreshTokenInfoSheet {
+                useToken = true
+                // Drop the user straight onto the new field so they
+                // can paste in their token immediately. Schedule
+                // after the dismiss animation so SwiftUI doesn't
+                // race the focus update against the sheet teardown.
+                DispatchQueue.main.async {
+                    focusedField = .refreshToken
+                }
+            }
+        }
         .onAppear {
             focusedField = .username
         }
@@ -209,40 +228,14 @@ struct AddAccountView: View {
             }
 
 
-            if selectedBrand == .hyundai && selectedRegion == .europe {
+            if useToken {
                 HStack {
-                    Button {
-                                showTokenInfo.toggle()
-                            } label: {
-                                Image(systemName: "info.circle")
-                                    .font(.title2)
-                            }.popover(isPresented: $showTokenInfo) {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    let link = "[GitHub Project Page](https://github.com/TMA84/bluelink-refresh-token/blob/main/README.md)"
-                                        Text("Feature Details").font(.headline)
-                                        Text("The Refresh-Token is an generated key to access the hyundai api on multiple devices.")
-                                        Text("You dont need to enter a password when using this key.")
-                                        if let openSourceString = try? AttributedString(
-                                            markdown: "Information on how to get such a key can be found on the \(link).") {
-                                            Text(openSourceString).tint(.blue)
-                                        }
-                                    }
-                                    .padding()
-                                    .frame(maxWidth: 300)
-                                    .presentationDetents([.height(320)])
-                            }
-                    Toggle("Refresh-Token/Password", isOn: $useToken)
-                }
-            }
-
-            if !useToken {
-                HStack {
-                    Text("Password")
+                    Text("Refresh Token")
                     Spacer()
-                    SecureField("", text: $password)
+                    SecureField("", text: $refreshToken)
                         .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .password)
-                        .submitLabel(selectedBrand == .hyundai ? .next : .done)
+                        .focused($focusedField, equals: .refreshToken)
+                        .submitLabel(.done)
                         .onSubmit {
                             if selectedBrand == .hyundai {
                                 focusedField = .pin
@@ -255,12 +248,12 @@ struct AddAccountView: View {
                 }
             } else {
                 HStack {
-                    Text("Refresh Token")
+                    Text("Password")
                     Spacer()
-                    SecureField("", text: $refreshToken)
+                    SecureField("", text: $password)
                         .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .refreshToken)
-                        .submitLabel(.done)
+                        .focused($focusedField, equals: .password)
+                        .submitLabel(selectedBrand == .hyundai ? .next : .done)
                         .onSubmit {
                             if selectedBrand == .hyundai {
                                 focusedField = .pin
@@ -291,7 +284,31 @@ struct AddAccountView: View {
             }
 
         } header: {
-            Text("Account Information")
+            HStack {
+                Text("Account Information")
+                Spacer()
+                // Refresh-token toggle moved to the section header so
+                // the field block stays a clean credentials form. Only
+                // Hyundai Europe offers refresh-token auth, so hide
+                // for everyone else.
+                if selectedBrand == .hyundai && selectedRegion == .europe {
+                    Button {
+                        if useToken {
+                            // Switching back to password is the common
+                            // case — no confirmation needed.
+                            useToken = false
+                        } else {
+                            // Switching INTO refresh-token mode opens
+                            // an explainer sheet first.
+                            showingRefreshTokenInfo = true
+                        }
+                    } label: {
+                        Text(useToken ? "Use Password" : "Use Refresh Token")
+                    }
+                    .font(.caption)
+                    .textCase(nil)
+                }
+            }
         } footer: {
             if selectedBrand == .fake {
                 Text("Using test account - fake data will be used")
@@ -457,6 +474,24 @@ struct AddAccountView: View {
         }
     }
 
+    return PreviewWrapper()
+        .modelContainer(for: [BBAccount.self, BBVehicle.self, ClimatePreset.self, BBHTTPLog.self])
+}
+
+#Preview("Add Europe Account") {
+    struct PreviewWrapper: View {
+        @State private var selectedRegion: Region = .europe
+        @State private var selectedBrand: Brand = .hyundai
+        
+        var body: some View {
+            NavigationView {
+                AddAccountView()
+            }
+            .onAppear {
+                
+            }
+        }
+    }
     return PreviewWrapper()
         .modelContainer(for: [BBAccount.self, BBVehicle.self, ClimatePreset.self, BBHTTPLog.self])
 }
