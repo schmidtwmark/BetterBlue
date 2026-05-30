@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "BetterBlue",
+    "slug": "better-blue",
+    "version": "1.0.0",
+    "scheme": "betterblue",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0f172a",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "bundleIdentifier": "com.markschmidt.betterblue",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BetterBlue uses your location to show your vehicle on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BetterBlue uses your location to show your vehicle on the map."
+      }
+    },
+    "android": {
+      "package": "com.markschmidt.betterblue",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", { "color": "#1a73e8" }],
+      ["expo-location", { "locationWhenInUsePermission": "BetterBlue uses your location to show your vehicle on the map." }]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}
