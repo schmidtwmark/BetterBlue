@@ -113,7 +113,12 @@ struct DebugExportData {
 
         var vehicleStatuses: [HTTPLog] = []
         for vehicle in vehicles {
-            if let statusLog = allLogs.first(where: {
+            // Up to 2 most-recent logs per vehicle, not just the first —
+            // the EU clients make TWO fetchVehicleStatus-typed calls per
+            // refresh (/status/latest + /location/park), and taking only
+            // the newest meant the park call always shadowed the actual
+            // status body in exports (as in the e-Niro report for #41).
+            let statusLogs = allLogs.filter {
                 guard $0.log.requestType == .fetchVehicleStatus else { return false }
                 if $0.log.vin == vehicle.vin { return true }
                 // Backwards-compat for logs written before HTTPLog.vin existed.
@@ -125,9 +130,8 @@ struct DebugExportData {
                     return true
                 }
                 return $0.log.url.contains(vehicle.vin)
-            })?.log {
-                vehicleStatuses.append(statusLog)
-            }
+            }.prefix(2)
+            vehicleStatuses.append(contentsOf: statusLogs.map(\.log))
         }
 
         return AccountHTTPLogs(

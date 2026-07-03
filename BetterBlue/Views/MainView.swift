@@ -57,6 +57,12 @@ struct MainView: View {
         center: CLLocationCoordinate2D(latitude: 25.0, longitude: -100.0),
         span: MKCoordinateSpan(latitudeDelta: 50.0, longitudeDelta: 60.0),
     )
+    /// Country-level region for the device's locale, geocoded once and
+    /// cached — the map falls back to this when the selected vehicle has
+    /// no usable location (no GPS fix / null island).
+    @State private var localeFallbackRegion: MKCoordinateRegion?
+    /// Guards against kicking off a second geocode while one is running.
+    @State private var isGeocodingLocaleRegion = false
 
     @Namespace private var transition
 
@@ -145,8 +151,10 @@ struct MainView: View {
                     // already populated here, so the map renders
                     // zoomed in on the right vehicle from the start
                     // instead of showing a continent-scale view
-                    // until the user swipes.
-                    if currentVehicle?.coordinate != nil {
+                    // until the user swipes. updateMapRegion falls
+                    // back to the locale-region view when the vehicle
+                    // has no usable coordinate.
+                    if currentVehicle != nil {
                         updateMapRegion(reason: "initial view appearance")
                     }
                     Task {
@@ -160,14 +168,16 @@ struct MainView: View {
                         updateMapRegion(reason: "screen size changed")
                     }
                 }
-                .onChange(of: currentVehicle?.location, initial: true) { _, newLocation in
+                .onChange(of: currentVehicle?.location, initial: true) { _, _ in
                     // `initial: true` catches the cold-launch case
                     // where displayedVehicles populates asynchronously
                     // — the .onAppear above runs before
                     // currentVehicle is valid, so we'd otherwise be
                     // stuck on the continent-scale default region
-                    // until the user swiped.
-                    if newLocation != nil {
+                    // until the user swiped. Runs for nil/(0,0)
+                    // locations too: updateMapRegion then applies the
+                    // missing-location fallback region instead.
+                    if currentVehicle != nil {
                         updateMapRegion(reason: "vehicle location updated")
                     }
                 }
@@ -235,6 +245,13 @@ struct MainView: View {
                 currentVehicle: currentVehicle,
                 mapRegion: $mapRegion,
             )
+            .overlay(alignment: .top) {
+                // Explains the marker-less, zoomed-out map when the API
+                // returned no GPS fix for the selected vehicle.
+                if let vehicle = currentVehicle, vehicle.coordinate == nil {
+                    missingLocationBanner(for: vehicle)
+                }
+            }
             VehicleSheetPager(
                 bbVehicles: displayedVehicles,
                 selectedVehicleIndex: $selectedVehicleIndex,
@@ -243,6 +260,27 @@ struct MainView: View {
                 sheetPresentation: sheetPresentation
             )
         }
+    }
+
+    /// Glass chip pinned to the top of the map when the selected
+    /// vehicle has no usable location.
+    @ViewBuilder
+    private func missingLocationBanner(for vehicle: BBVehicle) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "location.slash.fill")
+                .foregroundStyle(.orange)
+            Text("No location received from \(vehicle.displayName)")
+                .font(.footnote)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background {
+            Color.clear.glassEffect(.regular, in: Capsule())
+        }
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.25), value: vehicle.coordinate == nil)
     }
 
     @ViewBuilder
@@ -441,6 +479,7 @@ extension MainView {
 
         guard vehicle.coordinate != nil else {
             BBLogger.error(.app, "MapCentering: Vehicle \(vehicle.displayName) has no coordinate")
+            applyMissingLocationFallback()
             return
         }
 
@@ -462,6 +501,60 @@ extension MainView {
             .easeInOut(duration: MapCenteringConfig.animationDuration),
         ) {
             mapRegion = newRegion
+        }
+    }
+
+    /// Zoomed-out fallback when the selected vehicle has no usable
+    /// location: show the user's own region (the device locale's
+    /// country, geocoded once — no location permission required)
+    /// instead of the hardcoded North-America default or null island.
+    /// The "no location received" banner over the map explains why.
+    private func applyMissingLocationFallback() {
+        if let cached = localeFallbackRegion {
+            if shouldUpdateMapRegion(to: cached.center) {
+                withAnimation(.easeInOut(duration: MapCenteringConfig.animationDuration)) {
+                    mapRegion = cached
+                }
+            }
+            return
+        }
+        guard !isGeocodingLocaleRegion,
+              let regionCode = Locale.current.region?.identifier,
+              let countryName = Locale.current.localizedString(forRegionCode: regionCode) else {
+            return
+        }
+        isGeocodingLocaleRegion = true
+        Task { @MainActor in
+            defer { isGeocodingLocaleRegion = false }
+            guard let placemark = try? await CLGeocoder().geocodeAddressString(countryName).first else {
+                BBLogger.warning(.app, "MapCentering: locale-region geocode failed for \(countryName)")
+                return
+            }
+            let region: MKCoordinateRegion
+            if let circular = placemark.region as? CLCircularRegion {
+                // Radius (m) → degrees latitude (~111 km each), clamped so
+                // small countries still show context and large ones fit.
+                let degrees = min(40.0, max(3.0, (circular.radius * 2) / 111_000))
+                region = MKCoordinateRegion(
+                    center: circular.center,
+                    span: MKCoordinateSpan(latitudeDelta: degrees, longitudeDelta: degrees)
+                )
+            } else if let location = placemark.location {
+                region = MKCoordinateRegion(
+                    center: location.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+                )
+            } else {
+                return
+            }
+            localeFallbackRegion = region
+            // Only apply if the vehicle still has no coordinate — a status
+            // refresh may have delivered a real location mid-geocode.
+            if currentVehicle != nil, currentVehicle?.coordinate == nil {
+                withAnimation(.easeInOut(duration: MapCenteringConfig.animationDuration)) {
+                    mapRegion = region
+                }
+            }
         }
     }
 
