@@ -526,27 +526,20 @@ extension MainView {
         isGeocodingLocaleRegion = true
         Task { @MainActor in
             defer { isGeocodingLocaleRegion = false }
-            guard let placemark = try? await CLGeocoder().geocodeAddressString(countryName).first else {
-                BBLogger.warning(.app, "MapCentering: locale-region geocode failed for \(countryName)")
+            // MKLocalSearch instead of CLGeocoder (deprecated in iOS 26);
+            // its response's boundingRegion already frames the match, so
+            // no radius-to-degrees math is needed.
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = countryName
+            guard let response = try? await MKLocalSearch(request: request).start() else {
+                BBLogger.warning(.app, "MapCentering: locale-region search failed for \(countryName)")
                 return
             }
-            let region: MKCoordinateRegion
-            if let circular = placemark.region as? CLCircularRegion {
-                // Radius (m) → degrees latitude (~111 km each), clamped so
-                // small countries still show context and large ones fit.
-                let degrees = min(40.0, max(3.0, (circular.radius * 2) / 111_000))
-                region = MKCoordinateRegion(
-                    center: circular.center,
-                    span: MKCoordinateSpan(latitudeDelta: degrees, longitudeDelta: degrees)
-                )
-            } else if let location = placemark.location {
-                region = MKCoordinateRegion(
-                    center: location.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
-                )
-            } else {
-                return
-            }
+            var region = response.boundingRegion
+            // Clamp to country-scale zoom: a stray point match shouldn't
+            // zoom to street level, a huge match shouldn't show the globe.
+            let degrees = min(40.0, max(3.0, region.span.latitudeDelta))
+            region.span = MKCoordinateSpan(latitudeDelta: degrees, longitudeDelta: degrees)
             localeFallbackRegion = region
             // Only apply if the vehicle still has no coordinate — a status
             // refresh may have delivered a real location mid-geocode.
