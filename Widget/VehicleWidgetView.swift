@@ -505,16 +505,20 @@ struct VehicleRingGauge: View {
         } currentValueLabel: {
             switch center {
             case .percentage:
-                // Bare number, matching Apple's battery ring.
-                Text("\(Int(percentage.rounded()))")
+                Text("\(Int(percentage.rounded()))%")
+                    .minimumScaleFactor(0.6)
             case .range:
                 let (value, unit) = rangeParts
-                VStack(spacing: -2) {
+                // Explicit fonts so BOTH lines reliably fit the gauge's
+                // small center slot — with the default text size the unit
+                // line gets squeezed out entirely.
+                VStack(spacing: -1) {
                     Text(value)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .minimumScaleFactor(0.5)
                     if let unit {
                         Text(unit)
-                            .font(.system(size: 9))
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                 }

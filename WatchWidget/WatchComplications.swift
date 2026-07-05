@@ -142,18 +142,20 @@ struct WatchRingGauge: View {
             } currentValueLabel: {
                 switch center {
                 case .percentage:
-                    // Bare number, matching the system battery ring.
-                    Text("\(Int(percentage.rounded()))")
+                    Text("\(Int(percentage.rounded()))%")
                         .font(.system(.body, design: .rounded))
+                        .minimumScaleFactor(0.6)
                 case .range:
                     let (value, unit) = rangeParts
-                    VStack(spacing: -2) {
+                    // Explicit fonts so BOTH lines reliably fit the gauge's
+                    // small center slot.
+                    VStack(spacing: -1) {
                         Text(value)
-                            .font(.system(.body, design: .rounded))
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .minimumScaleFactor(0.5)
                         if let unit {
                             Text(unit)
-                                .font(.system(size: 9))
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -210,10 +212,14 @@ struct VehicleStatusComplicationView: View {
                 Spacer()
             }
         case .accessoryInline:
-            if let range = entry.rangeText {
-                Label(range, systemImage: "car.fill")
-            } else {
+            // Range and percentage together, dot-separated — whichever of
+            // the two is available ("250 mi · 82%", "82%", …).
+            let percentText = entry.batteryPercentage.map { "\(Int($0.rounded()))%" }
+            let parts = [entry.rangeText, percentText].compactMap(\.self)
+            if parts.isEmpty {
                 Label("BetterBlue", systemImage: "car.fill")
+            } else {
+                Label(parts.joined(separator: " · "), systemImage: "car.fill")
             }
         default:
             Image(systemName: "car.fill")
