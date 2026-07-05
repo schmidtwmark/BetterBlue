@@ -421,8 +421,13 @@ extension BBVehicle {
             }
         }
 
+        // Distinct error type: the command was already accepted upstream —
+        // only the confirmation polling timed out. UIs render this as a
+        // soft "awaiting confirmation" state, not a failure (issue #83).
         throw APIError(
-            message: "Status change condition not met after \(maxAttempts) attempts",
+            message: "The command was sent, but the vehicle hasn't confirmed the change yet. "
+                + "It may still complete — refresh in a minute to check.",
+            errorType: .statusVerificationTimeout
         )
     }
 

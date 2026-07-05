@@ -291,6 +291,10 @@ struct EVRangeChargingCard: View {
                 message = .warning("Server temporarily unavailable")
             case .invalidPin:
                 message = .error(apiError.message)
+            case .statusVerificationTimeout:
+                // Command accepted; confirmation just hasn't landed yet
+                // (issue #83) — a soft note, not a failure.
+                message = .warning("Sent — awaiting confirmation")
             default:
                 message = .error(apiError.message)
             }
@@ -391,12 +395,16 @@ struct EVRangeChargingCard: View {
             }
         }
 
+        // Charging state propagates slowest through the backends — give it
+        // a longer window than the default (matches ChargingButton).
         try await bbVehicle.waitForStatusChange(
             modelContext: context,
             condition: { status in
                 status.evStatus?.charging == shouldStart
             },
-            statusMessageUpdater: statusUpdater
+            statusMessageUpdater: statusUpdater,
+            maxAttempts: 5,
+            retryDelaySeconds: 15
         )
     }
 }

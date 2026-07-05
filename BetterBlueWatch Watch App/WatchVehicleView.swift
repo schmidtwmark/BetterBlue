@@ -412,12 +412,16 @@ struct WatchVehicleView: View {
             try await account.stopCharge(currentVehicle, modelContext: modelContext)
         }
 
+        // Charging state propagates slowest through the backends — give it
+        // a longer window than the default (matches the iOS ChargingButton).
         try await currentVehicle.waitForStatusChange(
             modelContext: modelContext,
             condition: { status in
                 status.evStatus?.charging == shouldStart
             },
             statusMessageUpdater: statusUpdater,
+            maxAttempts: 5,
+            retryDelaySeconds: 15,
         )
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -533,6 +537,13 @@ struct WatchVehicleButton: View {
                 BBLogger.warning(.app, "WatchVehicleButton: action failed: \(error)")
                 await MainActor.run {
                     inProgressAction = nil
+                    // Verification timeout is NOT a failure — the command
+                    // was accepted; the backend just hasn't confirmed the
+                    // change yet (issue #83). No error sheet for it.
+                    if let apiError = error as? APIError,
+                       apiError.errorType == .statusVerificationTimeout {
+                        return
+                    }
                     // Match the iOS catch site: prefer the action's
                     // completedText (verb-noun like "Lock vehicle"),
                     // fall back to the menu label. Only set if the

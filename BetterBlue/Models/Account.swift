@@ -225,18 +225,25 @@ extension BBAccount {
         }
     }
 
-    /// Clears the cached session (auth token + API client) and forces a
-    /// fresh login. Use when the server-side session has gone stale but
-    /// the locally-stored token hasn't expired yet, so the app keeps
-    /// failing with no way to recover short of deleting the account
-    /// (BetterBlue#71). Credentials, device ID, and refresh token are
-    /// preserved.
+    /// Clears the cached session and forces a fresh login. Use when the
+    /// server-side session has gone stale but the locally-stored token
+    /// hasn't expired yet, so the app keeps failing with no way to recover
+    /// short of deleting the account (BetterBlue#71).
+    ///
+    /// This is a FULL reset: the remember-me token and device id are
+    /// dropped too. They're session artifacts the backends regenerate on a
+    /// clean login — and a stale rotated rmToken (Kia US) or device
+    /// registration is exactly what made "Reset Session" insufficient for
+    /// an expired session (BetterBlue#84). Credentials and the refresh
+    /// token (the EU accounts' long-lived credential) are preserved.
     @MainActor
     func resetSession(modelContext: ModelContext) async throws {
         BBLogger.info(.auth, "BBAccount: resetting session for \(username)")
         authToken = nil
         api = nil
         pendingMFAError = nil
+        rememberMeToken = nil
+        deviceId = nil
         do {
             try modelContext.save()
         } catch {
@@ -321,6 +328,7 @@ extension BBAccount {
              .serverError,
              .concurrentRequest,
              .regionNotSupported,
+             .statusVerificationTimeout,
              .general:
             return false
         }

@@ -135,12 +135,17 @@ struct ChargingButton: View {
             }
         }
 
+        // The charging flag is the slowest state to propagate through the
+        // backends (Kia US in particular) — give it a longer window than
+        // the default before declaring the change unconfirmed.
         try await bbVehicle.waitForStatusChange(
             modelContext: context,
             condition: { status in
                 status.evStatus?.charging == shouldStart
             },
             statusMessageUpdater: statusUpdater,
+            maxAttempts: 5,
+            retryDelaySeconds: 15,
         )
     }
 }

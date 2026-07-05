@@ -1098,12 +1098,16 @@ struct PersistentVehicleSheet: View {
                     for: bbVehicle, modelContext: context, cached: false
                 )
             }
+            // Charging state propagates slowest through the backends —
+            // give it a longer window (matches ChargingButton).
             try await bbVehicle.waitForStatusChange(
                 modelContext: context,
                 condition: { $0.evStatus?.charging == start },
                 statusMessageUpdater: { msg in
                     Task { @MainActor in chargingStatusText = msg }
-                }
+                },
+                maxAttempts: 5,
+                retryDelaySeconds: 15
             )
         } catch {
             handleError(error, action: start ? "Start Charging \(bbVehicle.displayName)" : "Stop Charging \(bbVehicle.displayName)")
@@ -1155,6 +1159,13 @@ struct PersistentVehicleSheet: View {
     // MARK: - Error wiring
 
     private func handleError(_ error: Error, action: String) {
+        // Verification timeout is NOT a failure — the command was accepted
+        // and usually completes; the backend just hasn't reflected it yet
+        // (issue #83). No red banner: the next status refresh settles it.
+        if let apiError = error as? APIError, apiError.errorType == .statusVerificationTimeout {
+            BBLogger.info(.app, "\(action): command sent, confirmation pending")
+            return
+        }
         let message: String
         if let apiError = error as? APIError {
             // Route through the friendly-message mapping so the
@@ -1216,6 +1227,11 @@ struct PersistentVehicleSheet: View {
             return error.message
         case .regionNotSupported:
             return "This region is not yet supported"
+        case .statusVerificationTimeout:
+            // Normally unreachable — handleError early-returns for this
+            // type (soft state, no banner) — but keep a sane message in
+            // case another path routes it here.
+            return "Command sent — the vehicle hasn't confirmed the change yet"
         }
     }
 
