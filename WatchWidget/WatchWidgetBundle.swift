@@ -12,5 +12,6 @@ import WidgetKit
 struct WatchWidgetBundle: WidgetBundle {
     var body: some Widget {
         VehicleStatusComplication()
+        VehicleRangeComplication()
     }
 }

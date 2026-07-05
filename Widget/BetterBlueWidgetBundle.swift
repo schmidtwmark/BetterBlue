@@ -14,6 +14,7 @@ struct BetterBlueWidgetBundle: WidgetBundle {
     var body: some Widget {
         BetterBlueWidget()
         BetterBlueLockScreenWidget()
+        BetterBlueLockScreenRangeWidget()
         VehicleLockControlWidget()
         VehicleUnlockControlWidget()
         ClimateStartControlWidget()

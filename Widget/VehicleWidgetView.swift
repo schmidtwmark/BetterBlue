@@ -445,13 +445,16 @@ private extension Array {
 
 struct LockScreenVehicleWidgetView: View {
     let entry: VehicleWidgetEntry
+    /// What the circular ring shows in its center — the percentage
+    /// widget and the range widget share this one view.
+    var circularCenter: VehicleRingGauge.Center = .percentage
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
         if let vehicle = entry.vehicle {
             switch family {
             case .accessoryCircular:
-                LockScreenRangeWidget(vehicle: vehicle)
+                LockScreenRangeWidget(vehicle: vehicle, center: circularCenter)
                     .containerBackground(for: .widget) {
                         Color.clear
                     }
@@ -477,40 +480,57 @@ struct LockScreenVehicleWidgetView: View {
     }
 }
 
-struct LockScreenProgressIcon: View {
+/// Battery-widget-style ring: the SYSTEM accessoryCircular gauge (270°
+/// arc with a bottom gap and rounded caps — the exact rendering Apple's
+/// Batteries lock-screen widget uses, unlike the old hand-drawn full
+/// circle), with the fuel glyph in the gap and a configurable center.
+struct VehicleRingGauge: View {
+    enum Center { case percentage, range }
     let vehicle: VehicleEntity
-    let lineWidth = 3.0
+    let center: Center
 
-    private var rangePercentage: Double {
-        guard let batteryPercentage = vehicle.batteryPercentage else { return 0.0 }
-        return batteryPercentage / 100.0
+    private var percentage: Double { vehicle.batteryPercentage ?? 0 }
+
+    /// "203 mi" → ("203", "mi") so the unit can render small under the
+    /// number inside the ring; non-splittable text passes through whole.
+    private var rangeParts: (String, String?) {
+        let parts = vehicle.rangeText.split(separator: " ", maxSplits: 1)
+        guard parts.count == 2 else { return (vehicle.rangeText, nil) }
+        return (String(parts[0]), String(parts[1]))
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.secondary.opacity(0.3), lineWidth: lineWidth)
-
-            Circle()
-                .trim(from: 0, to: rangePercentage)
-                .stroke(Color.primary,
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 1), value: rangePercentage)
-
-            Image(systemName: vehicle.fuelType.hasElectricCapability ? "bolt.car.fill" : "car.fill")
+        Gauge(value: percentage, in: 0 ... 100) {
+            Image(systemName: vehicle.fuelType.hasElectricCapability ? "bolt.fill" : "fuelpump.fill")
+        } currentValueLabel: {
+            switch center {
+            case .percentage:
+                // Bare number, matching Apple's battery ring.
+                Text("\(Int(percentage.rounded()))")
+            case .range:
+                let (value, unit) = rangeParts
+                VStack(spacing: -2) {
+                    Text(value)
+                        .minimumScaleFactor(0.5)
+                    if let unit {
+                        Text(unit)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
-        .frame(width: 44, height: 44)
+        .gaugeStyle(.accessoryCircular)
+        .widgetAccentable()
     }
 }
 
 struct LockScreenRangeWidget: View {
     let vehicle: VehicleEntity
+    var center: VehicleRingGauge.Center = .percentage
 
     var body: some View {
-        LockScreenProgressIcon(
-            vehicle: vehicle,
-        )
+        VehicleRingGauge(vehicle: vehicle, center: center)
     }
 }
 
@@ -518,13 +538,10 @@ struct LockScreenWideRangeWidget: View {
     let vehicle: VehicleEntity
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Progress icon on the left
-            LockScreenProgressIcon(
-                vehicle: vehicle,
-            )
+        HStack(spacing: 10) {
+            // Percentage ring on the left, name + range beside it.
+            VehicleRingGauge(vehicle: vehicle, center: .percentage)
 
-            // Vehicle name and range text
             VStack(alignment: .leading, spacing: 1) {
                 Text(vehicle.displayName)
                     .fontWeight(.medium)
@@ -568,6 +585,23 @@ struct LockScreenWideRangeWidget: View {
         fuelType: .electric,
         rangeText: "250 mi",
         batteryPercentage: 85.0,
+        timestamp: Date(),
+        backgroundColorName: "white"
+    )
+
+    VehicleWidgetEntry(date: .now, vehicle: placeholderVehicle, configuration: VehicleWidgetIntent())
+}
+
+#Preview(as: .accessoryCircular) {
+    BetterBlueLockScreenRangeWidget()
+} timeline: {
+    let placeholderVehicle = VehicleEntity(
+        id: .init(),
+        displayName: "Model Y",
+        vin: "test",
+        fuelType: .electric,
+        rangeText: "280 mi",
+        batteryPercentage: 75.0,
         timestamp: Date(),
         backgroundColorName: "white"
     )

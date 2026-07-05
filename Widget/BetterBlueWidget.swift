@@ -43,9 +43,30 @@ struct BetterBlueLockScreenWidget: Widget {
         ) { entry in
             LockScreenVehicleWidgetView(entry: entry)
         }
-        .configurationDisplayName("Vehicle Range")
-        .description("Shows your vehicle's current range as a circular indicator.")
+        .configurationDisplayName("Vehicle Percentage")
+        .description("Battery or fuel ring with the percentage. The rectangular size adds the vehicle name and range.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular])
+    }
+}
+
+/// Circular ring with the remaining RANGE in the center instead of the
+/// percentage. Its own widget kind (rather than an option on
+/// BetterBlueLockScreenWidget) so both variants appear in the gallery
+/// and existing placements upgrade in place without reconfiguration.
+struct BetterBlueLockScreenRangeWidget: Widget {
+    let kind: String = "BetterBlueLockScreenRangeWidget"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: kind,
+            intent: VehicleWidgetIntent.self,
+            provider: VehicleTimelineProvider(),
+        ) { entry in
+            LockScreenVehicleWidgetView(entry: entry, circularCenter: .range)
+        }
+        .configurationDisplayName("Vehicle Range")
+        .description("Battery or fuel ring with the remaining range.")
+        .supportedFamilies([.accessoryCircular])
     }
 }
 
