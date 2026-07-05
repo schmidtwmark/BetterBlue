@@ -18,6 +18,36 @@ import WidgetKit
     import UserNotifications
 #endif
 
+/// Tint options for the watch complication ring. Lives here (not in
+/// CustomColors) because AppSettings is the one file already compiled
+/// into BOTH watch targets — the watch app (settings UI) and the
+/// complication extension (rendering).
+enum WatchComplicationColor: String, CaseIterable, Identifiable {
+    case automatic, green, blue, red, orange, yellow, purple, pink, teal
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        self == .automatic ? "Automatic" : rawValue.capitalized
+    }
+
+    /// `nil` for `.automatic` — no explicit tint, so the ring takes the
+    /// watch face's tint like the system complications do.
+    var color: Color? {
+        switch self {
+        case .automatic: nil
+        case .green: .green
+        case .blue: .blue
+        case .red: .red
+        case .orange: .orange
+        case .yellow: .yellow
+        case .purple: .purple
+        case .pink: .pink
+        case .teal: .teal
+        }
+    }
+}
+
 enum WidgetRefreshInterval: Int, CaseIterable {
     case oneHour = 1
     case twoHours = 2
@@ -171,6 +201,48 @@ class AppSettings {
         return unit
     }
 
+    nonisolated private static let watchComplicationVINKey = "WatchComplicationVIN"
+    nonisolated private static let watchComplicationColorKey = "WatchComplicationColor"
+
+    /// VIN the watch complication shows; nil/absent = first visible
+    /// vehicle. Live read — the complication runs in its own process.
+    nonisolated static func liveWatchComplicationVIN() -> String? {
+        guard let defaults = UserDefaults(suiteName: appGroupSuiteName),
+              let vin = defaults.string(forKey: watchComplicationVINKey),
+              !vin.isEmpty else {
+            return nil
+        }
+        return vin
+    }
+
+    nonisolated static func liveWatchComplicationColor() -> WatchComplicationColor {
+        guard let defaults = UserDefaults(suiteName: appGroupSuiteName),
+              let raw = defaults.string(forKey: watchComplicationColorKey),
+              let color = WatchComplicationColor(rawValue: raw) else {
+            return .automatic
+        }
+        return color
+    }
+
+    /// Which vehicle the watch complication tracks (VIN; nil = first
+    /// visible vehicle). Watch-local: written by the watch app's
+    /// settings into the watch's own app-group defaults — deliberately
+    /// NOT synced across devices, since it only means anything to the
+    /// complication on this watch.
+    var watchComplicationVIN: String? {
+        didSet {
+            userDefaults.set(watchComplicationVIN, forKey: Self.watchComplicationVINKey)
+            refreshWidgetsAndLiveActivities()
+        }
+    }
+
+    var watchComplicationColor: WatchComplicationColor {
+        didSet {
+            userDefaults.set(watchComplicationColor.rawValue, forKey: Self.watchComplicationColorKey)
+            refreshWidgetsAndLiveActivities()
+        }
+    }
+
     var notificationsEnabled: Bool {
         didSet {
             userDefaults.set(notificationsEnabled, forKey: notificationsEnabledKey)
@@ -236,6 +308,12 @@ class AppSettings {
 
         let savedRefreshInterval = userDefaults.integer(forKey: widgetRefreshIntervalKey)
         widgetRefreshInterval = WidgetRefreshInterval(rawValue: savedRefreshInterval) ?? .fourHours
+
+        let savedComplicationVIN = userDefaults.string(forKey: Self.watchComplicationVINKey)
+        watchComplicationVIN = (savedComplicationVIN?.isEmpty ?? true) ? nil : savedComplicationVIN
+        watchComplicationColor = WatchComplicationColor(
+            rawValue: userDefaults.string(forKey: Self.watchComplicationColorKey) ?? ""
+        ) ?? .automatic
 
         if userDefaults.object(forKey: debugModeEnabledKey) == nil {
             #if DEBUG

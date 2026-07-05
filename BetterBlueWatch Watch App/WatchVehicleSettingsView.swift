@@ -33,6 +33,32 @@ struct WatchVehicleSettingsView: View {
                         }
                     }
                 }
+
+                Section("Complication") {
+                    // Which vehicle the watch-face ring tracks. "" tags the
+                    // follow-the-first-vehicle default; a VIN pins one.
+                    Picker("Vehicle", selection: Binding(
+                        get: { appSettings.watchComplicationVIN ?? "" },
+                        set: { appSettings.watchComplicationVIN = $0.isEmpty ? nil : $0 }
+                    )) {
+                        Text("First vehicle").tag("")
+                        ForEach(allVehicles.filter { !$0.isHidden }.sorted { $0.sortOrder < $1.sortOrder }) { v in
+                            Text(v.displayName).tag(v.vin)
+                        }
+                    }
+
+                    Picker("Color", selection: $appSettings.watchComplicationColor) {
+                        ForEach(WatchComplicationColor.allCases) { option in
+                            HStack {
+                                Circle()
+                                    .fill(option.color ?? .white)
+                                    .frame(width: 12, height: 12)
+                                Text(option.displayName)
+                            }
+                            .tag(option)
+                        }
+                    }
+                }
                 Section("Watch Background") {
                     ForEach(BBVehicle.availableWatchBackgrounds, id: \.name) { background in
                         Button {

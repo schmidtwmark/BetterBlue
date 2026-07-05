@@ -19,6 +19,8 @@ struct WatchComplicationEntry: TimelineEntry {
     let batteryPercentage: Double?
     /// Drives the ring's gap glyph (bolt vs fuel pump).
     var isElectric: Bool = true
+    /// User-selected ring tint; `.automatic` follows the watch face.
+    var tint: WatchComplicationColor = .automatic
 }
 
 struct WatchComplicationProvider: TimelineProvider {
@@ -57,7 +59,12 @@ struct WatchComplicationProvider: TimelineProvider {
                 sortBy: [SortDescriptor(\.sortOrder)]
             ))
 
-            guard let vehicle = vehicles.first else {
+            // The watch app's Settings can pin the complication to a
+            // specific vehicle; otherwise the first visible one. Live
+            // read — this extension process outlives settings changes.
+            let selectedVIN = AppSettings.liveWatchComplicationVIN()
+            let vehicle = vehicles.first(where: { $0.vin == selectedVIN }) ?? vehicles.first
+            guard let vehicle else {
                 return WatchComplicationEntry(date: Date(), vehicleName: nil, rangeText: nil, batteryPercentage: nil)
             }
 
@@ -88,7 +95,8 @@ struct WatchComplicationProvider: TimelineProvider {
                 vehicleName: vehicle.displayName,
                 rangeText: rangeText,
                 batteryPercentage: percentage,
-                isElectric: vehicle.fuelType.hasElectricCapability
+                isElectric: vehicle.fuelType.hasElectricCapability,
+                tint: AppSettings.liveWatchComplicationColor()
             )
         } catch {
             BBLogger.error(.app, "WatchComplicationProvider: \(error)")
@@ -117,10 +125,11 @@ struct VehicleStatusComplication: Widget {
     }
 }
 
-/// Battery-widget-style ring, identical in construction to the iOS
-/// lock-screen `VehicleRingGauge`: the SYSTEM accessoryCircular gauge
-/// (270° arc, bottom gap, rounded caps — the same rendering the built-in
-/// battery complication uses), fuel glyph in the gap, configurable center.
+/// Battery-complication-style ring: `.accessoryCircularCapacity` — the
+/// SAME style as the system watch battery complication, so the arc FILLS
+/// proportionally instead of the plain accessoryCircular dot-on-a-track
+/// marker. No gap glyph in this style, which also stops the unit text
+/// from crowding an icon. Tintable from the watch app's Settings.
 struct WatchRingGauge: View {
     enum Center { case percentage, range }
     let entry: WatchComplicationEntry
@@ -137,38 +146,47 @@ struct WatchRingGauge: View {
 
     var body: some View {
         if let percentage = entry.batteryPercentage {
-            Gauge(value: percentage, in: 0 ... 100) {
-                Image(systemName: entry.isElectric ? "bolt.fill" : "fuelpump.fill")
-            } currentValueLabel: {
-                switch center {
-                case .percentage:
-                    Text("\(Int(percentage.rounded()))%")
-                        .font(.system(.body, design: .rounded))
-                        .minimumScaleFactor(0.6)
-                case .range:
-                    let (value, unit) = rangeParts
-                    // Explicit fonts so BOTH lines reliably fit the gauge's
-                    // small center slot.
-                    VStack(spacing: -1) {
-                        Text(value)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .minimumScaleFactor(0.5)
-                        if let unit {
-                            Text(unit)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .gaugeStyle(.accessoryCircular)
-            .widgetAccentable()
+            gauge(percentage)
         } else {
             ZStack {
                 AccessoryWidgetBackground()
                 Image(systemName: "car.fill")
                     .font(.title2)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func gauge(_ percentage: Double) -> some View {
+        let base = Gauge(value: percentage, in: 0 ... 100) {
+            EmptyView()
+        } currentValueLabel: {
+            switch center {
+            case .percentage:
+                Text("\(Int(percentage.rounded()))%")
+                    .font(.system(.body, design: .rounded))
+                    .minimumScaleFactor(0.6)
+            case .range:
+                let (value, unit) = rangeParts
+                VStack(spacing: 0) {
+                    Text(value)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .minimumScaleFactor(0.5)
+                    if let unit {
+                        Text(unit.uppercased())
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+        .widgetAccentable()
+
+        if let tint = entry.tint.color {
+            base.tint(tint)
+        } else {
+            base
         }
     }
 }
