@@ -344,12 +344,21 @@ final class LiveActivityManager {
         Task {
             var taskId = UIBackgroundTaskIdentifier.invalid
             if let app = UIApplication.value(forKeyPath: "sharedApplication") as? UIApplication {
-                taskId = app.beginBackgroundTask { }
+                taskId = app.beginBackgroundTask(withName: "CommandActivityPoll") {
+                    // iOS is about to suspend us: end the task now so RunningBoard
+                    // doesn't force-kill the app (0xdead10cc). Guard so the `defer`
+                    // below doesn't double-end the same identifier.
+                    if taskId != .invalid {
+                        app.endBackgroundTask(taskId)
+                        taskId = .invalid
+                    }
+                }
             }
 
             defer {
                 if let app = UIApplication.value(forKeyPath: "sharedApplication") as? UIApplication, taskId != .invalid {
                     app.endBackgroundTask(taskId)
+                    taskId = .invalid
                 }
             }
 

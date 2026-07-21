@@ -341,6 +341,24 @@ extension BBAccount {
         clearAPICache()
         self.api = nil
         self.authToken = nil
+
+        // If the stored session artifacts themselves are the problem (dead
+        // credentials, or a re-login that already failed), drop the remember-me
+        // token and device id too — otherwise every retry re-logs-in against the
+        // same bad artifacts and fails identically, which on the 1/min Live
+        // Activity wakeup is the background drain in BetterBlue#88. The backends
+        // regenerate both on a clean login (this is the full reset that made
+        // "Reset Session" sufficient in BetterBlue#84). Transient session errors
+        // keep the artifacts so a plain re-login can recover.
+        switch error.errorType {
+        case .invalidCredentials, .failedRetryLogin:
+            rememberMeToken = nil
+            deviceId = nil
+            try? modelContext.save()
+        default:
+            break
+        }
+
         try await initialize(modelContext: modelContext)
 
         guard let api, let authToken else {
