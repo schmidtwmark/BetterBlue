@@ -237,6 +237,16 @@
 			);
 			target = ED37F0232DFB4E4F00C02398 /* BetterBlue */;
 		};
+		EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BetterBlueShortcuts.swift,
+				VehicleAppIntents.swift,
+				VehicleWidgetIntent.swift,
+				WidgetCommandStatus.swift,
+			);
+			target = ED37F0232DFB4E4F00C02398 /* BetterBlue */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -265,6 +275,7 @@
 			exceptions = (
 				ED70549B2E61F57100CA7926 /* Exceptions for "Widget" folder in "WidgetExtension" target */,
 				ED8103602F2981C80072BDDE /* Exceptions for "Widget" folder in "WatchWidgetExtension" target */,
+				EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */,
 			);
 			path = Widget;
 			sourceTree = "<group>";

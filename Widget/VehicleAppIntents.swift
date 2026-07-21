@@ -37,8 +37,8 @@ extension LiveActivityType: AppEnum {
 // MARK: - Live Activity Intents
 
 struct StopLiveActivityIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Stop Live Activity"
-    static var description = IntentDescription("Stop the current activity (climate or charging)")
+    static let title: LocalizedStringResource = "Stop Live Activity"
+    static let description = IntentDescription("Stop the current activity (climate or charging)")
 
     @Parameter(title: "VIN")
     var vin: String
@@ -98,7 +98,8 @@ struct StopLiveActivityIntent: LiveActivityIntent {
             }
 
             // End the Live Activity
-            await existingActivity.end(nil, dismissalPolicy: .immediate)
+            nonisolated(unsafe) let activity = existingActivity
+            await activity.end(nil, dismissalPolicy: .immediate)
             BBLogger.info(.intent, "StopLiveActivityIntent: Activity ended successfully")
 
             // Send notification
@@ -123,9 +124,9 @@ struct StopLiveActivityIntent: LiveActivityIntent {
 }
 
 struct RefreshVehicleStatusIntent: AppIntent {
-    static var title: LocalizedStringResource = "Refresh Vehicle Status"
-    static var description = IntentDescription("Refresh the status of your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Refresh Vehicle Status"
+    static let description = IntentDescription("Refresh the status of your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle", description: "The vehicle to refresh")
     var vehicle: VehicleEntity
@@ -171,9 +172,9 @@ struct RefreshVehicleStatusIntent: AppIntent {
 }
 
 struct GetVehicleStatusIntent: AppIntent {
-    static var title: LocalizedStringResource = "Get Vehicle Status"
-    static var description = IntentDescription("Get the current status of your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Get Vehicle Status"
+    static let description = IntentDescription("Get the current status of your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle", description: "The vehicle to check")
     var vehicle: VehicleEntity
@@ -282,9 +283,9 @@ private func fetchBBVehicle(forVin vin: String, context: ModelContext) throws ->
 }
 
 struct IsVehiclePluggedInIntent: AppIntent {
-    static var title: LocalizedStringResource = "Is Vehicle Plugged In"
-    static var description = IntentDescription("Returns true if the vehicle's charging cable is connected.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Is Vehicle Plugged In"
+    static let description = IntentDescription("Returns true if the vehicle's charging cable is connected.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -298,9 +299,9 @@ struct IsVehiclePluggedInIntent: AppIntent {
 }
 
 struct IsVehicleChargingIntent: AppIntent {
-    static var title: LocalizedStringResource = "Is Vehicle Charging"
-    static var description = IntentDescription("Returns true if the vehicle is actively drawing power.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Is Vehicle Charging"
+    static let description = IntentDescription("Returns true if the vehicle is actively drawing power.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -314,9 +315,9 @@ struct IsVehicleChargingIntent: AppIntent {
 }
 
 struct IsVehicleLockedIntent: AppIntent {
-    static var title: LocalizedStringResource = "Is Vehicle Locked"
-    static var description = IntentDescription("Returns true if the vehicle's doors are locked.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Is Vehicle Locked"
+    static let description = IntentDescription("Returns true if the vehicle's doors are locked.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -330,9 +331,9 @@ struct IsVehicleLockedIntent: AppIntent {
 }
 
 struct IsClimateOnIntent: AppIntent {
-    static var title: LocalizedStringResource = "Is Climate Control On"
-    static var description = IntentDescription("Returns true if climate control is currently running.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Is Climate Control On"
+    static let description = IntentDescription("Returns true if climate control is currently running.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -346,9 +347,9 @@ struct IsClimateOnIntent: AppIntent {
 }
 
 struct GetBatteryPercentageIntent: AppIntent {
-    static var title: LocalizedStringResource = "Get Battery Percentage"
-    static var description = IntentDescription("Returns the EV battery percentage (0–100), or the fuel level for ICE vehicles.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Get Battery Percentage"
+    static let description = IntentDescription("Returns the EV battery percentage (0–100), or the fuel level for ICE vehicles.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -369,9 +370,9 @@ struct GetBatteryPercentageIntent: AppIntent {
 }
 
 struct GetVehicleRangeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Get Vehicle Range"
-    static var description = IntentDescription("Returns the formatted remaining range (e.g. \"218 mi\").")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Get Vehicle Range"
+    static let description = IntentDescription("Returns the formatted remaining range (e.g. \"218 mi\").")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -386,9 +387,9 @@ struct GetVehicleRangeIntent: AppIntent {
 }
 
 struct GetChargeTimeRemainingIntent: AppIntent {
-    static var title: LocalizedStringResource = "Get Charge Time Remaining"
-    static var description = IntentDescription("Returns the minutes until the charge target is reached. Zero if not charging.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Get Charge Time Remaining"
+    static let description = IntentDescription("Returns the minutes until the charge target is reached. Zero if not charging.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Vehicle")
     var vehicle: VehicleEntity
@@ -408,7 +409,7 @@ struct GetChargeTimeRemainingIntent: AppIntent {
 @MainActor
 private func performVehicleActionWithVin(
     _ vin: String,
-    action: @escaping (BBVehicle, BBAccount, ModelContext) async throws -> Void,
+    action: @escaping @MainActor (BBVehicle, BBAccount, ModelContext) async throws -> Void,
 ) async throws {
     let modelContainer = try createSharedModelContainer(enableCloudKit: false)
     let context = ModelContext(modelContainer)
@@ -474,9 +475,9 @@ private func sendNotification(title: String, body: String) async {
 // MARK: - Control Center Configuration Intents
 
 struct LockVehicleControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Lock Vehicle"
-    static var description = IntentDescription("Lock your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Lock Vehicle"
+    static let description = IntentDescription("Lock your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",
@@ -509,9 +510,9 @@ struct LockVehicleControlIntent: ControlConfigurationIntent {
 }
 
 struct UnlockVehicleControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Unlock Vehicle"
-    static var description = IntentDescription("Unlock your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Unlock Vehicle"
+    static let description = IntentDescription("Unlock your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",
@@ -542,9 +543,9 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
 }
 
 struct StartClimateControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Start Climate Control"
-    static var description = IntentDescription("Start climate control for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Start Climate Control"
+    static let description = IntentDescription("Start climate control for your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Preset", description: "The climate control preset to use")
     var preset: ClimatePresetEntity?
@@ -590,9 +591,9 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
 }
 
 struct StopClimateControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Stop Climate Control"
-    static var description = IntentDescription("Stop climate control for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Stop Climate Control"
+    static let description = IntentDescription("Stop climate control for your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",
@@ -623,9 +624,9 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
 }
 
 struct StartChargeControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Start Charging"
-    static var description = IntentDescription("Start charging for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Start Charging"
+    static let description = IntentDescription("Start charging for your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",
@@ -656,9 +657,9 @@ struct StartChargeControlIntent: ControlConfigurationIntent {
 }
 
 struct StopChargeControlIntent: ControlConfigurationIntent {
-    static var title: LocalizedStringResource = "Stop Charging"
-    static var description = IntentDescription("Stop charging for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Stop Charging"
+    static let description = IntentDescription("Stop charging for your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",
@@ -689,9 +690,9 @@ struct StopChargeControlIntent: ControlConfigurationIntent {
 }
 
 struct SetChargeLimitsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Set Charge Limits"
-    static var description = IntentDescription("Set the AC and DC charge limits for your vehicle")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Set Charge Limits"
+    static let description = IntentDescription("Set the AC and DC charge limits for your vehicle")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(
         title: "Vehicle",

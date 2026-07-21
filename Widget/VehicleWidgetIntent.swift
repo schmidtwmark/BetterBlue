@@ -12,9 +12,9 @@ import SwiftUI
 import WidgetKit
 
 struct VehicleWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource =
+    static let title: LocalizedStringResource =
         "Vehicle Widget Configuration"
-    static var description = IntentDescription("Choose a vehicle and buttons for the widget")
+    static let description = IntentDescription("Choose a vehicle and buttons for the widget")
 
     @Parameter(
         title: "Vehicle",
@@ -378,9 +378,9 @@ struct WidgetActionOptionsProvider: DynamicOptionsProvider {
 }
 
 struct VehicleEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation =
+    static let typeDisplayRepresentation: TypeDisplayRepresentation =
         "Vehicle"
-    static var defaultQuery = VehicleQuery()
+    static let defaultQuery = VehicleQuery()
 
     var id: UUID
     var displayName: String
