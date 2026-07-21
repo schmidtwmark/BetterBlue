@@ -97,23 +97,108 @@ final class LiveActivityManager {
             // a ModelContext for HTTP logging + token persistence),
             // but limiting the change-tracking window to one activity
             // at a time keeps each save fast and short.
-            let status: VehicleStatus?
+            // ActivityKit work happens outside the per-iteration context
+            // scope so the push doesn't extend the SwiftData lock-hold window.
             do {
-                status = try await updateVehicleStatus(vin: vin, container: container)
+                if let status = try await updateVehicleStatus(vin: vin, container: container) {
+                    // Authoritative: only refresh when this fetch confirms the
+                    // vehicle is still in the activity's state; otherwise end the
+                    // activity so the backend stops waking us (BetterBlue#88).
+                    await refreshOrRetireActivity(for: vin, status: status)
+                } else {
+                    // No vehicle/account for this VIN — the activity is orphaned
+                    // (e.g. the vehicle was removed). End it so wakeups stop.
+                    await retireActivity(for: vin, reason: "vehicle or account not found")
+                }
             } catch {
-                AppLogger.liveActivity.error("Error updating Live Activity for \(vin.prefix(8), privacy: .public): \(error)")
-                status = nil
-            }
-
-            // ActivityKit refresh is independent of SwiftData — do it
-            // outside the per-iteration context scope so the push
-            // doesn't extend the lock-hold window.
-            if let status {
-                await refreshActivity(for: vin, status: status, incrementWakeup: true)
-                AppLogger.liveActivity.info("Updated Live Activity for \(vin.prefix(8), privacy: .public)")
+                AppLogger.liveActivity.error(
+                    "Error updating Live Activity for \(vin.prefix(8), privacy: .public): \(error)"
+                )
+                // A permanently-broken session fails identically on every 1/min
+                // wakeup forever — the background CPU/battery drain in #88. Retire
+                // the activity so the push stream stops; transient errors (server
+                // hiccup, network blip) are left alone to retry on the next push.
+                if Self.isUnrecoverableWakeupError(error) {
+                    await retireActivity(for: vin, reason: "session unrecoverable")
+                }
             }
         }
         #endif
+    }
+
+    /// Max number of 1/min background wakeups before an activity is force-ended
+    /// regardless of reported state — a safety net so a stuck or stale
+    /// "charging" status can't keep the wakeup-push loop alive forever (#88).
+    /// Set well beyond any realistic charge session (~24h at one wakeup/minute).
+    private static let maxWakeups = 1440
+
+    /// Refresh the activity's wakeup metadata **only** if this wakeup's fresh
+    /// status confirms the vehicle is still in the activity's state; otherwise
+    /// end it. Being authoritative here — rather than trusting the
+    /// `updateActivity` side-effect inside `fetchVehicleStatus` — closes the
+    /// window where a just-ended activity could be revived by a blind refresh.
+    private func refreshOrRetireActivity(for vin: String, status: VehicleStatus) async {
+        #if canImport(ActivityKit)
+        guard let activity = Activity<VehicleActivityAttributes>.activities
+            .first(where: { $0.attributes.vin == vin }) else {
+            return // already ended (e.g. charging stopped -> updateActivity ended it)
+        }
+
+        let state = activity.content.state
+        let stillLive: Bool
+        switch state.activityType {
+        case .charging: stillLive = status.evStatus?.charging == true
+        case .climate: stillLive = status.climateStatus.airControlOn
+        case .debug: stillLive = true // manually controlled; never auto-end
+        case .none: stillLive = false
+        }
+
+        guard stillLive else {
+            await retireActivity(for: vin, reason: "vehicle no longer in activity state")
+            return
+        }
+        guard state.wakeupCount < Self.maxWakeups else {
+            await retireActivity(for: vin, reason: "exceeded max wakeups")
+            return
+        }
+
+        await refreshActivity(for: vin, status: status, incrementWakeup: true)
+        AppLogger.liveActivity.info("Updated Live Activity for \(vin.prefix(8), privacy: .public)")
+        #endif
+    }
+
+    /// End a Live Activity and, if it was the last one, unregister from the
+    /// backend so it stops sending wakeup pushes.
+    private func retireActivity(for vin: String, reason: String) async {
+        #if canImport(ActivityKit)
+        guard let existingActivity = Activity<VehicleActivityAttributes>.activities
+            .first(where: { $0.attributes.vin == vin }) else {
+            return
+        }
+        AppLogger.liveActivity.info(
+            "Retiring Live Activity for \(vin.prefix(8), privacy: .public): \(reason, privacy: .public)"
+        )
+        nonisolated(unsafe) let activity = existingActivity
+        await activity.end(nil, dismissalPolicy: .immediate)
+        // `<= 1`: the just-ended activity can still appear in `activities`
+        // briefly, so "1 or fewer remaining" means "none left that need pushes."
+        if Activity<VehicleActivityAttributes>.activities.count <= 1 {
+            await unregisterFromBackend()
+        }
+        #endif
+    }
+
+    /// Whether a wakeup fetch error means the session is permanently broken
+    /// (re-login won't help until the user re-authenticates), versus a
+    /// transient failure worth retrying on the next push.
+    private static func isUnrecoverableWakeupError(_ error: Error) -> Bool {
+        guard let apiError = error as? APIError else { return false }
+        switch apiError.errorType {
+        case .invalidCredentials, .failedRetryLogin:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Per-activity SwiftData scope. Opens a fresh `ModelContext`,
