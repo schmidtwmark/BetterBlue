@@ -295,6 +295,12 @@ struct TripDetailRow: View {
     let distanceUnit: Distance.Units
     @State private var isExpanded = false
 
+    /// EU /drvhistory returns day-level summaries with no trip time, duration,
+    /// or speeds — render those trips date-only instead of showing zeros.
+    private var isDailySummary: Bool {
+        trip.durationSeconds == 0
+    }
+
     private var formattedDistance: String {
         trip.distance.units.format(trip.distance.length, to: distanceUnit)
     }
@@ -317,7 +323,9 @@ struct TripDetailRow: View {
             HStack {
                 Text(
                     trip.startDate,
-                    format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
+                    format: isDailySummary
+                        ? .dateTime.weekday(.abbreviated).month(.abbreviated).day()
+                        : .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
                 )
                 .font(.subheadline)
                 .fontWeight(.medium)
@@ -330,12 +338,14 @@ struct TripDetailRow: View {
 
             // Summary row (never animates except chevron)
             HStack {
-                Text(trip.formattedDuration)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if !isDailySummary {
+                    Text(trip.formattedDuration)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
-                Text("•")
-                    .foregroundColor(.secondary)
+                    Text("•")
+                        .foregroundColor(.secondary)
+                }
 
                 Text(formattedTotalEnergy)
                     .font(.caption)
@@ -419,17 +429,19 @@ struct TripDetailRow: View {
                         }
                     }
 
-                    // Speed info
-                    HStack {
-                        Text("Avg: \(Int(trip.avgSpeed)) mph")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Text("Max: \(Int(trip.maxSpeed)) mph")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                    // Speed info (absent from EU day-level summaries)
+                    if !isDailySummary {
+                        HStack {
+                            Text("Avg: \(Int(trip.avgSpeed)) mph")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            Text("Max: \(Int(trip.maxSpeed)) mph")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
                     }
                 }
             }
