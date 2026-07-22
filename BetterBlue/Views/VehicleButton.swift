@@ -34,7 +34,7 @@ struct VehicleControlButton: View {
     @State private var inProgressAction: VehicleAction?
     @State private var message = ButtonMessage.empty
     @State private var currentTask: Task<Void, Never>?
-    @State private var currentActionIndex: Array.Index = 0
+    @State private var currentActionIndex: Int = 0
     @State private var animatedDots = ""
     @State private var dotsTimer: Timer?
     /// Full error context for the most recent failed action. Drives the
