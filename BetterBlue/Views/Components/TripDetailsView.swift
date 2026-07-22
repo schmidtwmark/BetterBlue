@@ -8,6 +8,7 @@
 import BetterBlueKit
 import Charts
 import SwiftUI
+import SwiftData
 
 struct TripDetailsView: View {
     let bbVehicle: BBVehicle
@@ -295,11 +296,11 @@ struct TripDetailRow: View {
     @State private var isExpanded = false
 
     private var formattedDistance: String {
-        Distance.Units.miles.format(trip.distance, to: distanceUnit)
+        trip.distance.units.format(trip.distance.length, to: distanceUnit)
     }
 
     private var formattedEfficiency: String {
-        String(format: "%.1f mi/kWh", trip.efficiency)
+        String(format: "%.1f %@/kWh", trip.efficiency(in: distanceUnit), distanceUnit.abbreviation)
     }
 
     private var formattedTotalEnergy: String {
@@ -725,8 +726,8 @@ private struct TripDetailsPreviewContent: View {
 extension EVTripDetail {
     static var sample: EVTripDetail {
         EVTripDetail(
-            distance: 7,
-            odometer: 14214.1,
+            distance: Distance(length: 7, units: .miles),
+            odometer: Distance(length: 14214.1, units: .miles),
             accessoriesEnergy: 220,
             totalEnergyUsed: 3090,
             regenEnergy: 966,
@@ -743,8 +744,8 @@ extension EVTripDetail {
     static var sampleTrips: [EVTripDetail] {
         [
             EVTripDetail(
-                distance: 7,
-                odometer: 14214.1,
+                distance: Distance(length: 7, units: .miles),
+                odometer: Distance(length: 14214.1, units: .miles),
                 accessoriesEnergy: 220,
                 totalEnergyUsed: 3090,
                 regenEnergy: 966,
@@ -757,8 +758,8 @@ extension EVTripDetail {
                 maxSpeed: 41.0
             ),
             EVTripDetail(
-                distance: 4,
-                odometer: 14206.1,
+                distance: Distance(length: 4, units: .miles),
+                odometer: Distance(length: 14206.1, units: .miles),
                 accessoriesEnergy: 160,
                 totalEnergyUsed: 2677,
                 regenEnergy: 446,
@@ -771,8 +772,8 @@ extension EVTripDetail {
                 maxSpeed: 42.0
             ),
             EVTripDetail(
-                distance: 4,
-                odometer: 14200.9,
+                distance: Distance(length: 4, units: .miles),
+                odometer: Distance(length: 14200.9, units: .miles),
                 accessoriesEnergy: 70,
                 totalEnergyUsed: 2116,
                 regenEnergy: 364,
@@ -785,8 +786,8 @@ extension EVTripDetail {
                 maxSpeed: 59.0
             ),
             EVTripDetail(
-                distance: 6,
-                odometer: 14196.5,
+                distance: Distance(length: 6, units: .miles),
+                odometer: Distance(length: 14196.5, units: .miles),
                 accessoriesEnergy: 90,
                 totalEnergyUsed: 2583,
                 regenEnergy: 1334,
