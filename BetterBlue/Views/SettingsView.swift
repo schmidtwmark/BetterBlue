@@ -182,9 +182,11 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    NavigationLink(destination: WalkAwayLockGuideView()) {
-                        Label("Walk-Away Lock", systemImage: "car.side.lock")
-                    }
+                    // Walk-away-lock Shortcuts guide hidden until the packaged
+                    // shortcut is ready to distribute.
+                    // NavigationLink(destination: WalkAwayLockGuideView()) {
+                    //     Label("Walk-Away Lock", systemImage: "car.side.lock")
+                    // }
                     NavigationLink(destination: TroubleshootingView()) {
                         Label("Troubleshooting", systemImage: "questionmark.circle")
                     }

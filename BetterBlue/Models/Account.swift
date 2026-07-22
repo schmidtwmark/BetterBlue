@@ -726,10 +726,13 @@ extension BBAccount {
         }
     }
 
-    /// Returns true if the account's API supports EV trip details
+    /// Returns true if the account's API supports EV trip details.
+    /// Delegates to the client (like `supportsMFA`) so new brand support in
+    /// BetterBlueKit lights up without app changes. False until the client
+    /// is initialized; the UI re-evaluates once startup init completes.
+    @MainActor
     var supportsEVTripDetails: Bool {
-        // Currently only Hyundai USA supports trip details
-        brandEnum == .hyundai && regionEnum == .usa
+        api?.supportsEVTripDetails() ?? false
     }
 }
 

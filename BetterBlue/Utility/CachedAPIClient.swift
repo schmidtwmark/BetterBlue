@@ -211,6 +211,12 @@ class CachedAPIClient: APIClientProtocol {
         return try await underlyingClient.fetchEVTripDetails(for: vehicle, authToken: authToken)
     }
 
+    func supportsEVTripDetails() -> Bool {
+        // Without this forward the protocol's default (false) would answer
+        // for the wrapper and hide trip details for every account.
+        underlyingClient.supportsEVTripDetails()
+    }
+
     /// Invalidates the cached status for a specific vehicle
     func invalidateStatusCache(for vin: String) {
         let cacheKey = CacheKey.fetchVehicleStatus(vin: vin)
