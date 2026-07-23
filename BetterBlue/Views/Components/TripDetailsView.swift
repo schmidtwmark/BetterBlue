@@ -18,6 +18,10 @@ struct TripDetailsView: View {
     @State private var loadError: ActionError?
     @State private var appSettings = AppSettings.shared
     @State private var showEnergyBreakdown = false
+    /// Offset from current period.
+    /// EU (weekly):  0 = this week, -1 = last week.
+    /// Other (daily): 0 = today, -1 = yesterday.
+    @State private var periodOffset: Int = 0
 
     var body: some View {
         PersistentModelGuard(model: bbVehicle) {
@@ -84,6 +88,12 @@ struct TripDetailsView: View {
 
     private var tripListView: some View {
         List {
+            // Period navigator (week for EU daily summaries, day for others)
+            Section {
+                periodNavigatorView
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            }
+
             // Energy usage chart section
             Section {
                 energyUsageChartView
@@ -102,12 +112,73 @@ struct TripDetailsView: View {
 
             // Trip list section
             Section {
-                ForEach(trips) { trip in
-                    TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit)
+                if tripsForSelectedPeriod.isEmpty {
+                    Text(isDailySummaryData ? "No trips this week" : "No trips today")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(tripsForSelectedPeriod) { trip in
+                        TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit, isDailySummary: isDailySummaryData)
+                    }
                 }
             } header: {
                 Text("Recent Trips")
             }
+        }
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    let threshold: CGFloat = 50
+                    if value.translation.width < -threshold, periodOffset < 0 {
+                        withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
+                    } else if value.translation.width > threshold {
+                        withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
+                    }
+                }
+        )
+    }
+
+    private var periodNavigatorView: some View {
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            VStack(spacing: 2) {
+                Text(periodLabel)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Text(periodSubLabel)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(periodOffset < 0 ? .primary : .secondary)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(periodOffset >= 0)
         }
     }
 
@@ -120,22 +191,35 @@ struct TripDetailsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
+        .animation(.easeInOut(duration: 0.25), value: periodOffset)
         .padding(.horizontal)
     }
 
     /// Indexed trips for categorical x-axis (oldest first for left-to-right display)
     private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
-        Array(trips.reversed().enumerated().map { ($0.offset, $0.element) })
+        Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
     }
 
-    private func formatTripTime(_ date: Date) -> String {
-        date.formatted(.dateTime.hour().minute())
+    private var isDailySummaryData: Bool {
+        guard !trips.isEmpty else { return false }
+        return trips.allSatisfy {
+            let comps = Calendar.current.dateComponents([.hour, .minute], from: $0.startDate)
+            return comps.hour == 0 && comps.minute == 0
+        }
+    }
+
+    private func formatTripLabel(_ date: Date) -> String {
+        if isDailySummaryData {
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        } else {
+            return date.formatted(.dateTime.hour().minute())
+        }
     }
 
     private var totalEnergyChart: some View {
         Chart(indexedTrips, id: \.index) { item in
             BarMark(
-                x: .value("Trip", formatTripTime(item.trip.startDate)),
+                x: .value("Trip", formatTripLabel(item.trip.startDate)),
                 y: .value("Energy", Double(item.trip.totalEnergyUsed) / 1000.0)
             )
             .foregroundStyle(by: .value("Category", "Total"))
@@ -166,6 +250,8 @@ struct TripDetailsView: View {
         }
         .chartYAxisLabel("kWh", position: .leading)
         .chartLegend(position: .bottom, spacing: 8)
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: 7)
     }
 
     private var stackedEnergyChart: some View {
@@ -205,12 +291,14 @@ struct TripDetailsView: View {
         }
         .chartYAxisLabel("kWh", position: .leading)
         .chartLegend(position: .bottom, spacing: 8)
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: 7)
     }
 
     /// Data points for the stacked energy breakdown chart
     private var energyBreakdownData: [EnergyDataPoint] {
         indexedTrips.flatMap { item -> [EnergyDataPoint] in
-            let tripLabel = formatTripTime(item.trip.startDate)
+            let tripLabel = formatTripLabel(item.trip.startDate)
             var points: [EnergyDataPoint] = [
                 EnergyDataPoint(
                     tripLabel: tripLabel,
@@ -236,6 +324,66 @@ struct TripDetailsView: View {
                 ))
             }
             return points
+        }
+    }
+
+    // MARK: - Period helpers
+
+    private var selectedWeekStart: Date {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        comps.weekday = 2 // Monday
+        let thisMonday = cal.date(from: comps) ?? Date()
+        return cal.date(byAdding: .weekOfYear, value: periodOffset, to: thisMonday) ?? Date()
+    }
+
+    private var selectedWeekEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 7, to: selectedWeekStart) ?? Date()
+    }
+
+    private var selectedDayStart: Date {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return cal.date(byAdding: .day, value: periodOffset, to: today) ?? today
+    }
+
+    private var selectedDayEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 1, to: selectedDayStart) ?? Date()
+    }
+
+    private var periodLabel: String {
+        let fmt = DateFormatter()
+        if isDailySummaryData {
+            fmt.dateFormat = "MMM d"
+            let end = Calendar.current.date(byAdding: .day, value: 6, to: selectedWeekStart) ?? selectedWeekEnd
+            return "\(fmt.string(from: selectedWeekStart)) – \(fmt.string(from: end))"
+        } else {
+            fmt.dateFormat = "EEE, MMM d"
+            return fmt.string(from: selectedDayStart)
+        }
+    }
+
+    private var periodSubLabel: String {
+        if isDailySummaryData {
+            switch periodOffset {
+            case 0:  return "This Week"
+            case -1: return "Last Week"
+            default: return "\(-periodOffset) weeks ago"
+            }
+        } else {
+            switch periodOffset {
+            case 0:  return "Today"
+            case -1: return "Yesterday"
+            default: return "\(-periodOffset) days ago"
+            }
+        }
+    }
+
+    private var tripsForSelectedPeriod: [EVTripDetail] {
+        if isDailySummaryData {
+            return trips.filter { $0.startDate >= selectedWeekStart && $0.startDate < selectedWeekEnd }
+        } else {
+            return trips.filter { $0.startDate >= selectedDayStart && $0.startDate < selectedDayEnd }
         }
     }
 
@@ -293,6 +441,7 @@ struct EnergyDataPoint: Identifiable {
 struct TripDetailRow: View {
     let trip: EVTripDetail
     let distanceUnit: Distance.Units
+    let isDailySummary: Bool
     @State private var isExpanded = false
 
     private var formattedDistance: String {
@@ -315,12 +464,21 @@ struct TripDetailRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // Header row with date and distance (never animates)
             HStack {
-                Text(
-                    trip.startDate,
-                    format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
-                )
-                .font(.subheadline)
-                .fontWeight(.medium)
+                if isDailySummary {
+                    Text(
+                        trip.startDate,
+                        format: .dateTime.weekday(.abbreviated).month(.abbreviated).day()
+                    )
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                } else {
+                    Text(
+                        trip.startDate,
+                        format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
+                    )
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                }
                 Spacer()
                 Text(formattedDistance)
                     .font(.subheadline)
@@ -503,7 +661,8 @@ struct EnergyBreakdownPill: View {
     List {
         TripDetailRow(
             trip: .sample,
-            distanceUnit: .miles
+            distanceUnit: .miles,
+            isDailySummary: false
         )
     }
 }
@@ -532,6 +691,7 @@ private struct TripDetailsPreviewContent: View {
     let errorMessage: String?
     @State private var appSettings = AppSettings.shared
     @State private var showEnergyBreakdown = false
+    @State private var periodOffset: Int = 0
 
     var body: some View {
         Group {
@@ -572,6 +732,49 @@ private struct TripDetailsPreviewContent: View {
             } else {
                 List {
                     Section {
+                        HStack {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color(.secondarySystemBackground))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            VStack(spacing: 2) {
+                                Text(periodLabel)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text(periodSubLabel)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(periodOffset < 0 ? .primary : .secondary)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color(.secondarySystemBackground))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(periodOffset >= 0)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+
+                    Section {
                         Group {
                             if showEnergyBreakdown {
                                 stackedEnergyChart
@@ -580,6 +783,7 @@ private struct TripDetailsPreviewContent: View {
                             }
                         }
                         .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
+                        .animation(.easeInOut(duration: 0.25), value: periodOffset)
                         .padding(.horizontal)
                         .frame(height: 200)
                         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
@@ -595,23 +799,112 @@ private struct TripDetailsPreviewContent: View {
                     }
 
                     Section {
-                        ForEach(trips) { trip in
-                            TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit)
+                        if tripsForSelectedPeriod.isEmpty {
+                            Text(isDailySummaryData ? "No trips this week" : "No trips today")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        } else {
+                            ForEach(tripsForSelectedPeriod) { trip in
+                                TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit, isDailySummary: isDailySummaryData)
+                            }
                         }
                     } header: {
                         Text("Recent Trips")
                     }
                 }
+                .gesture(
+                    DragGesture()
+                        .onEnded { value in
+                            let threshold: CGFloat = 50
+                            if value.translation.width < -threshold, periodOffset < 0 {
+                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
+                            } else if value.translation.width > threshold {
+                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
+                            }
+                        }
+                )
             }
         }
     }
 
+    private var isDailySummaryData: Bool {
+        guard !trips.isEmpty else { return false }
+        return trips.allSatisfy {
+            let comps = Calendar.current.dateComponents([.hour, .minute], from: $0.startDate)
+            return comps.hour == 0 && comps.minute == 0
+        }
+    }
+
+    private var selectedWeekStart: Date {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        comps.weekday = 2
+        let thisMonday = cal.date(from: comps) ?? Date()
+        return cal.date(byAdding: .weekOfYear, value: periodOffset, to: thisMonday) ?? Date()
+    }
+
+    private var selectedWeekEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 7, to: selectedWeekStart) ?? Date()
+    }
+
+    private var selectedDayStart: Date {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return cal.date(byAdding: .day, value: periodOffset, to: today) ?? today
+    }
+
+    private var selectedDayEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 1, to: selectedDayStart) ?? Date()
+    }
+
+    private var periodLabel: String {
+        let fmt = DateFormatter()
+        if isDailySummaryData {
+            fmt.dateFormat = "MMM d"
+            let end = Calendar.current.date(byAdding: .day, value: 6, to: selectedWeekStart) ?? selectedWeekEnd
+            return "\(fmt.string(from: selectedWeekStart)) – \(fmt.string(from: end))"
+        } else {
+            fmt.dateFormat = "EEE, MMM d"
+            return fmt.string(from: selectedDayStart)
+        }
+    }
+
+    private var periodSubLabel: String {
+        if isDailySummaryData {
+            switch periodOffset {
+            case 0:  return "This Week"
+            case -1: return "Last Week"
+            default: return "\(-periodOffset) weeks ago"
+            }
+        } else {
+            switch periodOffset {
+            case 0:  return "Today"
+            case -1: return "Yesterday"
+            default: return "\(-periodOffset) days ago"
+            }
+        }
+    }
+
+    private var tripsForSelectedPeriod: [EVTripDetail] {
+        if isDailySummaryData {
+            return trips.filter { $0.startDate >= selectedWeekStart && $0.startDate < selectedWeekEnd }
+        } else {
+            return trips.filter { $0.startDate >= selectedDayStart && $0.startDate < selectedDayEnd }
+        }
+    }
+
     private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
-        Array(trips.reversed().enumerated().map { ($0.offset, $0.element) })
+        Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
     }
 
     private func formatTripTime(_ date: Date) -> String {
-        date.formatted(.dateTime.hour().minute())
+        if isDailySummaryData {
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        } else {
+            return date.formatted(.dateTime.hour().minute())
+        }
     }
 
     private var totalEnergyChart: some View {
@@ -648,6 +941,8 @@ private struct TripDetailsPreviewContent: View {
         }
         .chartYAxisLabel("kWh", position: .leading)
         .chartLegend(position: .bottom, spacing: 8)
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: 7)
     }
 
     private var stackedEnergyChart: some View {
@@ -687,6 +982,8 @@ private struct TripDetailsPreviewContent: View {
         }
         .chartYAxisLabel("kWh", position: .leading)
         .chartLegend(position: .bottom, spacing: 8)
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: 7)
     }
 
     private var energyBreakdownData: [EnergyDataPoint] {
