@@ -884,7 +884,7 @@ struct PersistentVehicleSheet: View {
         }
 
         if bbVehicle.fuelType.hasElectricCapability,
-           bbVehicle.account?.supportsEVTripDetails == true {
+           bbVehicle.account?.supportedEVTripTypes.contains(.summary) == true {
             Button {
                 sheetPresentation.show(.tripDetails(vehicle: bbVehicle))
             } label: {

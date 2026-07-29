@@ -205,16 +205,21 @@ class CachedAPIClient: APIClientProtocol {
         try await task.value
     }
 
-    func fetchEVTripDetails(for vehicle: Vehicle, authToken: AuthToken) async throws -> [EVTripDetail]? {
+    func fetchEVTripSummary(for vehicle: Vehicle, authToken: AuthToken) async throws -> [EVTripSummary]? {
         // Trip details are not cached - forward directly to underlying client
-        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchEVTripDetails request for VIN: \(vehicle.vin)")
-        return try await underlyingClient.fetchEVTripDetails(for: vehicle, authToken: authToken)
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchEVTripSummary request for VIN: \(vehicle.vin)")
+        return try await underlyingClient.fetchEVTripSummary(for: vehicle, authToken: authToken)
     }
 
-    func supportsEVTripDetails() -> Bool {
+    func fetchEVTripInfo(for vehicle: Vehicle, authToken: AuthToken, date: Date) async throws -> [EVTripInfo]? {
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchEVTripInfo request for VIN: \(vehicle.vin)")
+        return try await underlyingClient.fetchEVTripInfo(for: vehicle, authToken: authToken, date: date)
+    }
+
+    func supportedEVTripTypes() -> [EVTripType] {
         // Without this forward the protocol's default (false) would answer
         // for the wrapper and hide trip details for every account.
-        underlyingClient.supportsEVTripDetails()
+        underlyingClient.supportedEVTripTypes()
     }
 
     /// Invalidates the cached status for a specific vehicle

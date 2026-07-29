@@ -540,7 +540,7 @@ struct VehicleTitleView: View {
             }
         }
 
-        if bbVehicle.fuelType.hasElectricCapability && vehicleAccount?.supportsEVTripDetails == true {
+        if bbVehicle.fuelType.hasElectricCapability && vehicleAccount?.supportedEVTripTypes.contains(.summary) == true {
             Button {
                 showingTripDetails = true
             } label: {

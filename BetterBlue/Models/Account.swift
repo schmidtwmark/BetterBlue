@@ -702,37 +702,58 @@ extension BBAccount {
     }
 }
 
-// MARK: - EV Trip Details
+// MARK: - EV Trip Summary & Info
 
 extension BBAccount {
-    /// Fetches EV trip details for a vehicle. Returns nil if the API doesn't support this feature.
+    /// Fetches EV trip summary for a vehicle. Returns nil if the API doesn't support this feature.
     @MainActor
-    func fetchEVTripDetails(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws -> [EVTripDetail]? {
+    func fetchEVTripSummary(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws -> [EVTripSummary]? {
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
-            return try await fetchEVTripDetails(for: bbVehicle, modelContext: modelContext)
+            return try await fetchEVTripSummary(for: bbVehicle, modelContext: modelContext)
         }
 
         let vehicle = bbVehicle.toVehicle()
 
         do {
-            return try await api.fetchEVTripDetails(for: vehicle, authToken: authToken)
+            return try await api.fetchEVTripSummary(for: vehicle, authToken: authToken)
         } catch let error as APIError where shouldReauthenticate(for: error) {
             try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()
             }
-            return try await api.fetchEVTripDetails(for: vehicle, authToken: authToken)
+            return try await api.fetchEVTripSummary(for: vehicle, authToken: authToken)
         }
     }
 
-    /// Returns true if the account's API supports EV trip details.
-    /// Delegates to the client (like `supportsMFA`) so new brand support in
-    /// BetterBlueKit lights up without app changes. False until the client
+    /// Fetches EV trip info for a specific date. Returns nil if the API doesn't support this feature.
+    @MainActor
+    func fetchEVTripInfo(for bbVehicle: BBVehicle, date: Date, modelContext: ModelContext) async throws -> [EVTripInfo]? {
+        guard let api, let authToken else {
+            try await initialize(modelContext: modelContext)
+            return try await fetchEVTripInfo(for: bbVehicle, date: date, modelContext: modelContext)
+        }
+
+        let vehicle = bbVehicle.toVehicle()
+
+        do {
+            return try await api.fetchEVTripInfo(for: vehicle, authToken: authToken, date: date)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
+            guard let api = self.api, let authToken = self.authToken else {
+                throw APIError.failedRetryLogin()
+            }
+            return try await api.fetchEVTripInfo(for: vehicle, authToken: authToken, date: date)
+        }
+    }
+
+    /// Returns the EV trip types supported by the account's API.
+    /// Delegates to the client so new brand support in BetterBlueKit
+    /// lights up without app changes. Empty until the client
     /// is initialized; the UI re-evaluates once startup init completes.
     @MainActor
-    var supportsEVTripDetails: Bool {
-        api?.supportsEVTripDetails() ?? false
+    var supportedEVTripTypes: [EVTripType] {
+        api?.supportedEVTripTypes() ?? []
     }
 }
 

@@ -13,7 +13,7 @@ import SwiftData
 struct TripDetailsView: View {
     let bbVehicle: BBVehicle
     @Environment(\.modelContext) private var modelContext
-    @State private var trips: [EVTripDetail] = []
+    @State private var trips: [EVTripSummary] = []
     @State private var isLoading = true
     @State private var loadError: ActionError?
     @State private var appSettings = AppSettings.shared
@@ -196,7 +196,7 @@ struct TripDetailsView: View {
     }
 
     /// Indexed trips for categorical x-axis (oldest first for left-to-right display)
-    private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
+    private var indexedTrips: [(index: Int, trip: EVTripSummary)] {
         Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
     }
 
@@ -379,7 +379,7 @@ struct TripDetailsView: View {
         }
     }
 
-    private var tripsForSelectedPeriod: [EVTripDetail] {
+    private var tripsForSelectedPeriod: [EVTripSummary] {
         if isDailySummaryData {
             return trips.filter { $0.startDate >= selectedWeekStart && $0.startDate < selectedWeekEnd }
         } else {
@@ -401,7 +401,7 @@ struct TripDetailsView: View {
         }
 
         do {
-            if let fetchedTrips = try await account.fetchEVTripDetails(for: bbVehicle, modelContext: modelContext) {
+            if let fetchedTrips = try await account.fetchEVTripSummary(for: bbVehicle, modelContext: modelContext) {
                 trips = fetchedTrips
             } else {
                 loadError = ActionError(
@@ -439,7 +439,7 @@ struct EnergyDataPoint: Identifiable {
 // MARK: - Trip Detail Row
 
 struct TripDetailRow: View {
-    let trip: EVTripDetail
+    let trip: EVTripSummary
     let distanceUnit: Distance.Units
     let isDailySummary: Bool
     @State private var isExpanded = false
@@ -635,7 +635,7 @@ struct EnergyBreakdownPill: View {
 
 #Preview("Trip Details - With Data") {
     NavigationView {
-        TripDetailsPreviewWrapper(trips: EVTripDetail.sampleTrips)
+        TripDetailsPreviewWrapper(trips: EVTripSummary.sampleTrips)
     }
 }
 
@@ -670,7 +670,7 @@ struct EnergyBreakdownPill: View {
 // MARK: - Preview Helpers
 
 private struct TripDetailsPreviewWrapper: View {
-    let trips: [EVTripDetail]?
+    let trips: [EVTripSummary]?
     var isLoading: Bool = false
     var errorMessage: String?
 
@@ -686,7 +686,7 @@ private struct TripDetailsPreviewWrapper: View {
 }
 
 private struct TripDetailsPreviewContent: View {
-    let trips: [EVTripDetail]
+    let trips: [EVTripSummary]
     let isLoading: Bool
     let errorMessage: String?
     @State private var appSettings = AppSettings.shared
@@ -887,7 +887,7 @@ private struct TripDetailsPreviewContent: View {
         }
     }
 
-    private var tripsForSelectedPeriod: [EVTripDetail] {
+    private var tripsForSelectedPeriod: [EVTripSummary] {
         if isDailySummaryData {
             return trips.filter { $0.startDate >= selectedWeekStart && $0.startDate < selectedWeekEnd }
         } else {
@@ -895,7 +895,7 @@ private struct TripDetailsPreviewContent: View {
         }
     }
 
-    private var indexedTrips: [(index: Int, trip: EVTripDetail)] {
+    private var indexedTrips: [(index: Int, trip: EVTripSummary)] {
         Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
     }
 
@@ -1020,9 +1020,9 @@ private struct TripDetailsPreviewContent: View {
 
 // MARK: - Sample Data
 
-extension EVTripDetail {
-    static var sample: EVTripDetail {
-        EVTripDetail(
+extension EVTripSummary {
+    static var sample: EVTripSummary {
+        EVTripSummary(
             distance: Distance(length: 7, units: .miles),
             odometer: Distance(length: 14214.1, units: .miles),
             accessoriesEnergy: 220,
@@ -1032,15 +1032,15 @@ extension EVTripDetail {
             drivetrainEnergy: 1635,
             batteryCareEnergy: 0,
             startDate: Date().addingTimeInterval(-3600),
-            durationSeconds: 1268,
+            duration: .seconds(1268),
             avgSpeed: 27.0,
             maxSpeed: 41.0
         )
     }
 
-    static var sampleTrips: [EVTripDetail] {
+    static var sampleTrips: [EVTripSummary] {
         [
-            EVTripDetail(
+            EVTripSummary(
                 distance: Distance(length: 7, units: .miles),
                 odometer: Distance(length: 14214.1, units: .miles),
                 accessoriesEnergy: 220,
@@ -1050,11 +1050,11 @@ extension EVTripDetail {
                 drivetrainEnergy: 1635,
                 batteryCareEnergy: 0,
                 startDate: Date().addingTimeInterval(-3600),
-                durationSeconds: 1268,
+                duration: .seconds(1268),
                 avgSpeed: 27.0,
                 maxSpeed: 41.0
             ),
-            EVTripDetail(
+            EVTripSummary(
                 distance: Distance(length: 4, units: .miles),
                 odometer: Distance(length: 14206.1, units: .miles),
                 accessoriesEnergy: 160,
@@ -1064,11 +1064,11 @@ extension EVTripDetail {
                 drivetrainEnergy: 1409,
                 batteryCareEnergy: 200,
                 startDate: Date().addingTimeInterval(-7200),
-                durationSeconds: 932,
+                duration: .seconds(932),
                 avgSpeed: 24.0,
                 maxSpeed: 42.0
             ),
-            EVTripDetail(
+            EVTripSummary(
                 distance: Distance(length: 4, units: .miles),
                 odometer: Distance(length: 14200.9, units: .miles),
                 accessoriesEnergy: 70,
@@ -1078,11 +1078,11 @@ extension EVTripDetail {
                 drivetrainEnergy: 1177,
                 batteryCareEnergy: 300,
                 startDate: Date().addingTimeInterval(-10800),
-                durationSeconds: 526,
+                duration: .seconds(526),
                 avgSpeed: 34.0,
                 maxSpeed: 59.0
             ),
-            EVTripDetail(
+            EVTripSummary(
                 distance: Distance(length: 6, units: .miles),
                 odometer: Distance(length: 14196.5, units: .miles),
                 accessoriesEnergy: 90,
@@ -1092,7 +1092,7 @@ extension EVTripDetail {
                 drivetrainEnergy: 1524,
                 batteryCareEnergy: 200,
                 startDate: Date().addingTimeInterval(-14400),
-                durationSeconds: 752,
+                duration: .seconds(752),
                 avgSpeed: 32.0,
                 maxSpeed: 51.0
             )
