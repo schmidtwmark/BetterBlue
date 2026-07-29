@@ -22,6 +22,7 @@ struct TripDetailsView: View {
     /// EU (weekly):  0 = this week, -1 = last week.
     /// Other (daily): 0 = today, -1 = yesterday.
     @State private var periodOffset: Int = 0
+    @State private var detailedTrips: [Date: [EVTripInfo]] = [:]
 
     var body: some View {
         PersistentModelGuard(model: bbVehicle) {
@@ -40,6 +41,11 @@ struct TripDetailsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 await loadTripDetails()
+            }
+            .onChange(of: periodOffset) { _, _ in
+                Task {
+                    await loadDetailedTripsForSelectedPeriod()
+                }
             }
         }
     }
@@ -120,24 +126,20 @@ struct TripDetailsView: View {
                         .padding(.vertical, 8)
                 } else {
                     ForEach(tripsForSelectedPeriod) { trip in
-                        TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit, isDailySummary: isDailySummaryData)
+                        TripDetailRow(
+                            trip: trip,
+                            distanceUnit: appSettings.preferredDistanceUnit,
+                            isDailySummary: isDailySummaryData,
+                            bbVehicle: bbVehicle,
+                            supportsTripInfo: supportsTripInfo,
+                            detailedTrips: detailedTrips[trip.startDate]
+                        )
                     }
                 }
             } header: {
                 Text("Recent Trips")
             }
         }
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    let threshold: CGFloat = 50
-                    if value.translation.width < -threshold, periodOffset < 0 {
-                        withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
-                    } else if value.translation.width > threshold {
-                        withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
-                    }
-                }
-        )
     }
 
     private var periodNavigatorView: some View {
@@ -387,6 +389,10 @@ struct TripDetailsView: View {
         }
     }
 
+    private var supportsTripInfo: Bool {
+        bbVehicle.account?.supportedEVTripTypes.contains(.info) == true
+    }
+
     private func loadTripDetails() async {
         isLoading = true
         loadError = nil
@@ -403,6 +409,7 @@ struct TripDetailsView: View {
         do {
             if let fetchedTrips = try await account.fetchEVTripSummary(for: bbVehicle, modelContext: modelContext) {
                 trips = fetchedTrips
+                await loadDetailedTripsForSelectedPeriod()
             } else {
                 loadError = ActionError(
                     action: "Load trip history",
@@ -424,6 +431,28 @@ struct TripDetailsView: View {
 
         isLoading = false
     }
+
+    private func loadDetailedTripsForSelectedPeriod() async {
+        guard supportsTripInfo, let account = bbVehicle.account else { return }
+        
+        let tripsToFetch = tripsForSelectedPeriod.filter { detailedTrips[$0.startDate] == nil }
+        guard !tripsToFetch.isEmpty else { return }
+        
+        for trip in tripsToFetch {
+            let date = trip.startDate
+            do {
+                let info = try await account.fetchEVTripInfo(for: bbVehicle, date: date, modelContext: modelContext)
+                if let info = info {
+                    detailedTrips[date] = info.sorted(by: { $0.date > $1.date })
+                } else {
+                    detailedTrips[date] = []
+                }
+            } catch {
+                BBLogger.error(.api, "TripDetailsView: Failed to fetch detailed trips for \(date): \(error)")
+                detailedTrips[date] = []
+            }
+        }
+    }
 }
 
 // MARK: - Energy Data Point
@@ -442,7 +471,42 @@ struct TripDetailRow: View {
     let trip: EVTripSummary
     let distanceUnit: Distance.Units
     let isDailySummary: Bool
+    var bbVehicle: BBVehicle? = nil
+    var supportsTripInfo: Bool = false
+    var detailedTrips: [EVTripInfo]? = nil
     @State private var isExpanded = false
+
+    private var effectiveAvgSpeed: Int {
+        if let detailedTrips = detailedTrips, !detailedTrips.isEmpty {
+            let validSpeeds = detailedTrips.filter { $0.avgSpeed > 0 }
+            if validSpeeds.isEmpty { return Int(trip.avgSpeed) }
+            let avg = validSpeeds.reduce(0.0) { $0 + $1.avgSpeed } / Double(validSpeeds.count)
+            return Int(distanceUnit.abbreviation == "mi" ? avg * 0.621371 : avg)
+        }
+        return Int(trip.avgSpeed)
+    }
+
+    private var effectiveMaxSpeed: Int {
+        if let detailedTrips = detailedTrips, !detailedTrips.isEmpty {
+            let max = detailedTrips.map { $0.maxSpeed }.max() ?? 0
+            return max > 0 ? Int(distanceUnit.abbreviation == "mi" ? max * 0.621371 : max) : Int(trip.maxSpeed)
+        }
+        return Int(trip.maxSpeed)
+    }
+
+    private var speedUnitString: String {
+        distanceUnit.abbreviation == "mi" ? "mph" : "km/h"
+    }
+
+    private var effectiveDurationString: String {
+        if let detailedTrips = detailedTrips, !detailedTrips.isEmpty {
+            let totalSeconds = detailedTrips.reduce(0 as Int64) { $0 + $1.driveTime.components.seconds }
+            if totalSeconds > 0 {
+                return Duration.seconds(totalSeconds).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+            }
+        }
+        return trip.formattedDuration
+    }
 
     private var formattedDistance: String {
         trip.distance.units.format(trip.distance.length, to: distanceUnit)
@@ -462,7 +526,9 @@ struct TripDetailRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header row with date and distance (never animates)
+            // Touchable Header Area
+            VStack(alignment: .leading, spacing: 8) {
+                // Header row with date and distance (never animates)
             HStack {
                 if isDailySummary {
                     Text(
@@ -488,7 +554,7 @@ struct TripDetailRow: View {
 
             // Summary row (never animates except chevron)
             HStack {
-                Text(trip.formattedDuration)
+                Text(effectiveDurationString)
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -515,8 +581,15 @@ struct TripDetailRow: View {
                     .animation(.easeInOut(duration: 0.2), value: isExpanded)
             }
             .animation(nil, value: isExpanded)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+            }
+        }
 
-            // Expanded energy breakdown
+        // Expanded energy breakdown
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
                     if trip.batteryCareEnergy > 0 {
@@ -579,26 +652,44 @@ struct TripDetailRow: View {
 
                     // Speed info
                     HStack {
-                        Text("Avg: \(Int(trip.avgSpeed)) mph")
+                        Text("Avg: \(effectiveAvgSpeed) \(speedUnitString)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         Text("•")
                             .foregroundColor(.secondary)
-                        Text("Max: \(Int(trip.maxSpeed)) mph")
+                        Text("Max: \(effectiveMaxSpeed) \(speedUnitString)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         Spacer()
+                    }
+                    
+                    if supportsTripInfo {
+                        Divider()
+                            .padding(.vertical, 4)
+                            
+                        if let detailedTrips = detailedTrips {
+                            if detailedTrips.isEmpty {
+                                Text("No individual trips found.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                VStack(spacing: 6) {
+                                    ForEach(detailedTrips, id: \.self) { detail in
+                                        TripInfoPillView(trip: detail, distanceUnit: distanceUnit)
+                                    }
+                                }
+                            }
+                        } else {
+                            ProgressView("Loading trips...")
+                                .font(.caption)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
                     }
                 }
             }
         }
         .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExpanded.toggle()
-            }
-        }
     }
 }
 
@@ -631,8 +722,54 @@ struct EnergyBreakdownPill: View {
     }
 }
 
-// MARK: - Previews
+// MARK: - Trip Info Pill
 
+struct TripInfoPillView: View {
+    let trip: EVTripInfo
+    let distanceUnit: Distance.Units
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(trip.date, format: .dateTime.hour().minute())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(distanceUnit.format(trip.distance.length, to: distanceUnit))
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .frame(width: 65, alignment: .leading)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Drive")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(trip.driveTime.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Idle")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(trip.idleTime.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.orange)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(8)
+        .background(Color(.tertiarySystemFill))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Previews
+/*
 #Preview("Trip Details - With Data") {
     NavigationView {
         TripDetailsPreviewWrapper(trips: EVTripSummary.sampleTrips)
@@ -1099,3 +1236,4 @@ extension EVTripSummary {
         ]
     }
 }
+*/
