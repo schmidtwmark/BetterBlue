@@ -1,0 +1,82 @@
+name: Bug report
+description: Something in BetterBlue isn't working right
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Reports that include **debug data** almost
+        always get diagnosed and fixed faster — often in a single round-trip instead of several.
+
+        **Before filing, please capture debug data:**
+        1. In BetterBlue, go to **Settings → Debug Settings** and turn on **Debug Mode**.
+        2. **Reproduce the problem** (debug mode only records requests made while it's on).
+        3. Go to **Settings → Debug Settings → Export Debug Data** and attach the file below.
+
+        The export automatically redacts credentials, tokens, PINs, and coordinates — but
+        **review the file yourself before attaching**. Response bodies can still contain
+        identifiers like your full VIN or email; mask anything you're not comfortable sharing.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what actually happened?
+      placeholder: I tapped Start Climate from the widget and the app showed an error, but the car turned on anyway.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If you can make it happen on demand, list the steps. If it's intermittent, describe when it tends to happen.
+      placeholder: |
+        1. Open the app
+        2. ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: App version and build
+      description: Shown in Settings → About (e.g. 2026.7.1 (58)).
+      placeholder: 2026.7.1 (58)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and iOS version
+      placeholder: iPhone 16 Pro, iOS 26.5.2
+    validations:
+      required: true
+  - type: dropdown
+    id: brand-region
+    attributes:
+      label: Vehicle brand and region
+      options:
+        - Hyundai — USA
+        - Hyundai — Canada
+        - Hyundai — Europe
+        - Kia — USA
+        - Kia — Europe
+        - Other / multiple
+    validations:
+      required: true
+  - type: textarea
+    id: debug-data
+    attributes:
+      label: Debug data
+      description: >
+        Attach the Export Debug Data file here (drag and drop). If the issue involves a specific
+        request, you can also attach the matching entry from Settings → Account → HTTP Logs.
+        If you're intentionally skipping this, say why so we know it wasn't missed.
+      placeholder: Drag the exported file here, or explain why it's not included.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Checklist
+      options:
+        - label: I turned on Debug Mode and reproduced the issue before exporting.
+        - label: I reviewed the attached data for anything sensitive (VIN, email, location).

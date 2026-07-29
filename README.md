@@ -1,7 +1,8 @@
 # BetterBlue
 
 <p align="center">
-  <img src="betterblue-phones.png" alt="BetterBlue on iPhone" width="400"/>
+  <img src="betterblue-app.png" alt="BetterBlue vehicle view with map, charging status, and controls" width="260"/>
+  <img src="betterblue-widget.png" alt="BetterBlue home screen widget with lock, unlock, and climate buttons" width="260"/>
   <img src="betterblue-watch.png" alt="BetterBlue on Apple Watch" width="200"/>
 </p>
 

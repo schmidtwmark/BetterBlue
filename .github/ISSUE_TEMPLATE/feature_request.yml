@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement or new capability for BetterBlue
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like BetterBlue to do?
+      description: Describe the feature and the situation where you'd use it.
+      placeholder: On road trips I'd like the app to...
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: How do you handle this today?
+      description: Workarounds you use now, or other apps that do this well.
+    validations:
+      required: false
+  - type: dropdown
+    id: brand-region
+    attributes:
+      label: Vehicle brand and region
+      description: Some features depend on what your region's API exposes.
+      options:
+        - Hyundai — USA
+        - Hyundai — Canada
+        - Hyundai — Europe
+        - Kia — USA
+        - Kia — Europe
+        - Other / not vehicle-specific
+    validations:
+      required: false
