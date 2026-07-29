@@ -568,22 +568,45 @@ extension BBAccount {
 // MARK: - Vehicle Commands
 
 extension BBAccount {
+    /// Whether a failed command may be re-sent after re-authenticating.
+    ///
+    /// Commands change vehicle state, so a blind retry can act on the car
+    /// twice. Only retry when the error proves the backend rejected the
+    /// request before it reached the vehicle — an authentication failure.
+    /// `kiaInvalidRequest` is deliberately excluded: it is a generic
+    /// "request rejected" that Kia's anti-fraud layer can return *after*
+    /// accepting a command, so retrying it risks a second lock/unlock.
+    private func shouldRetryCommand(after error: APIError) -> Bool {
+        switch error.errorType {
+        case .invalidCredentials, .invalidVehicleSession, .failedRetryLogin:
+            return true
+        default:
+            return false
+        }
+    }
+
     @MainActor
     func sendCommand(
         for bbVehicle: BBVehicle,
         command: VehicleCommand,
         modelContext: ModelContext,
         climatePresetName: String? = nil,
-        climatePresetIcon: String? = nil
+        climatePresetIcon: String? = nil,
+        allowAuthRetry: Bool = true
     ) async throws {
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
+            // Re-entering with a freshly-initialized session: a subsequent auth
+            // failure is genuine, so don't let this path stack another retry on
+            // top of the one below (a bad session could otherwise turn a single
+            // tap into several commands at the car).
             return try await sendCommand(
                 for: bbVehicle,
                 command: command,
                 modelContext: modelContext,
                 climatePresetName: climatePresetName,
-                climatePresetIcon: climatePresetIcon
+                climatePresetIcon: climatePresetIcon,
+                allowAuthRetry: false
             )
         }
 
@@ -620,7 +643,8 @@ extension BBAccount {
         let vehicle = bbVehicle.toVehicle()
         do {
             try await api.sendCommand(for: vehicle, command: command, authToken: authToken)
-        } catch let error as APIError where shouldReauthenticate(for: error) {
+        } catch let error as APIError where allowAuthRetry && shouldRetryCommand(after: error) {
+            BBLogger.info(.api, "BBAccount: command rejected (\(error.errorType)), re-authenticating and retrying once")
             try await handleAPIError(error, modelContext: modelContext)
             guard let api = self.api, let authToken = self.authToken else {
                 throw APIError.failedRetryLogin()

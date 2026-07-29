@@ -96,7 +96,13 @@ struct DebugExportData {
         do {
             allLogs = try modelContext.fetch(descriptor)
         } catch {
-            return AccountHTTPLogs(login: nil, getVehicles: nil, mfaLogs: [], vehicleStatuses: [])
+            return AccountHTTPLogs(
+                login: nil,
+                getVehicles: nil,
+                mfaLogs: [],
+                vehicleStatuses: [],
+                commands: []
+            )
         }
 
         let loginLog = allLogs.first { $0.log.requestType == .login }?.log
@@ -134,11 +140,25 @@ struct DebugExportData {
             vehicleStatuses.append(contentsOf: statusLogs.map(\.log))
         }
 
+        // Commands (lock/unlock/climate/charge). Previously omitted entirely,
+        // which made "the app sent a command I didn't ask for" reports
+        // undiagnosable — the export contained no trace of the command at all
+        // (BetterBlue#94). Each log carries a timestamp and a stack trace, so
+        // an unexpected command can be placed in time and attributed to the
+        // surface that issued it (widget/Control Center intent vs in-app
+        // button vs watch). Take the newest 15 to cover an overnight run of
+        // repeats rather than just the last one.
+        let commands = allLogs
+            .filter { $0.log.requestType == .sendCommand }
+            .prefix(15)
+            .map(\.log)
+
         return AccountHTTPLogs(
             login: loginLog,
             getVehicles: getVehiclesLog,
             mfaLogs: Array(mfaLogs),
-            vehicleStatuses: vehicleStatuses
+            vehicleStatuses: vehicleStatuses,
+            commands: Array(commands)
         )
     }
 }
@@ -150,9 +170,10 @@ struct AccountHTTPLogs: Encodable {
     let getVehicles: HTTPLog?
     let mfaLogs: [HTTPLog]
     let vehicleStatuses: [HTTPLog]
+    let commands: [HTTPLog]
 
     enum CodingKeys: String, CodingKey {
-        case login, getVehicles, mfaLogs, vehicleStatuses
+        case login, getVehicles, mfaLogs, vehicleStatuses, commands
     }
 
     func encode(to encoder: Encoder) throws {
@@ -161,6 +182,7 @@ struct AccountHTTPLogs: Encodable {
         try container.encodeIfPresent(getVehicles.map { HTTPLogExport(log: $0) }, forKey: .getVehicles)
         try container.encode(mfaLogs.map { HTTPLogExport(log: $0) }, forKey: .mfaLogs)
         try container.encode(vehicleStatuses.map { HTTPLogExport(log: $0) }, forKey: .vehicleStatuses)
+        try container.encode(commands.map { HTTPLogExport(log: $0) }, forKey: .commands)
     }
 }
 

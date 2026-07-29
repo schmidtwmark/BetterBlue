@@ -494,12 +494,22 @@ struct LockVehicleControlIntent: ControlConfigurationIntent {
         let vehicleName = vehicle.displayName
 
         // Optimistically surface the request on the widget right away,
-        // before the (possibly slow) command round-trips.
-        WidgetCommandStatus.record(command: "Lock", vin: targetVin)
+        // before the (possibly slow) command round-trips. Claiming the slot
+        // also collapses a duplicate delivery of this intent (#94).
+        guard WidgetCommandStatus.beginCommand("Lock", vin: targetVin) else {
+            BBLogger.info(.intent, "LockVehicleIntent: duplicate lock for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Lock request already sent to \(vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.lockVehicle(bbVehicle, modelContext: context)
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.lockVehicle(bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Lock Request Sent", body: "Command sent to \(vehicleName)")
@@ -528,11 +538,20 @@ struct UnlockVehicleControlIntent: ControlConfigurationIntent {
         let targetVin = vehicle.vin
         let vehicleName = vehicle.displayName
 
-        WidgetCommandStatus.record(command: "Unlock", vin: targetVin)
+        guard WidgetCommandStatus.beginCommand("Unlock", vin: targetVin) else {
+            BBLogger.info(.intent, "UnlockVehicleIntent: duplicate unlock for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Unlock request already sent to \(vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.unlockVehicle(bbVehicle, modelContext: context)
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.unlockVehicle(bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Unlock Request Sent", body: "Command sent to \(vehicleName)")
@@ -561,26 +580,35 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
         let presetIcon = preset.presetIcon
         let targetVin = preset.vehicleVin
 
-        WidgetCommandStatus.record(command: "Start Climate", vin: targetVin)
+        guard WidgetCommandStatus.beginCommand("Start Climate", vin: targetVin) else {
+            BBLogger.info(.intent, "StartClimateIntent: duplicate start for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Climate start request already sent to \(preset.vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            if let climatePreset = bbVehicle.safeClimatePresets.first(where: { $0.id == presetId }) {
-                try await account.startClimate(
-                    bbVehicle,
-                    options: climatePreset.climateOptions,
-                    modelContext: context,
-                    presetName: presetName,
-                    presetIcon: presetIcon
-                )
-            } else {
-                try await account.startClimate(
-                    bbVehicle,
-                    modelContext: context,
-                    presetName: presetName,
-                    presetIcon: presetIcon
-                )
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                if let climatePreset = bbVehicle.safeClimatePresets.first(where: { $0.id == presetId }) {
+                    try await account.startClimate(
+                        bbVehicle,
+                        options: climatePreset.climateOptions,
+                        modelContext: context,
+                        presetName: presetName,
+                        presetIcon: presetIcon
+                    )
+                } else {
+                    try await account.startClimate(
+                        bbVehicle,
+                        modelContext: context,
+                        presetName: presetName,
+                        presetIcon: presetIcon
+                    )
+                }
             }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Climate Start Request Sent", body: "Command sent to \(preset.vehicleName)")
@@ -609,11 +637,20 @@ struct StopClimateControlIntent: ControlConfigurationIntent {
         let targetVin = vehicle.vin
         let vehicleName = vehicle.displayName
 
-        WidgetCommandStatus.record(command: "Stop Climate", vin: targetVin)
+        guard WidgetCommandStatus.beginCommand("Stop Climate", vin: targetVin) else {
+            BBLogger.info(.intent, "StopClimateIntent: duplicate stop for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Climate stop request already sent to \(vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.stopClimate(bbVehicle, modelContext: context)
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.stopClimate(bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Climate Stop Request Sent", body: "Command sent to \(vehicleName)")
@@ -642,11 +679,20 @@ struct StartChargeControlIntent: ControlConfigurationIntent {
         let targetVin = vehicle.vin
         let vehicleName = vehicle.displayName
 
-        WidgetCommandStatus.record(command: "Start Charge", vin: targetVin)
+        guard WidgetCommandStatus.beginCommand("Start Charge", vin: targetVin) else {
+            BBLogger.info(.intent, "StartChargeIntent: duplicate start for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Charge start request already sent to \(vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.startCharge(bbVehicle, modelContext: context)
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.startCharge(bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Charge Start Request Sent", body: "Command sent to \(vehicleName)")
@@ -675,11 +721,20 @@ struct StopChargeControlIntent: ControlConfigurationIntent {
         let targetVin = vehicle.vin
         let vehicleName = vehicle.displayName
 
-        WidgetCommandStatus.record(command: "Stop Charge", vin: targetVin)
+        guard WidgetCommandStatus.beginCommand("Stop Charge", vin: targetVin) else {
+            BBLogger.info(.intent, "StopChargeIntent: duplicate stop for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Charge stop request already sent to \(vehicleName)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
 
-        try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-            try await account.stopCharge(bbVehicle, modelContext: context)
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.stopCharge(bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            WidgetCenter.shared.reloadAllTimelines()
+            throw error
         }
 
         await sendNotification(title: "Charge Stop Request Sent", body: "Command sent to \(vehicleName)")
