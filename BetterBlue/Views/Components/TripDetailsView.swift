@@ -142,6 +142,13 @@ struct TripDetailsView: View {
         }
     }
 
+    /// Whether stepping back another period would still overlap the data.
+    /// Without this the chevron pages into empty weeks forever.
+    private var canNavigateBack: Bool {
+        guard let earliest = trips.map(\.startDate).min() else { return false }
+        return (isDailySummaryData ? selectedWeekStart : selectedDayStart) > earliest
+    }
+
     private var periodNavigatorView: some View {
         HStack {
             Button {
@@ -149,12 +156,13 @@ struct TripDetailsView: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(canNavigateBack ? .primary : .secondary)
                     .frame(width: 32, height: 32)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .disabled(!canNavigateBack)
 
             Spacer()
 
@@ -202,12 +210,14 @@ struct TripDetailsView: View {
         Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
     }
 
+    /// Day-summary data (EU /drvhistory) reports whole days: no per-trip
+    /// times, so every summary carries zero duration — and those regions are
+    /// the ones that declare the per-trip drill-down capability. Keying off
+    /// the model rather than midnight timestamps keeps a real trip that
+    /// happens to start at 12:00 AM from flipping the view into weekly mode.
     private var isDailySummaryData: Bool {
         guard !trips.isEmpty else { return false }
-        return trips.allSatisfy {
-            let comps = Calendar.current.dateComponents([.hour, .minute], from: $0.startDate)
-            return comps.hour == 0 && comps.minute == 0
-        }
+        return supportsTripInfo || trips.allSatisfy { $0.duration == .zero }
     }
 
     private func formatTripLabel(_ date: Date) -> String {
@@ -476,12 +486,18 @@ struct TripDetailRow: View {
     var detailedTrips: [EVTripInfo]? = nil
     @State private var isExpanded = false
 
+    /// EVTripInfo speeds arrive in the API's native unit, which matches the
+    /// detail's own distance units (km/h for Europe).
+    private var detailSpeedUnits: Distance.Units {
+        detailedTrips?.first?.distance.units ?? .kilometers
+    }
+
     private var effectiveAvgSpeed: Int {
         if let detailedTrips = detailedTrips, !detailedTrips.isEmpty {
             let validSpeeds = detailedTrips.filter { $0.avgSpeed > 0 }
             if validSpeeds.isEmpty { return Int(trip.avgSpeed) }
             let avg = validSpeeds.reduce(0.0) { $0 + $1.avgSpeed } / Double(validSpeeds.count)
-            return Int(distanceUnit.abbreviation == "mi" ? avg * 0.621371 : avg)
+            return Int(detailSpeedUnits.convert(avg, to: distanceUnit))
         }
         return Int(trip.avgSpeed)
     }
@@ -489,13 +505,13 @@ struct TripDetailRow: View {
     private var effectiveMaxSpeed: Int {
         if let detailedTrips = detailedTrips, !detailedTrips.isEmpty {
             let max = detailedTrips.map { $0.maxSpeed }.max() ?? 0
-            return max > 0 ? Int(distanceUnit.abbreviation == "mi" ? max * 0.621371 : max) : Int(trip.maxSpeed)
+            return max > 0 ? Int(detailSpeedUnits.convert(max, to: distanceUnit)) : Int(trip.maxSpeed)
         }
         return Int(trip.maxSpeed)
     }
 
     private var speedUnitString: String {
-        distanceUnit.abbreviation == "mi" ? "mph" : "km/h"
+        distanceUnit == .miles ? "mph" : "km/h"
     }
 
     private var effectiveDurationString: String {
@@ -734,7 +750,7 @@ struct TripInfoPillView: View {
                 Text(trip.date, format: .dateTime.hour().minute())
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                Text(distanceUnit.format(trip.distance.length, to: distanceUnit))
+                Text(trip.distance.units.format(trip.distance.length, to: distanceUnit))
                     .font(.caption)
                     .fontWeight(.medium)
             }
@@ -769,393 +785,6 @@ struct TripInfoPillView: View {
 }
 
 // MARK: - Previews
-/*
-#Preview("Trip Details - With Data") {
-    NavigationView {
-        TripDetailsPreviewWrapper(trips: EVTripSummary.sampleTrips)
-    }
-}
-
-#Preview("Trip Details - Loading") {
-    NavigationView {
-        TripDetailsPreviewWrapper(trips: nil, isLoading: true)
-    }
-}
-
-#Preview("Trip Details - Empty") {
-    NavigationView {
-        TripDetailsPreviewWrapper(trips: [])
-    }
-}
-
-#Preview("Trip Details - Error") {
-    NavigationView {
-        TripDetailsPreviewWrapper(trips: nil, errorMessage: "Failed to connect to server")
-    }
-}
-
-#Preview("Trip Row") {
-    List {
-        TripDetailRow(
-            trip: .sample,
-            distanceUnit: .miles,
-            isDailySummary: false
-        )
-    }
-}
-
-// MARK: - Preview Helpers
-
-private struct TripDetailsPreviewWrapper: View {
-    let trips: [EVTripSummary]?
-    var isLoading: Bool = false
-    var errorMessage: String?
-
-    var body: some View {
-        TripDetailsPreviewContent(
-            trips: trips ?? [],
-            isLoading: isLoading,
-            errorMessage: errorMessage
-        )
-        .navigationTitle("Trip History")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-private struct TripDetailsPreviewContent: View {
-    let trips: [EVTripSummary]
-    let isLoading: Bool
-    let errorMessage: String?
-    @State private var appSettings = AppSettings.shared
-    @State private var showEnergyBreakdown = false
-    @State private var periodOffset: Int = 0
-
-    var body: some View {
-        Group {
-            if isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                    Text("Loading trip details...")
-                        .foregroundColor(.secondary)
-                }
-            } else if let error = errorMessage {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundColor(.orange)
-                    Text("Failed to load trips")
-                        .font(.headline)
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                    Button("Try Again") {}
-                        .buttonStyle(.bordered)
-                }
-                .padding()
-            } else if trips.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "car.fill")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-                    Text("No Recent Trips")
-                        .font(.headline)
-                    Text("Trip history will appear here after you drive your vehicle.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding()
-            } else {
-                List {
-                    Section {
-                        HStack {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 32, height: 32)
-                                    .background(Color(.secondarySystemBackground))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-
-                            Spacer()
-
-                            VStack(spacing: 2) {
-                                Text(periodLabel)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                Text(periodSubLabel)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(periodOffset < 0 ? .primary : .secondary)
-                                    .frame(width: 32, height: 32)
-                                    .background(Color(.secondarySystemBackground))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(periodOffset >= 0)
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    }
-
-                    Section {
-                        Group {
-                            if showEnergyBreakdown {
-                                stackedEnergyChart
-                            } else {
-                                totalEnergyChart
-                            }
-                        }
-                        .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
-                        .animation(.easeInOut(duration: 0.25), value: periodOffset)
-                        .padding(.horizontal)
-                        .frame(height: 200)
-                        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
-                    } header: {
-                        HStack {
-                            Text("Energy Usage")
-                            Spacer()
-                            Toggle("Breakdown", isOn: $showEnergyBreakdown)
-                                .toggleStyle(.button)
-                                .buttonStyle(.bordered)
-                                .font(.caption)
-                        }
-                    }
-
-                    Section {
-                        if tripsForSelectedPeriod.isEmpty {
-                            Text(isDailySummaryData ? "No trips this week" : "No trips today")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                        } else {
-                            ForEach(tripsForSelectedPeriod) { trip in
-                                TripDetailRow(trip: trip, distanceUnit: appSettings.preferredDistanceUnit, isDailySummary: isDailySummaryData)
-                            }
-                        }
-                    } header: {
-                        Text("Recent Trips")
-                    }
-                }
-                .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            let threshold: CGFloat = 50
-                            if value.translation.width < -threshold, periodOffset < 0 {
-                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset += 1 }
-                            } else if value.translation.width > threshold {
-                                withAnimation(.easeInOut(duration: 0.25)) { periodOffset -= 1 }
-                            }
-                        }
-                )
-            }
-        }
-    }
-
-    private var isDailySummaryData: Bool {
-        guard !trips.isEmpty else { return false }
-        return trips.allSatisfy {
-            let comps = Calendar.current.dateComponents([.hour, .minute], from: $0.startDate)
-            return comps.hour == 0 && comps.minute == 0
-        }
-    }
-
-    private var selectedWeekStart: Date {
-        let cal = Calendar.current
-        var comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
-        comps.weekday = 2
-        let thisMonday = cal.date(from: comps) ?? Date()
-        return cal.date(byAdding: .weekOfYear, value: periodOffset, to: thisMonday) ?? Date()
-    }
-
-    private var selectedWeekEnd: Date {
-        Calendar.current.date(byAdding: .day, value: 7, to: selectedWeekStart) ?? Date()
-    }
-
-    private var selectedDayStart: Date {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        return cal.date(byAdding: .day, value: periodOffset, to: today) ?? today
-    }
-
-    private var selectedDayEnd: Date {
-        Calendar.current.date(byAdding: .day, value: 1, to: selectedDayStart) ?? Date()
-    }
-
-    private var periodLabel: String {
-        let fmt = DateFormatter()
-        if isDailySummaryData {
-            fmt.dateFormat = "MMM d"
-            let end = Calendar.current.date(byAdding: .day, value: 6, to: selectedWeekStart) ?? selectedWeekEnd
-            return "\(fmt.string(from: selectedWeekStart)) – \(fmt.string(from: end))"
-        } else {
-            fmt.dateFormat = "EEE, MMM d"
-            return fmt.string(from: selectedDayStart)
-        }
-    }
-
-    private var periodSubLabel: String {
-        if isDailySummaryData {
-            switch periodOffset {
-            case 0:  return "This Week"
-            case -1: return "Last Week"
-            default: return "\(-periodOffset) weeks ago"
-            }
-        } else {
-            switch periodOffset {
-            case 0:  return "Today"
-            case -1: return "Yesterday"
-            default: return "\(-periodOffset) days ago"
-            }
-        }
-    }
-
-    private var tripsForSelectedPeriod: [EVTripSummary] {
-        if isDailySummaryData {
-            return trips.filter { $0.startDate >= selectedWeekStart && $0.startDate < selectedWeekEnd }
-        } else {
-            return trips.filter { $0.startDate >= selectedDayStart && $0.startDate < selectedDayEnd }
-        }
-    }
-
-    private var indexedTrips: [(index: Int, trip: EVTripSummary)] {
-        Array(tripsForSelectedPeriod.reversed().enumerated().map { ($0.offset, $0.element) })
-    }
-
-    private func formatTripTime(_ date: Date) -> String {
-        if isDailySummaryData {
-            return date.formatted(.dateTime.month(.abbreviated).day())
-        } else {
-            return date.formatted(.dateTime.hour().minute())
-        }
-    }
-
-    private var totalEnergyChart: some View {
-        Chart(indexedTrips, id: \.index) { item in
-            BarMark(
-                x: .value("Trip", formatTripTime(item.trip.startDate)),
-                y: .value("Energy", Double(item.trip.totalEnergyUsed) / 1000.0)
-            )
-            .foregroundStyle(by: .value("Category", "Total"))
-            .cornerRadius(4)
-        }
-        .chartForegroundStyleScale([
-            "Total": Color.orange
-        ])
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let energy = value.as(Double.self) {
-                        Text(String(format: "%.1f", energy))
-                    }
-                }
-            }
-        }
-        .chartXAxis {
-            AxisMarks { value in
-                AxisValueLabel {
-                    if let label = value.as(String.self) {
-                        Text(label)
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .chartYAxisLabel("kWh", position: .leading)
-        .chartLegend(position: .bottom, spacing: 8)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: 7)
-    }
-
-    private var stackedEnergyChart: some View {
-        Chart(energyBreakdownData) { dataPoint in
-            BarMark(
-                x: .value("Trip", dataPoint.tripLabel),
-                y: .value("Energy", dataPoint.energy)
-            )
-            .foregroundStyle(by: .value("Category", dataPoint.category))
-            .cornerRadius(4)
-        }
-        .chartForegroundStyleScale([
-            "Drivetrain": Color.orange,
-            "Climate": Color.blue,
-            "Accessories": Color.purple,
-            "Battery Care": Color.cyan
-        ])
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let energy = value.as(Double.self) {
-                        Text(String(format: "%.1f", energy))
-                    }
-                }
-            }
-        }
-        .chartXAxis {
-            AxisMarks { value in
-                AxisValueLabel {
-                    if let label = value.as(String.self) {
-                        Text(label)
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .chartYAxisLabel("kWh", position: .leading)
-        .chartLegend(position: .bottom, spacing: 8)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: 7)
-    }
-
-    private var energyBreakdownData: [EnergyDataPoint] {
-        indexedTrips.flatMap { item -> [EnergyDataPoint] in
-            let tripLabel = formatTripTime(item.trip.startDate)
-            var points: [EnergyDataPoint] = [
-                EnergyDataPoint(
-                    tripLabel: tripLabel,
-                    category: "Drivetrain",
-                    energy: Double(item.trip.drivetrainEnergy) / 1000.0
-                ),
-                EnergyDataPoint(
-                    tripLabel: tripLabel,
-                    category: "Climate",
-                    energy: Double(item.trip.climateEnergy) / 1000.0
-                ),
-                EnergyDataPoint(
-                    tripLabel: tripLabel,
-                    category: "Accessories",
-                    energy: Double(item.trip.accessoriesEnergy) / 1000.0
-                )
-            ]
-            if item.trip.batteryCareEnergy > 0 {
-                points.append(EnergyDataPoint(
-                    tripLabel: tripLabel,
-                    category: "Battery Care",
-                    energy: Double(item.trip.batteryCareEnergy) / 1000.0
-                ))
-            }
-            return points
-        }
-    }
-}
-
-// MARK: - Sample Data
 
 extension EVTripSummary {
     static var sample: EVTripSummary {
@@ -1175,65 +804,67 @@ extension EVTripSummary {
         )
     }
 
-    static var sampleTrips: [EVTripSummary] {
+    /// A day-summary shaped sample (zero duration/speeds, km distance),
+    /// matching what the EU /drvhistory endpoint returns.
+    static var sampleDaySummary: EVTripSummary {
+        EVTripSummary(
+            distance: Distance(length: 53, units: .kilometers),
+            odometer: Distance(length: 0, units: .kilometers),
+            accessoriesEnergy: 528,
+            totalEnergyUsed: 5311,
+            regenEnergy: 3785,
+            climateEnergy: 216,
+            drivetrainEnergy: 6027,
+            batteryCareEnergy: 0,
+            startDate: Calendar.current.startOfDay(for: Date()),
+            duration: .zero,
+            avgSpeed: 0,
+            maxSpeed: 0
+        )
+    }
+}
+
+extension EVTripInfo {
+    static var sampleTrips: [EVTripInfo] {
         [
-            EVTripSummary(
-                distance: Distance(length: 7, units: .miles),
-                odometer: Distance(length: 14214.1, units: .miles),
-                accessoriesEnergy: 220,
-                totalEnergyUsed: 3090,
-                regenEnergy: 966,
-                climateEnergy: 1235,
-                drivetrainEnergy: 1635,
-                batteryCareEnergy: 0,
-                startDate: Date().addingTimeInterval(-3600),
-                duration: .seconds(1268),
-                avgSpeed: 27.0,
-                maxSpeed: 41.0
+            EVTripInfo(
+                date: Date().addingTimeInterval(-7200),
+                driveTime: .seconds(22 * 60),
+                idleTime: .seconds(3 * 60),
+                distance: Distance(length: 12.4, units: .kilometers),
+                avgSpeed: 34,
+                maxSpeed: 61
             ),
-            EVTripSummary(
-                distance: Distance(length: 4, units: .miles),
-                odometer: Distance(length: 14206.1, units: .miles),
-                accessoriesEnergy: 160,
-                totalEnergyUsed: 2677,
-                regenEnergy: 446,
-                climateEnergy: 908,
-                drivetrainEnergy: 1409,
-                batteryCareEnergy: 200,
-                startDate: Date().addingTimeInterval(-7200),
-                duration: .seconds(932),
-                avgSpeed: 24.0,
-                maxSpeed: 42.0
-            ),
-            EVTripSummary(
-                distance: Distance(length: 4, units: .miles),
-                odometer: Distance(length: 14200.9, units: .miles),
-                accessoriesEnergy: 70,
-                totalEnergyUsed: 2116,
-                regenEnergy: 364,
-                climateEnergy: 569,
-                drivetrainEnergy: 1177,
-                batteryCareEnergy: 300,
-                startDate: Date().addingTimeInterval(-10800),
-                duration: .seconds(526),
-                avgSpeed: 34.0,
-                maxSpeed: 59.0
-            ),
-            EVTripSummary(
-                distance: Distance(length: 6, units: .miles),
-                odometer: Distance(length: 14196.5, units: .miles),
-                accessoriesEnergy: 90,
-                totalEnergyUsed: 2583,
-                regenEnergy: 1334,
-                climateEnergy: 769,
-                drivetrainEnergy: 1524,
-                batteryCareEnergy: 200,
-                startDate: Date().addingTimeInterval(-14400),
-                duration: .seconds(752),
-                avgSpeed: 32.0,
-                maxSpeed: 51.0
+            EVTripInfo(
+                date: Date().addingTimeInterval(-30_000),
+                driveTime: .seconds(41 * 60),
+                idleTime: .seconds(6 * 60),
+                distance: Distance(length: 40.6, units: .kilometers),
+                avgSpeed: 52,
+                maxSpeed: 118
             )
         ]
     }
 }
-*/
+
+#Preview("Trip Row (per-trip region)") {
+    List {
+        TripDetailRow(
+            trip: .sample,
+            distanceUnit: .miles,
+            isDailySummary: false
+        )
+    }
+}
+
+#Preview("Day Summary Row (EU, drill-down)") {
+    List {
+        TripDetailRow(
+            trip: .sampleDaySummary,
+            distanceUnit: .kilometers,
+            isDailySummary: true,
+            supportsTripInfo: true,
+            detailedTrips: EVTripInfo.sampleTrips
+        )
+    }
+}
