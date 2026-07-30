@@ -207,6 +207,12 @@ extension BBAccount {
             // -> api.configuration is updated with new id
             if deviceId == nil {
                 deviceId = try await api.registerDevice()
+                // Flush immediately rather than waiting on SwiftData's
+                // autosave. The device id is what an MFA-gated backend
+                // recognizes on the next login; losing it (app killed before
+                // an autosave landed) means the next launch looks like a new
+                // device and challenges for MFA again (BetterBlue#95).
+                try? modelContext.save()
             }
 
             authToken = try await api.login()
@@ -218,6 +224,7 @@ extension BBAccount {
 
             // Clear any pending MFA error on successful login
             pendingMFAError = nil
+            try? modelContext.save()
         } catch let error as APIError where error.errorType == .requiresMFA {
             // Store MFA error so other parallel operations know MFA is required
             pendingMFAError = error
@@ -304,6 +311,21 @@ extension BBAccount {
         self.authToken = finalAuthToken
         // Clear pending MFA error now that MFA is complete
         self.pendingMFAError = nil
+
+        // Persist the just-earned session immediately. Everything the next
+        // launch needs to avoid re-challenging — the remember-me token, the
+        // serialized auth token, and the device id the backend just accepted
+        // — lives on this model, and waiting for an autosave risks losing it
+        // if the app is killed after the user dismisses the MFA sheet
+        // (BetterBlue#95).
+        if let modelContext = modelContextForMFA {
+            do {
+                try modelContext.save()
+            } catch {
+                BBLogger.error(.auth, "BBAccount: failed to persist session after MFA: \(error)")
+            }
+        }
+
         BBLogger.info(.api, "BBAccount: MFA complete - final session: \(finalAuthToken.accessToken.prefix(20))...")
     }
 
@@ -342,23 +364,18 @@ extension BBAccount {
         self.api = nil
         self.authToken = nil
 
-        // If the stored session artifacts themselves are the problem (dead
-        // credentials, or a re-login that already failed), drop the remember-me
-        // token and device id too — otherwise every retry re-logs-in against the
-        // same bad artifacts and fails identically, which on the 1/min Live
-        // Activity wakeup is the background drain in BetterBlue#88. The backends
-        // regenerate both on a clean login (this is the full reset that made
-        // "Reset Session" sufficient in BetterBlue#84). Transient session errors
-        // keep the artifacts so a plain re-login can recover.
-        switch error.errorType {
-        case .invalidCredentials, .failedRetryLogin:
-            rememberMeToken = nil
-            deviceId = nil
-            try? modelContext.save()
-        default:
-            break
-        }
-
+        // Deliberately KEEP `deviceId` and `rememberMeToken` here. They are not
+        // session artifacts — they are the device-trust anchors that let an
+        // MFA-gated backend recognize this install and skip the OTP challenge:
+        // Hyundai Canada matches the `deviceid` header (its only mechanism —
+        // the region has no refresh endpoint, so every re-login is a password
+        // login and an unrecognized device answers with errorCode 7110), and
+        // Kia USA sends `rememberMeToken` as the `rmtoken` login header.
+        // Clearing them on a routine session expiry made every re-auth look
+        // like a brand-new device, so Canadian users were re-verifying MFA on
+        // each launch (BetterBlue#95). Only the explicit user-initiated
+        // `resetSession()` drops them. If a trust anchor really is dead the
+        // backend says so by challenging, which is the correct outcome.
         try await initialize(modelContext: modelContext)
 
         guard let api, let authToken else {
