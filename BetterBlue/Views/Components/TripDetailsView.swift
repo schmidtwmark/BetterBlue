@@ -17,7 +17,6 @@ struct TripDetailsView: View {
     @State private var isLoading = true
     @State private var loadError: ActionError?
     @State private var appSettings = AppSettings.shared
-    @State private var showEnergyBreakdown = false
     /// Offset from current period.
     /// EU (weekly):  0 = this week, -1 = last week.
     /// Other (daily): 0 = today, -1 = yesterday.
@@ -106,14 +105,7 @@ struct TripDetailsView: View {
                     .frame(height: 200)
                     .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0))
             } header: {
-                HStack {
-                    Text("Energy Usage")
-                    Spacer()
-                    Toggle("Breakdown", isOn: $showEnergyBreakdown)
-                        .toggleStyle(.button)
-                        .buttonStyle(.bordered)
-                        .font(.caption)
-                }
+                Text("Energy Usage")
             }
 
             // Trip list section
@@ -193,16 +185,9 @@ struct TripDetailsView: View {
     }
 
     private var energyUsageChartView: some View {
-        Group {
-            if showEnergyBreakdown {
-                stackedEnergyChart
-            } else {
-                totalEnergyChart
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: showEnergyBreakdown)
-        .animation(.easeInOut(duration: 0.25), value: periodOffset)
-        .padding(.horizontal)
+        stackedEnergyChart
+            .animation(.easeInOut(duration: 0.25), value: periodOffset)
+            .padding(.horizontal)
     }
 
     /// Indexed trips for categorical x-axis (oldest first for left-to-right display)
@@ -226,44 +211,6 @@ struct TripDetailsView: View {
         } else {
             return date.formatted(.dateTime.hour().minute())
         }
-    }
-
-    private var totalEnergyChart: some View {
-        Chart(indexedTrips, id: \.index) { item in
-            BarMark(
-                x: .value("Trip", formatTripLabel(item.trip.startDate)),
-                y: .value("Energy", Double(item.trip.totalEnergyUsed) / 1000.0)
-            )
-            .foregroundStyle(by: .value("Category", "Total"))
-            .cornerRadius(4)
-        }
-        .chartForegroundStyleScale([
-            "Total": Color.orange
-        ])
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let energy = value.as(Double.self) {
-                        Text(String(format: "%.1f", energy))
-                    }
-                }
-            }
-        }
-        .chartXAxis {
-            AxisMarks { value in
-                AxisValueLabel {
-                    if let label = value.as(String.self) {
-                        Text(label)
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .chartYAxisLabel("kWh", position: .leading)
-        .chartLegend(position: .bottom, spacing: 8)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: 7)
     }
 
     private var stackedEnergyChart: some View {
@@ -303,8 +250,9 @@ struct TripDetailsView: View {
         }
         .chartYAxisLabel("kWh", position: .leading)
         .chartLegend(position: .bottom, spacing: 8)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: 7)
+        // No scrollable axes: the period navigator already scopes the data to
+        // one day/week. Pinning chartXVisibleDomain(7) on a categorical axis
+        // squeezed 1-2 bars into a corner with overlapping labels.
     }
 
     /// Data points for the stacked energy breakdown chart
