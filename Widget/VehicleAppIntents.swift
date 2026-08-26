@@ -842,7 +842,7 @@ struct RequestSurroundViewCaptureIntent: AppIntent {
 
         await sendNotification(
             title: "Surround View Requested",
-            body: "\(vehicleName) is taking photos. They'll be ready in a minute or two."
+            body: "Surround view images have been requested for \(vehicleName). Please wait 1-2 minutes."
         )
 
         // Deliberately returns as soon as the vehicle accepts the
@@ -850,7 +850,7 @@ struct RequestSurroundViewCaptureIntent: AppIntent {
         // sat blocked for two minutes would look hung, and Siri would
         // time out well before the photos landed.
         return .result(
-            dialog: "\(vehicleName) is taking surround view photos. They'll be ready in a minute or two."
+            dialog: "Surround view images have been requested for \(vehicleName). Please wait 1-2 minutes."
         )
     }
 }
@@ -878,7 +878,7 @@ enum IntentError: Swift.Error, LocalizedError {
         case .noPresetSelected:
             "Please select a climate preset"
         case .surroundViewUnsupported:
-            "Surround view isn't available for this vehicle"
+            "Surround view isn't supported by this vehicle"
         }
     }
 }
