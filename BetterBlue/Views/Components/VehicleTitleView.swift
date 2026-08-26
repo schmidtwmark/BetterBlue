@@ -29,6 +29,7 @@ struct VehicleTitleView: View {
     @State private var showingHTTPLogs = false
     @State private var showingVehicleConfiguration = false
     @State private var showingTripDetails = false
+    @State private var showingSurroundView = false
     @State private var customVehicleName = ""
     @Namespace private var fallbackTransition
     /// Namespace used for `matchedGeometryEffect` on the refresh button (so
@@ -125,6 +126,16 @@ struct VehicleTitleView: View {
                         .toolbar {
                             ToolbarItem(placement: .navigationBarLeading) {
                                 Button("Done") { showingTripDetails = false }
+                            }
+                        }
+                }
+            }
+            .sheet(isPresented: $showingSurroundView) {
+                NavigationView {
+                    SurroundViewMonitorView(bbVehicle: bbVehicle)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") { showingSurroundView = false }
                             }
                         }
                 }
@@ -545,6 +556,14 @@ struct VehicleTitleView: View {
                 showingTripDetails = true
             } label: {
                 Label("Trip History", systemImage: "chart.line.uptrend.xyaxis")
+            }
+        }
+
+        if vehicleAccount?.supportsSurroundView == true {
+            Button {
+                showingSurroundView = true
+            } label: {
+                Label("Surround View", systemImage: "camera.viewfinder")
             }
         }
 

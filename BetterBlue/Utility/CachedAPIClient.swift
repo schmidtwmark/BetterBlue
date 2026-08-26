@@ -216,6 +216,23 @@ class CachedAPIClient: APIClientProtocol {
         return try await underlyingClient.fetchEVTripInfo(for: vehicle, authToken: authToken, date: date)
     }
 
+    func requestSurroundViewCapture(for vehicle: Vehicle, authToken: AuthToken) async throws {
+        // Never cached or deduplicated: this is a user-initiated command
+        // that tells the vehicle to go take fresh photos.
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding requestSurroundViewCapture for VIN: \(vehicle.vin)")
+        try await underlyingClient.requestSurroundViewCapture(for: vehicle, authToken: authToken)
+    }
+
+    func fetchSurroundViewCaptures(
+        for vehicle: Vehicle,
+        authToken: AuthToken
+    ) async throws -> [SurroundViewCapture] {
+        // Not cached — the caller polls this waiting for the server to
+        // pick up a new capture, so a stale hit would defeat the point.
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchSurroundViewCaptures for VIN: \(vehicle.vin)")
+        return try await underlyingClient.fetchSurroundViewCaptures(for: vehicle, authToken: authToken)
+    }
+
     func optionalFeaturesSupported() -> [OptionalAPIFeature] {
         // Without this forward the protocol's default ([]) would answer for
         // the wrapper, hiding MFA and trip history for every account.

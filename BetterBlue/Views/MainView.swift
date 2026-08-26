@@ -420,6 +420,15 @@ struct MainView: View {
                         }
                     }
             }
+        case .surroundView(let vehicle):
+            NavigationView {
+                SurroundViewMonitorView(bbVehicle: vehicle)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") { sheetPresentation.dismiss() }
+                        }
+                    }
+            }
         case .climateSettings(let vehicle):
             ClimateSettingsSheet(vehicle: vehicle)
         case .chargeLimitSettings(let vehicle):

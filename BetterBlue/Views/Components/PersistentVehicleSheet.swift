@@ -892,6 +892,14 @@ struct PersistentVehicleSheet: View {
             }
         }
 
+        if bbVehicle.account?.supportsSurroundView == true {
+            Button {
+                sheetPresentation.show(.surroundView(vehicle: bbVehicle))
+            } label: {
+                Label("Surround View", systemImage: "camera.viewfinder")
+            }
+        }
+
         Button {
             sheetPresentation.show(.vehicleInfo(vehicle: bbVehicle))
         } label: {

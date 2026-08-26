@@ -803,6 +803,58 @@ struct SetChargeLimitsIntent: AppIntent {
     }
 }
 
+// MARK: - Surround View
+
+struct RequestSurroundViewCaptureIntent: AppIntent {
+    static let title: LocalizedStringResource = "Request Surround View Capture"
+    // A single literal, not a concatenation: IntentDescription takes a
+    // LocalizedStringResource, which only a literal can satisfy.
+    static let description = IntentDescription(
+        "Ask your vehicle to take a fresh set of surround view photos, ready in a minute or two."
+    )
+    static let openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to photograph")
+    var vehicle: VehicleEntity
+
+    init() {}
+
+    init(vehicle: VehicleEntity) {
+        self.vehicle = vehicle
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let vehicleName = vehicle.displayName
+
+        try await performVehicleActionWithVin(vehicle.vin) { bbVehicle, account, context in
+            // Initialize before asking about the capability: it reads
+            // through to the API client, which is nil (and would answer
+            // "unsupported") until login has happened.
+            try await account.initialize(modelContext: context)
+
+            guard account.supportsSurroundView else {
+                throw IntentError.surroundViewUnsupported
+            }
+
+            try await account.requestSurroundViewCapture(for: bbVehicle, modelContext: context)
+        }
+
+        await sendNotification(
+            title: "Surround View Requested",
+            body: "\(vehicleName) is taking photos. They'll be ready in a minute or two."
+        )
+
+        // Deliberately returns as soon as the vehicle accepts the
+        // request rather than polling for the images: a Shortcut that
+        // sat blocked for two minutes would look hung, and Siri would
+        // time out well before the photos landed.
+        return .result(
+            dialog: "\(vehicleName) is taking surround view photos. They'll be ready in a minute or two."
+        )
+    }
+}
+
 // MARK: - Intent Errors
 
 enum IntentError: Swift.Error, LocalizedError {
@@ -811,6 +863,7 @@ enum IntentError: Swift.Error, LocalizedError {
     case refreshFailed(String)
     case noVehicleSelected
     case noPresetSelected
+    case surroundViewUnsupported
 
     var errorDescription: String? {
         switch self {
@@ -824,6 +877,8 @@ enum IntentError: Swift.Error, LocalizedError {
             "Please edit this control and select a vehicle before using it"
         case .noPresetSelected:
             "Please select a climate preset"
+        case .surroundViewUnsupported:
+            "Surround view isn't available for this vehicle"
         }
     }
 }

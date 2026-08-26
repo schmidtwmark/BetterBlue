@@ -41,6 +41,7 @@ final class VehicleSheetPresentation {
         case httpLogs(account: BBAccount)
         case vehicleConfiguration(vehicle: BBVehicle)
         case tripDetails(vehicle: BBVehicle)
+        case surroundView(vehicle: BBVehicle)
         case climateSettings(vehicle: BBVehicle)
         case chargeLimitSettings(vehicle: BBVehicle)
 
@@ -57,6 +58,7 @@ final class VehicleSheetPresentation {
             case .httpLogs(let a): return "httpLogs:\(a.id)"
             case .vehicleConfiguration(let v): return "vehicleConfiguration:\(v.id)"
             case .tripDetails(let v): return "tripDetails:\(v.id)"
+            case .surroundView(let v): return "surroundView:\(v.id)"
             case .climateSettings(let v): return "climateSettings:\(v.id)"
             case .chargeLimitSettings(let v): return "chargeLimitSettings:\(v.id)"
             }

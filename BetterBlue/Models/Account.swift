@@ -799,6 +799,67 @@ extension BBAccount {
     }
 }
 
+// MARK: - Surround View
+
+extension BBAccount {
+    /// Asks the vehicle to take a fresh surround-view capture. Returns
+    /// once the request is accepted — the vehicle then wakes its
+    /// cameras, shoots, and uploads, which takes a few minutes.
+    @MainActor
+    func requestSurroundViewCapture(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws {
+        guard let api, let authToken else {
+            try await initialize(modelContext: modelContext)
+            return try await requestSurroundViewCapture(for: bbVehicle, modelContext: modelContext)
+        }
+
+        let vehicle = bbVehicle.toVehicle()
+
+        do {
+            try await api.requestSurroundViewCapture(for: vehicle, authToken: authToken)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
+            guard let api = self.api, let authToken = self.authToken else {
+                throw APIError.failedRetryLogin()
+            }
+            try await api.requestSurroundViewCapture(for: vehicle, authToken: authToken)
+        }
+    }
+
+    /// The captures the server is holding for a vehicle, newest first.
+    /// Never triggers a new capture.
+    @MainActor
+    func fetchSurroundViewCaptures(
+        for bbVehicle: BBVehicle,
+        modelContext: ModelContext
+    ) async throws -> [SurroundViewCapture] {
+        guard let api, let authToken else {
+            try await initialize(modelContext: modelContext)
+            return try await fetchSurroundViewCaptures(for: bbVehicle, modelContext: modelContext)
+        }
+
+        let vehicle = bbVehicle.toVehicle()
+
+        do {
+            return try await api.fetchSurroundViewCaptures(for: vehicle, authToken: authToken)
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
+            guard let api = self.api, let authToken = self.authToken else {
+                throw APIError.failedRetryLogin()
+            }
+            return try await api.fetchSurroundViewCaptures(for: vehicle, authToken: authToken)
+        }
+    }
+
+    /// Whether this account's API exposes surround view. Like
+    /// `supportedEVTripTypes`, this delegates to the client so new brand
+    /// support lights up without app changes, and reads false until the
+    /// client is initialized.
+    @MainActor
+    var supportsSurroundView: Bool {
+        api?.supportsSurroundView() ?? false
+    }
+}
+
 // MARK: - Static Helper Methods
 
 extension BBAccount {
