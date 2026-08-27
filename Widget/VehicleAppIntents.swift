@@ -834,7 +834,7 @@ struct RequestSurroundViewCaptureIntent: AppIntent {
             // "unsupported") until login has happened.
             try await account.initialize(modelContext: context)
 
-            guard account.supportsSurroundView else {
+            guard bbVehicle.showsSurroundView else {
                 throw IntentError.surroundViewUnsupported
             }
 
@@ -889,7 +889,7 @@ struct RequestSurroundViewControlIntent: ControlConfigurationIntent {
             try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
                 try await account.initialize(modelContext: context)
 
-                guard account.supportsSurroundView else {
+                guard bbVehicle.showsSurroundView else {
                     throw IntentError.surroundViewUnsupported
                 }
 
@@ -976,7 +976,7 @@ struct GetSurroundViewImageIntent: AppIntent {
         try await performVehicleActionWithVin(vehicle.vin) { bbVehicle, account, context in
             try await account.initialize(modelContext: context)
 
-            guard account.supportsSurroundView else {
+            guard bbVehicle.showsSurroundView else {
                 throw IntentError.surroundViewUnsupported
             }
 

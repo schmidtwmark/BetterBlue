@@ -598,7 +598,7 @@ extension BBVehicle: Encodable {
     enum CodingKeys: String, CodingKey {
         case id, vin, regId, model, accountId, fuelTypeRaw, generation, odometer, marketOptions
         case lastUpdated, syncDate, gasRange, evStatus, location, lockStatus, climateStatus
-        case battery12V, doorOpen, trunkOpen, hoodOpen, tirePressureWarning
+        case battery12V, doorOpen, trunkOpen, hoodOpen, accessoryOn, tirePressureWarning
         case customName, isHidden, sortOrder, backgroundColorName, watchBackgroundColorName
         case chargePortTypeRaw, debugConfiguration, debugLiveActivity, enableSeatHeatControls
         case primaryColorName, chargingColorName, gasColorName, lockColorName, unlockColorName, startClimateColorName
@@ -634,6 +634,7 @@ extension BBVehicle: Encodable {
         try container.encodeIfPresent(doorOpen, forKey: .doorOpen)
         try container.encodeIfPresent(trunkOpen, forKey: .trunkOpen)
         try container.encodeIfPresent(hoodOpen, forKey: .hoodOpen)
+        try container.encodeIfPresent(accessoryOn, forKey: .accessoryOn)
         try container.encodeIfPresent(tirePressureWarning, forKey: .tirePressureWarning)
 
         // UI/Settings fields
