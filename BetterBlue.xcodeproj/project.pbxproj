@@ -273,9 +273,9 @@
 		ED70548A2E61F57000CA7926 /* Widget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */,
 				ED70549B2E61F57100CA7926 /* Exceptions for "Widget" folder in "WidgetExtension" target */,
 				ED8103602F2981C80072BDDE /* Exceptions for "Widget" folder in "WatchWidgetExtension" target */,
+				EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */,
 			);
 			path = Widget;
 			sourceTree = "<group>";
@@ -746,7 +746,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 59;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
-				DEVELOPMENT_TEAM = JP62KGLV8W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BetterBlue/Info.plist;
@@ -781,7 +780,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 59;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
-				DEVELOPMENT_TEAM = JP62KGLV8W;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BetterBlue/Info.plist;

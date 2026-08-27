@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2640"
-   version = "2.0">
+   version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "ED8103282F2978550072BDDE"
-               BuildableName = "WatchWidgetExtension.appex"
-               BlueprintName = "WatchWidgetExtension"
+               BlueprintIdentifier = "ED4A2D752E61356F0071A54A"
+               BuildableName = "BetterBlueWatch Watch App.app"
+               BlueprintName = "BetterBlueWatch Watch App"
                ReferencedContainer = "container:BetterBlue.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -35,20 +35,6 @@
                ReferencedContainer = "container:BetterBlue.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "ED4A2D752E61356F0071A54A"
-               BuildableName = "BetterBlueWatch Watch App.app"
-               BlueprintName = "BetterBlueWatch Watch App"
-               ReferencedContainer = "container:BetterBlue.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -60,16 +46,14 @@
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = ""
-      selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       launchStyle = "0"
-      askForAppToLaunch = "Yes"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES"
-      launchAutomaticallySubstyle = "2"
       queueDebuggingEnableBacktraceRecording = "Yes">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
@@ -80,23 +64,6 @@
             ReferencedContainer = "container:BetterBlue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "_XCWidgetKind"
-            value = ""
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "_XCWidgetDefaultView"
-            value = "timeline"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-         <EnvironmentVariable
-            key = "_XCWidgetFamily"
-            value = "systemMedium"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -108,8 +75,8 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "ED8103282F2978550072BDDE"
-            BuildableName = "WatchWidgetExtension.appex"
+            BlueprintIdentifier = "ED4A2D752E61356F0071A54A"
+            BuildableName = "BetterBlueWatch Watch App.app"
             ReferencedContainer = "container:BetterBlue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
