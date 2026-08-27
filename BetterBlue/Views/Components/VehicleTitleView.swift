@@ -559,7 +559,7 @@ struct VehicleTitleView: View {
             }
         }
 
-        if vehicleAccount?.supportsSurroundView == true {
+        if bbVehicle.showsSurroundView {
             Button {
                 showingSurroundView = true
             } label: {

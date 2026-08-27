@@ -74,6 +74,13 @@ class BBVehicle {
     var customName: String?
     var isHidden: Bool = false
     var sortOrder: Int = 0
+    /// Per-vehicle override for the Surround View menu item: nil follows
+    /// the automatic per-generation default, `true`/`false` force it shown
+    /// or hidden. Optional so CloudKit accepts the added column and so
+    /// every existing vehicle defaults to automatic. Not part of the debug
+    /// export — it's a local display preference, and it syncs via CloudKit
+    /// like the rest of the model.
+    var surroundViewOverride: Bool?
     /// Legacy widget background. No longer user-editable in-app (the
     /// widget background is now set on the widget itself); retained only
     /// so the widget's "Vehicle Setting" option and existing rows keep
@@ -147,6 +154,26 @@ class BBVehicle {
     var chargePortType: ChargePortType {
         get { ChargePortType(rawValue: chargePortTypeRaw) ?? .ccs1 }
         set { chargePortTypeRaw = newValue.rawValue }
+    }
+
+    /// Whether this vehicle is assumed to have surround-view hardware,
+    /// absent a user override. Surround view is a newer-generation
+    /// feature, so gate on generation: gen1/gen2 vehicles don't have it,
+    /// while gen3+ — and an unknown generation, which we don't want to
+    /// hide on a guess — are assumed to. A real per-vehicle flag exists on
+    /// Kia (`locationFeature.surroundView`); reading it to tighten this is
+    /// a follow-up.
+    var autoShowsSurroundView: Bool {
+        generation == 0 || generation >= 3
+    }
+
+    /// Whether to surface surround view for this vehicle. The account's API
+    /// must implement it at all; then a user override wins, otherwise the
+    /// automatic per-generation default applies.
+    @MainActor
+    var showsSurroundView: Bool {
+        guard account?.supportsSurroundView == true else { return false }
+        return surroundViewOverride ?? autoShowsSurroundView
     }
 
     /// User override for the inferred powertrain. `nil` means "use

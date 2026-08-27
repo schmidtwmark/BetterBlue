@@ -892,7 +892,7 @@ struct PersistentVehicleSheet: View {
             }
         }
 
-        if bbVehicle.account?.supportsSurroundView == true {
+        if bbVehicle.showsSurroundView {
             Button {
                 sheetPresentation.show(.surroundView(vehicle: bbVehicle))
             } label: {
