@@ -178,6 +178,27 @@ struct StartChargeControlWidget: ControlWidget {
 }
 
 @available(iOS 18, *)
+struct SurroundViewControlWidget: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        AppIntentControlConfiguration(
+            kind: "com.betterblue.surroundview.request",
+            intent: RequestSurroundViewControlIntent.self
+        ) { intent in
+            ControlWidgetButton(action: intent) {
+                if intent.vehicle != nil {
+                    Label("Surround View", systemImage: "camera.viewfinder")
+                } else {
+                    Label("Select Vehicle", systemImage: "camera.viewfinder")
+                }
+            }
+        }
+        .promptsForUserConfiguration()
+        .displayName("Request Surround View")
+        .description("Ask your vehicle for fresh 360° photos from Control Center")
+    }
+}
+
+@available(iOS 18, *)
 struct StopChargeControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(

@@ -11,6 +11,7 @@ import ActivityKit
 import AppIntents
 import BetterBlueKit
 import SwiftData
+import UniformTypeIdentifiers
 import UserNotifications
 import WidgetKit
 
@@ -855,6 +856,162 @@ struct RequestSurroundViewCaptureIntent: AppIntent {
     }
 }
 
+/// Control Center variant of `RequestSurroundViewCaptureIntent`.
+///
+/// Separate because a control's vehicle is configured once when the
+/// control is added, so the parameter has to be optional — the same
+/// split every other command here uses (`StartChargeControlIntent` vs
+/// `StartChargeIntent`).
+struct RequestSurroundViewControlIntent: ControlConfigurationIntent {
+    static let title: LocalizedStringResource = "Request Surround View"
+    static let description = IntentDescription("Ask your vehicle to take a fresh set of surround view photos")
+    static let openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "Select the vehicle to photograph")
+    var vehicle: VehicleEntity?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let vehicle else {
+            throw IntentError.noVehicleSelected
+        }
+        let targetVin = vehicle.vin
+        let vehicleName = vehicle.displayName
+
+        // A capture is slow and rate-limited at the vehicle, so a
+        // double-press must not queue a second one.
+        guard WidgetCommandStatus.beginCommand("Surround View", vin: targetVin) else {
+            BBLogger.info(.intent, "SurroundViewIntent: duplicate request for \(targetVin.prefix(8)), ignoring")
+            return .result(dialog: "Surround view already requested for \(vehicleName)")
+        }
+
+        do {
+            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
+                try await account.initialize(modelContext: context)
+
+                guard account.supportsSurroundView else {
+                    throw IntentError.surroundViewUnsupported
+                }
+
+                try await account.requestSurroundViewCapture(for: bbVehicle, modelContext: context)
+            }
+        } catch {
+            WidgetCommandStatus.clear(vin: targetVin)
+            throw error
+        }
+
+        await sendNotification(
+            title: "Surround View Requested",
+            body: "Surround view images have been requested for \(vehicleName). Please wait 1-2 minutes."
+        )
+
+        return .result(
+            dialog: "Surround view images have been requested for \(vehicleName). Please wait 1-2 minutes."
+        )
+    }
+}
+
+/// Which camera a Shortcut wants back.
+///
+/// A mirror of `SurroundViewCameraPosition` because `AppEnum` conformance
+/// has to carry `LocalizedStringResource` display names, which don't
+/// belong in BetterBlueKit.
+enum SurroundViewCameraAppEnum: String, AppEnum {
+    case topDown, front, rear, left, right, composite
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Camera")
+
+    static let caseDisplayRepresentations: [SurroundViewCameraAppEnum: DisplayRepresentation] = [
+        .topDown: "Top-Down",
+        .front: "Front",
+        .rear: "Rear",
+        .left: "Left",
+        .right: "Right",
+        .composite: "All Cameras"
+    ]
+
+    var position: SurroundViewCameraPosition {
+        switch self {
+        case .topDown: .topDown
+        case .front: .front
+        case .rear: .rear
+        case .left: .left
+        case .right: .right
+        case .composite: .composite
+        }
+    }
+}
+
+/// Returns the newest surround-view image the server is holding, as a
+/// file a Shortcut can save, share, or send on.
+///
+/// Reads only — it never asks the vehicle to shoot, so it's cheap and
+/// safe to run on a schedule. Pair it with `RequestSurroundViewControlIntent`
+/// in a Shortcut to take a fresh set first.
+struct GetSurroundViewImageIntent: AppIntent {
+    static let title: LocalizedStringResource = "Get Surround View Image"
+    static let description = IntentDescription(
+        "Get the most recent surround view image your vehicle uploaded, without taking a new one."
+    )
+    static let openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to read images from")
+    var vehicle: VehicleEntity
+
+    @Parameter(title: "Camera", description: "Which camera to return", default: .topDown)
+    var camera: SurroundViewCameraAppEnum
+
+    init() {}
+
+    init(vehicle: VehicleEntity, camera: SurroundViewCameraAppEnum = .topDown) {
+        self.vehicle = vehicle
+        self.camera = camera
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> & ProvidesDialog {
+        let vehicleName = vehicle.displayName
+        var captures: [SurroundViewCapture] = []
+
+        try await performVehicleActionWithVin(vehicle.vin) { bbVehicle, account, context in
+            try await account.initialize(modelContext: context)
+
+            guard account.supportsSurroundView else {
+                throw IntentError.surroundViewUnsupported
+            }
+
+            captures = try await account.fetchSurroundViewCaptures(for: bbVehicle, modelContext: context)
+        }
+
+        guard let capture = captures.first else {
+            throw IntentError.noSurroundViewCaptures
+        }
+
+        // `.composite` means "whatever the payload gave us whole", which
+        // is exactly the uncropped frame.
+        let position: SurroundViewCameraPosition? = camera == .composite ? nil : camera.position
+        guard let data = camera == .composite
+            ? capture.frames.first
+            : SurroundViewRendering.jpegData(in: capture, position: position) else {
+            throw IntentError.noSurroundViewCaptures
+        }
+
+        let stamp = capture.capturedAt.map {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+            return formatter.string(from: $0)
+        } ?? "latest"
+
+        let file = IntentFile(
+            data: data,
+            filename: "\(vehicleName)-surround-\(camera.rawValue)-\(stamp).jpg",
+            type: .jpeg
+        )
+
+        return .result(value: file, dialog: "Here's the latest surround view image for \(vehicleName)")
+    }
+}
+
 // MARK: - Intent Errors
 
 enum IntentError: Swift.Error, LocalizedError {
@@ -864,6 +1021,7 @@ enum IntentError: Swift.Error, LocalizedError {
     case noVehicleSelected
     case noPresetSelected
     case surroundViewUnsupported
+    case noSurroundViewCaptures
 
     var errorDescription: String? {
         switch self {
@@ -879,6 +1037,8 @@ enum IntentError: Swift.Error, LocalizedError {
             "Please select a climate preset"
         case .surroundViewUnsupported:
             "Surround view isn't supported by this vehicle"
+        case .noSurroundViewCaptures:
+            "No surround view images are available yet — request a capture first"
         }
     }
 }

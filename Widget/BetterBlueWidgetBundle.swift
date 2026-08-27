@@ -21,6 +21,7 @@ struct BetterBlueWidgetBundle: WidgetBundle {
         ClimateStopControlWidget()
         StartChargeControlWidget()
         StopChargeControlWidget()
+        SurroundViewControlWidget()
         VehicleActivityWidget()
     }
 }

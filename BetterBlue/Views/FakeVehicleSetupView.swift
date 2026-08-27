@@ -290,6 +290,8 @@ struct FakeVehicleDetailView: View {
                 Toggle("Vehicle Fetch", isOn: bindings.vehicleFetch)
                 Toggle("Status Fetch", isOn: bindings.statusFetch)
                 Toggle("PIN Validation", isOn: bindings.pinValidation)
+                Toggle("Surround View Request", isOn: bindings.surroundView)
+                Toggle("Surround View Upload", isOn: bindings.surroundViewUpload)
             } header: {
                 Text("Login Flow Failures")
             }
@@ -305,6 +307,24 @@ struct FakeVehicleDetailView: View {
                 Text("Command Failures")
             } footer: {
                 Text("Turn a toggle on, then perform the matching action. The fake API will throw — you'll see the updated error UI (headline, type, technical details disclosure).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Seed 3 Surround View Captures") {
+                    FakeSurroundViewStore.shared.seedHistory(vin: vehicle.vin, count: 3)
+                }
+                Button("Clear Surround View Captures", role: .destructive) {
+                    FakeSurroundViewStore.shared.reset(vin: vehicle.vin)
+                }
+            } header: {
+                Text("Surround View")
+            } footer: {
+                // Seeding is a button rather than something automatic so
+                // the empty state stays reachable by default — and so the
+                // history picker doesn't need three real 35-second waits.
+                Text("Seeding back-dates three captures so the history picker and the detail rows are reachable without waiting out a capture each.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -333,6 +353,8 @@ struct FakeVehicleDetailView: View {
             vehicleFetch: binding(for: \.shouldFailVehicleFetch),
             statusFetch: binding(for: \.shouldFailStatusFetch),
             pinValidation: binding(for: \.shouldFailPinValidation),
+            surroundView: binding(for: \.shouldFailSurroundView),
+            surroundViewUpload: binding(for: \.shouldFailSurroundViewUpload),
             lock: binding(for: \.shouldFailLock),
             unlock: binding(for: \.shouldFailUnlock),
             startClimate: binding(for: \.shouldFailStartClimate),
@@ -348,6 +370,8 @@ struct FakeVehicleDetailView: View {
         let vehicleFetch: Binding<Bool>
         let statusFetch: Binding<Bool>
         let pinValidation: Binding<Bool>
+        let surroundView: Binding<Bool>
+        let surroundViewUpload: Binding<Bool>
         let lock: Binding<Bool>
         let unlock: Binding<Bool>
         let startClimate: Binding<Bool>

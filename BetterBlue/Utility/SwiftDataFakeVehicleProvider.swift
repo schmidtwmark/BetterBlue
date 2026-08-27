@@ -20,6 +20,12 @@ struct BBDebugConfiguration: Codable {
     var shouldFailVehicleFetch: Bool = false
     var shouldFailStatusFetch: Bool = false
     var shouldFailPinValidation: Bool = false
+    /// The vehicle refuses the capture request outright.
+    var shouldFailSurroundView: Bool = false
+    /// The request is accepted but the images never arrive — the only way
+    /// to reach the view's six-minute give-up path without waiting out a
+    /// real failure.
+    var shouldFailSurroundViewUpload: Bool = false
 
     // Command-specific failures
     var shouldFailLock: Bool = false
@@ -32,6 +38,48 @@ struct BBDebugConfiguration: Codable {
     // Custom error messages
     var customCredentialErrorMessage: String = "Invalid credentials"
     var customPinErrorMessage: String = "Invalid PIN"
+
+    init() {}
+
+    /// Written by hand on purpose.
+    ///
+    /// This struct is persisted as a Codable attribute on `BBVehicle` and
+    /// synced through iCloud, so configurations written by older builds
+    /// outlive the code that wrote them. Swift's synthesized decoder does
+    /// NOT fall back to a property's default value for a missing key — it
+    /// throws `keyNotFound` — so adding a single field here would
+    /// invalidate every debug configuration already in the store and
+    /// silently wipe the toggles a user had set. `decodeIfPresent`
+    /// throughout makes new fields additive instead.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        func flag(_ key: CodingKeys) throws -> Bool {
+            try container.decodeIfPresent(Bool.self, forKey: key) ?? false
+        }
+
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+
+        shouldFailCredentialValidation = try flag(.shouldFailCredentialValidation)
+        shouldFailLogin = try flag(.shouldFailLogin)
+        shouldFailVehicleFetch = try flag(.shouldFailVehicleFetch)
+        shouldFailStatusFetch = try flag(.shouldFailStatusFetch)
+        shouldFailPinValidation = try flag(.shouldFailPinValidation)
+        shouldFailSurroundView = try flag(.shouldFailSurroundView)
+        shouldFailSurroundViewUpload = try flag(.shouldFailSurroundViewUpload)
+
+        shouldFailLock = try flag(.shouldFailLock)
+        shouldFailUnlock = try flag(.shouldFailUnlock)
+        shouldFailStartClimate = try flag(.shouldFailStartClimate)
+        shouldFailStopClimate = try flag(.shouldFailStopClimate)
+        shouldFailStartCharge = try flag(.shouldFailStartCharge)
+        shouldFailStopCharge = try flag(.shouldFailStopCharge)
+
+        customCredentialErrorMessage = try container
+            .decodeIfPresent(String.self, forKey: .customCredentialErrorMessage) ?? "Invalid credentials"
+        customPinErrorMessage = try container
+            .decodeIfPresent(String.self, forKey: .customPinErrorMessage) ?? "Invalid PIN"
+    }
 
     func shouldFailCommand(_ command: VehicleCommand) -> Bool {
         switch command {
@@ -232,6 +280,49 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
             return false
         }
         return debugConfig.shouldFailCommand(command)
+    }
+
+    // MARK: - Surround View
+
+    public func requestSurroundViewCapture(for vin: String, accountId: UUID) async throws {
+        guard getBBVehicle(for: vin, accountId: accountId) != nil else {
+            throw APIError.logError("Fake vehicle not found for surround view: \(vin)", apiName: "FakeAPI")
+        }
+        try throwIfSurroundViewDisabled(for: vin, accountId: accountId)
+
+        // Both real Canada endpoints post the PIN, so a PIN refusal is
+        // the most faithful failure to simulate here.
+        if try await shouldFailPinValidation(for: vin, accountId: accountId) {
+            throw APIError.invalidPin(
+                try await getCustomPinErrorMessage(for: vin, accountId: accountId),
+                apiName: "FakeAPI"
+            )
+        }
+
+        let config = getBBVehicle(for: vin, accountId: accountId)?.debugConfiguration
+        FakeSurroundViewStore.shared.requestCapture(
+            vin: vin,
+            neverCompletes: config?.shouldFailSurroundViewUpload ?? false
+        )
+    }
+
+    public func getSurroundViewCaptures(for vin: String, accountId: UUID) async throws -> [SurroundViewCapture] {
+        guard getBBVehicle(for: vin, accountId: accountId) != nil else {
+            throw APIError.logError("Fake vehicle not found for surround view: \(vin)", apiName: "FakeAPI")
+        }
+        try throwIfSurroundViewDisabled(for: vin, accountId: accountId)
+
+        return FakeSurroundViewStore.shared.captures(vin: vin)
+    }
+
+    /// Honors the debug toggle so the view's error path can be exercised
+    /// without a real vehicle refusing the request.
+    private func throwIfSurroundViewDisabled(for vin: String, accountId: UUID) throws {
+        guard let config = getBBVehicle(for: vin, accountId: accountId)?.debugConfiguration,
+              config.shouldFailSurroundView else {
+            return
+        }
+        throw APIError.logError("Surround view is not available for this vehicle", apiName: "FakeAPI")
     }
 
     public func getCustomCredentialErrorMessage(accountId: UUID) async throws -> String {

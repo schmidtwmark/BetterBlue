@@ -120,8 +120,10 @@
 				Utility/CustomColors.swift,
 				Utility/Date.swift,
 				Utility/DiagnosticInfo.swift,
+				Utility/FakeSurroundView.swift,
 				Utility/HTTPLogSinkManager.swift,
 				Utility/LiveActivityManager.swift,
+				Utility/SurroundViewRendering.swift,
 				Utility/SwiftDataFakeVehicleProvider.swift,
 				Utility/TemperatureDisplay.swift,
 				Utility/VehicleUtility.swift,
@@ -169,8 +171,10 @@
 				Utility/CustomColors.swift,
 				Utility/Date.swift,
 				Utility/DiagnosticInfo.swift,
+				Utility/FakeSurroundView.swift,
 				Utility/HTTPLogSinkManager.swift,
 				Utility/LiveActivityManager.swift,
+				Utility/SurroundViewRendering.swift,
 				Utility/SwiftDataFakeVehicleProvider.swift,
 				Utility/TemperatureDisplay.swift,
 				Utility/VehicleUtility.swift,
@@ -214,8 +218,10 @@
 				Utility/CustomColors.swift,
 				Utility/Date.swift,
 				Utility/DiagnosticInfo.swift,
+				Utility/FakeSurroundView.swift,
 				Utility/HTTPLogSinkManager.swift,
 				Utility/LiveActivityManager.swift,
+				Utility/SurroundViewRendering.swift,
 				Utility/SwiftDataFakeVehicleProvider.swift,
 				Utility/TemperatureDisplay.swift,
 				Utility/VehicleUtility.swift,
@@ -273,9 +279,9 @@
 		ED70548A2E61F57000CA7926 /* Widget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */,
 				ED70549B2E61F57100CA7926 /* Exceptions for "Widget" folder in "WidgetExtension" target */,
 				ED8103602F2981C80072BDDE /* Exceptions for "Widget" folder in "WatchWidgetExtension" target */,
-				EDCAFE012E61F57100CA7926 /* Exceptions for "Widget" folder in "BetterBlue" target */,
 			);
 			path = Widget;
 			sourceTree = "<group>";

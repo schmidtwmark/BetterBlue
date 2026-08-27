@@ -23,7 +23,11 @@ struct SurroundViewMonitorView: View {
     @State private var captures: [SurroundViewCapture] = []
     @State private var selectedCaptureID: String?
     @State private var selectedPosition: SurroundViewCameraPosition?
-    @State private var displayedImage: UIImage?
+    /// Every tile of the selected capture, cropped once when the capture
+    /// changes. Rendering up front rather than per tap keeps swiping
+    /// between cameras instant — and stops a 4472px-wide composite being
+    /// re-decoded on every switch.
+    @State private var renderedTiles: [SurroundViewCameraPosition: UIImage] = [:]
     @State private var isLoading = true
     @State private var loadError: ActionError?
     @State private var capturePhase: CapturePhase?
@@ -36,6 +40,9 @@ struct SurroundViewMonitorView: View {
     /// Each poll costs a PIN verification plus the fetch, so keep it
     /// coarse — a capture takes minutes, not seconds.
     private static let pollInterval: TimeInterval = 30
+    /// Constant height for the image area, so switching cameras never
+    /// moves the controls underneath it.
+    private static let imageHeight: CGFloat = 260
 
     private enum CapturePhase: Equatable {
         /// Sending the request to the vehicle.
@@ -62,6 +69,11 @@ struct SurroundViewMonitorView: View {
             content
                 .navigationTitle("Surround View")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        shareButton
+                    }
+                }
                 .task {
                     // Only load once — re-entering from a background
                     // shouldn't wipe a capture the user is waiting on.
@@ -138,14 +150,7 @@ struct SurroundViewMonitorView: View {
     private var captureView: some View {
         ScrollView {
             VStack(spacing: 16) {
-                imageView
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                if availablePositions.count > 1 {
-                    positionPicker
-                }
+                captureCard
 
                 captureDetails
 
@@ -165,52 +170,82 @@ struct SurroundViewMonitorView: View {
 
     // MARK: - Image
 
-    @ViewBuilder
-    private var imageView: some View {
-        if let displayedImage {
-            let shareImage = Image(uiImage: displayedImage)
+    /// The image and its camera picker in one fixed-height card.
+    ///
+    /// The height is fixed and the picker is pinned to the bottom edge on
+    /// purpose: the cameras don't share an aspect ratio — a fisheye view
+    /// is 960x720 while the bird's-eye view is 632x720 — so sizing the
+    /// card to its image would shuffle every control below it each time
+    /// you switched cameras. Instead the image is centred in a constant
+    /// frame and everything under it stays put.
+    private var captureCard: some View {
+        VStack(spacing: 0) {
+            imagePager
+                .frame(height: Self.imageHeight)
 
-            shareImage
+            if availablePositions.count > 1 {
+                positionPicker
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Swipe between cameras, or use the picker — both drive the same
+    /// selection, so they stay in step.
+    private var imagePager: some View {
+        TabView(selection: Binding(
+            get: { resolvedPosition },
+            set: { selectedPosition = $0 }
+        )) {
+            ForEach(availablePositions, id: \.self) { position in
+                tileImage(for: position)
+                    .tag(position)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+    }
+
+    @ViewBuilder
+    private func tileImage(for position: SurroundViewCameraPosition) -> some View {
+        if let image = renderedTiles[position] {
+            Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .overlay(alignment: .bottomTrailing) {
-                    ShareLink(
-                        item: shareImage,
-                        preview: SharePreview(shareTitle, image: shareImage)
-                    ) {
-                        Image(systemName: "square.and.arrow.up")
-                            .padding(8)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .padding(8)
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             // A tile that failed to decode still leaves the rest of the
             // capture usable, so this is a placeholder, not an error.
-            Rectangle()
-                .fill(Color.black)
-                .aspectRatio(4 / 3, contentMode: .fit)
-                .overlay {
-                    Image(systemName: "photo")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-                }
+            Image(systemName: "photo")
+                .font(.largeTitle)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
     private var positionPicker: some View {
         Picker("Camera", selection: Binding(
-            get: { selectedPosition ?? availablePositions.first ?? .composite },
-            set: { newValue in
-                selectedPosition = newValue
-                renderSelectedImage()
-            }
+            get: { resolvedPosition },
+            set: { selectedPosition = $0 }
         )) {
             ForEach(availablePositions, id: \.self) { position in
                 Text(position.displayName).tag(position)
             }
         }
         .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if let displayedImage {
+            let shareImage = Image(uiImage: displayedImage)
+            ShareLink(item: shareImage, preview: SharePreview(shareTitle, image: shareImage)) {
+                Image(systemName: "square.and.arrow.up")
+            }
+        }
     }
 
     // MARK: - Details
@@ -306,7 +341,7 @@ struct SurroundViewMonitorView: View {
                 get: { selectedCaptureID ?? captures.first?.id ?? "" },
                 set: { newValue in
                     selectedCaptureID = newValue
-                    renderSelectedImage()
+                    renderTiles()
                 }
             )) {
                 ForEach(captures) { capture in
@@ -330,17 +365,21 @@ struct SurroundViewMonitorView: View {
         selectedCapture?.tiles.map(\.position) ?? []
     }
 
-    private var selectedTile: SurroundViewTile? {
-        guard let capture = selectedCapture else { return nil }
-        if let selectedPosition, let match = capture.tiles.first(where: { $0.position == selectedPosition }) {
-            return match
+    /// The camera actually on screen — the user's pick when it still
+    /// exists in this capture, otherwise the first one.
+    private var resolvedPosition: SurroundViewCameraPosition {
+        if let selectedPosition, availablePositions.contains(selectedPosition) {
+            return selectedPosition
         }
-        return capture.tiles.first
+        return availablePositions.first ?? .composite
+    }
+
+    private var displayedImage: UIImage? {
+        renderedTiles[resolvedPosition]
     }
 
     private var shareTitle: String {
-        let position = selectedTile?.position.displayName ?? "Surround View"
-        return "\(bbVehicle.displayName) — \(position)"
+        "\(bbVehicle.displayName) — \(resolvedPosition.displayName)"
     }
 
     // MARK: - Loading
@@ -390,42 +429,38 @@ struct SurroundViewMonitorView: View {
             selectedPosition = availablePositions.contains(.topDown) ? .topDown : availablePositions.first
         }
 
-        renderSelectedImage()
+        renderTiles()
     }
 
-    /// Decodes the selected tile out of its frame. Done on the main
-    /// actor: it's one JPEG per tap, and the alternative is shuttling
-    /// images across actor boundaries for no user-visible gain.
-    private func renderSelectedImage() {
-        guard let capture = selectedCapture,
-              let tile = selectedTile,
-              capture.frames.indices.contains(tile.frameIndex),
-              let frame = UIImage(data: capture.frames[tile.frameIndex]) else {
-            displayedImage = nil
+    /// Crops every tile of the selected capture out of its frame.
+    ///
+    /// Each frame is decoded once and shared by the tiles that live in it
+    /// — a surround-view composite is a single 4472px-wide JPEG holding
+    /// all five views, so decoding per tile would repeat the expensive
+    /// half five times. Done on the main actor: it runs once per capture,
+    /// and the alternative is shuttling images across actor boundaries
+    /// for no user-visible gain.
+    private func renderTiles() {
+        guard let capture = selectedCapture else {
+            renderedTiles = [:]
             return
         }
 
-        guard let crop = tile.crop else {
-            displayedImage = frame
-            return
+        var decodedFrames: [Int: CGImage] = [:]
+        var rendered: [SurroundViewCameraPosition: UIImage] = [:]
+
+        for tile in capture.tiles {
+            guard let cropped = SurroundViewRendering.image(
+                in: capture,
+                position: tile.position,
+                decodedFrames: &decodedFrames
+            ) else {
+                continue
+            }
+            rendered[tile.position] = UIImage(cgImage: cropped)
         }
 
-        guard let cgImage = frame.cgImage else {
-            displayedImage = frame
-            return
-        }
-
-        let rect = CGRect(x: crop.x, y: crop.y, width: crop.width, height: crop.height)
-            .intersection(CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
-
-        guard !rect.isEmpty, let cropped = cgImage.cropping(to: rect) else {
-            // Geometry that doesn't fit the image is a payload we don't
-            // understand — show the whole strip rather than nothing.
-            displayedImage = frame
-            return
-        }
-
-        displayedImage = UIImage(cgImage: cropped, scale: frame.scale, orientation: frame.imageOrientation)
+        renderedTiles = rendered
     }
 
     // MARK: - Capturing
