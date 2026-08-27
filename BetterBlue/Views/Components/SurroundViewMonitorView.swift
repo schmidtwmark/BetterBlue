@@ -302,15 +302,37 @@ struct SurroundViewMonitorView: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            Button {
-                startCapture()
-            } label: {
-                Label("New Capture", systemImage: "camera.viewfinder")
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 8) {
+                Button {
+                    startCapture()
+                } label: {
+                    Label("New Capture", systemImage: "camera.viewfinder")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isLoading || isVehicleOn)
+
+                if isVehicleOn {
+                    Text("Turn the vehicle off to take new photos — the cameras aren't available while it's running.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isLoading)
         }
+    }
+
+    /// The vehicle won't take surround-view photos while it's on, so the
+    /// capture button is disabled in that state.
+    ///
+    /// Keyed on accessory power rather than climate or engine state:
+    /// climate isn't reliable (a vehicle has been observed running with
+    /// `airCtrlOn` false), and engine state means nothing on an EV.
+    /// Accessory power is on whenever the car is, either way. Brands that
+    /// don't report it leave this nil, which keeps the button enabled
+    /// rather than blocking a capture we can't rule on.
+    private var isVehicleOn: Bool {
+        bbVehicle.accessoryOn == true
     }
 
     // MARK: - History

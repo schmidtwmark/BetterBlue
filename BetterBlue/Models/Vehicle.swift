@@ -65,6 +65,10 @@ class BBVehicle {
     var trunkOpen: Bool?
     var hoodOpen: Bool?
     var tirePressureWarning: VehicleStatus.TirePressureWarning?
+    /// Accessory power. True whenever the vehicle is "on" — the engine
+    /// running in an ICE car, or the high-voltage system live in an EV —
+    /// which makes it the one on/off signal that covers both powertrains.
+    var accessoryOn: Bool?
 
     // Custom name and visibility (kept separate for easier queries)
     var customName: String?
@@ -338,6 +342,7 @@ extension BBVehicle {
         doorOpen = status.doorOpen
         trunkOpen = status.trunkOpen
         hoodOpen = status.hoodOpen
+        accessoryOn = status.accessoryOn
         tirePressureWarning = status.tirePressureWarning
     }
 
