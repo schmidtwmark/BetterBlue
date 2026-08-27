@@ -40,9 +40,6 @@ struct SurroundViewMonitorView: View {
     /// Each poll costs a PIN verification plus the fetch, so keep it
     /// coarse — a capture takes minutes, not seconds.
     private static let pollInterval: TimeInterval = 30
-    /// Constant height for the image area, so switching cameras never
-    /// moves the controls underneath it.
-    private static let imageHeight: CGFloat = 260
 
     private enum CapturePhase: Equatable {
         /// Sending the request to the vehicle.
@@ -70,6 +67,9 @@ struct SurroundViewMonitorView: View {
                 .navigationTitle("Surround View")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        historyMenu
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         shareButton
                     }
@@ -147,52 +147,48 @@ struct SurroundViewMonitorView: View {
         .padding()
     }
 
-    private var captureView: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                captureCard
-
-                captureDetails
-
-                captureControls
-
-                if captures.count > 1 {
-                    historyPicker
-                }
-
-                if let loadError {
-                    ErrorDetailsView(error: loadError)
-                }
-            }
-            .padding()
-        }
-    }
-
-    // MARK: - Image
-
-    /// The image and its camera picker in one fixed-height card.
+    /// Laid out like Photos: the image floats dead centre in whatever
+    /// space is left, and the controls sit in a fixed strip along the
+    /// bottom of the sheet.
     ///
-    /// The height is fixed and the picker is pinned to the bottom edge on
-    /// purpose: the cameras don't share an aspect ratio — a fisheye view
-    /// is 960x720 while the bird's-eye view is 632x720 — so sizing the
-    /// card to its image would shuffle every control below it each time
-    /// you switched cameras. Instead the image is centred in a constant
-    /// frame and everything under it stays put.
-    private var captureCard: some View {
+    /// The cameras don't share an aspect ratio — a fisheye view is
+    /// 960x720, the bird's-eye view 632x720 — so anything that sized
+    /// itself to the image would shuffle the controls every time you
+    /// switched camera. Giving the image the leftover space instead lets
+    /// it fill the sheet's full width or full height, whichever it hits
+    /// first, while the strip below never moves.
+    private var captureView: some View {
         VStack(spacing: 0) {
             imagePager
-                .frame(height: Self.imageHeight)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            controlStrip
+        }
+        .background(Color.black.ignoresSafeArea(edges: .bottom))
+    }
+
+    private var controlStrip: some View {
+        VStack(spacing: 12) {
+            if let loadError {
+                ErrorDetailsView(error: loadError)
+            }
+
+            captureCaption
 
             if availablePositions.count > 1 {
                 positionPicker
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 10)
             }
+
+            captureControls
         }
+        .padding(.horizontal)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
         .frame(maxWidth: .infinity)
-        .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(.regularMaterial)
     }
+
+    // MARK: - Image
 
     /// Swipe between cameras, or use the picker — both drive the same
     /// selection, so they stay in step.
@@ -250,44 +246,32 @@ struct SurroundViewMonitorView: View {
 
     // MARK: - Details
 
+    /// When the capture was taken, plus anything that explains why the
+    /// picture above might look wrong.
+    ///
+    /// Only the folded-mirror note earns a line here. The payload also
+    /// reports door and trunk state, but the main vehicle screen already
+    /// shows both live and per-door — repeating them from a capture taken
+    /// minutes ago would be the same information, staler. Folded mirrors
+    /// are different: the side cameras are mounted in the mirrors, so a
+    /// folded mirror is the reason the left and right views are aimed at
+    /// the pavement.
     @ViewBuilder
-    private var captureDetails: some View {
+    private var captureCaption: some View {
         if let capture = selectedCapture {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "clock")
-                        .foregroundColor(.secondary)
-                    Text(capture.capturedAt.map { formatLastUpdated($0) } ?? "Time unknown")
-                        .font(.subheadline)
-                    Spacer()
-                }
-
-                if let doors = capture.doorOpen, doors.anyOpen {
-                    detailRow(icon: "car.top.door.front.left.open", text: "Doors open: \(doors.openDoorsDescription)")
-                }
-
-                if capture.trunkOpen == true {
-                    detailRow(icon: "car.side.rear.open", text: "Trunk open")
-                }
+            VStack(spacing: 4) {
+                Text(capture.capturedAt.map { formatLastUpdated($0) } ?? "Time unknown")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 if capture.sideMirrorOpen == false {
-                    // Folded mirrors move the side cameras, so the
-                    // stitched view can look skewed — worth saying.
-                    detailRow(icon: "car.side", text: "Mirrors folded — side views may be distorted")
+                    Label("Mirrors folded — side views may be distorted", systemImage: "car.side")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func detailRow(icon: String, text: String) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(.secondary)
-            Text(text)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Spacer()
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -331,27 +315,29 @@ struct SurroundViewMonitorView: View {
 
     // MARK: - History
 
-    private var historyPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Earlier Captures")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            Picker("Capture", selection: Binding(
-                get: { selectedCaptureID ?? captures.first?.id ?? "" },
-                set: { newValue in
-                    selectedCaptureID = newValue
-                    renderTiles()
+    /// Earlier captures live in the toolbar rather than the bottom strip:
+    /// the strip is for acting on the picture in front of you, and a
+    /// second selector down there competes with the camera picker.
+    @ViewBuilder
+    private var historyMenu: some View {
+        if captures.count > 1 {
+            Menu {
+                Picker("Capture", selection: Binding(
+                    get: { selectedCaptureID ?? captures.first?.id ?? "" },
+                    set: { newValue in
+                        selectedCaptureID = newValue
+                        renderTiles()
+                    }
+                )) {
+                    ForEach(captures) { capture in
+                        Text(capture.capturedAt.map { compactLastUpdated($0) } ?? "Unknown")
+                            .tag(capture.id)
+                    }
                 }
-            )) {
-                ForEach(captures) { capture in
-                    Text(capture.capturedAt.map { compactLastUpdated($0) } ?? "Unknown")
-                        .tag(capture.id)
-                }
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
             }
-            .pickerStyle(.menu)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Derived state
