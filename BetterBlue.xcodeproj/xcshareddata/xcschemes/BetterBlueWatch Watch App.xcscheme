@@ -61,6 +61,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ED4A2D752E61356F0071A54A"
             BuildableName = "BetterBlueWatch Watch App.app"
+            BlueprintName = "BetterBlueWatch Watch App"
             ReferencedContainer = "container:BetterBlue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -77,6 +78,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ED4A2D752E61356F0071A54A"
             BuildableName = "BetterBlueWatch Watch App.app"
+            BlueprintName = "BetterBlueWatch Watch App"
             ReferencedContainer = "container:BetterBlue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

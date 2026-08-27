@@ -61,6 +61,10 @@ class BBVehicle {
 
     // Additional status fields
     var battery12V: Int?
+    /// Accessory power. True whenever the vehicle is "on" — the engine
+    /// running in an ICE car, or the high-voltage system live in an EV —
+    /// which makes it the one on/off signal that covers both powertrains.
+    var accessoryOn: Bool?
     var doorOpen: VehicleStatus.DoorStatus?
     var trunkOpen: Bool?
     var hoodOpen: Bool?
@@ -335,6 +339,7 @@ extension BBVehicle {
 
         // Update additional status fields
         battery12V = status.battery12V
+        accessoryOn = status.accessoryOn
         doorOpen = status.doorOpen
         trunkOpen = status.trunkOpen
         hoodOpen = status.hoodOpen
