@@ -91,11 +91,11 @@ struct VehicleInfoView: View {
                         Text("Always Hide").tag(SurroundViewChoice.hide)
                     }
                 } header: {
-                    Text("Surround View")
-                } footer: {
-                    Text(bbVehicle.autoShowsSurroundView
-                        ? "Automatic shows the surround view menu for this vehicle. Override it if your vehicle doesn't have the cameras."
-                        : "Automatic hides the surround view menu for this vehicle's generation. Override it if your vehicle does have the cameras.")
+                    HStack {
+                        Text("Surround View")
+                        Spacer()
+                        SurroundViewSettingsInfoButton()
+                    }
                 }
             }
             
