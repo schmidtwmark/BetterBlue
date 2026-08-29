@@ -837,6 +837,12 @@ struct RequestSurroundViewCaptureIntent: AppIntent {
             guard bbVehicle.showsSurroundView else {
                 throw IntentError.surroundViewUnsupported
             }
+            // Showing the gallery and asking for a new capture are
+            // separate capabilities — Kia can do the first but not the
+            // second — so requesting needs its own gate.
+            guard account.supportsSurroundViewCapture else {
+                throw IntentError.surroundViewCaptureUnsupported
+            }
 
             try await account.requestSurroundViewCapture(for: bbVehicle, modelContext: context)
         }
@@ -891,6 +897,9 @@ struct RequestSurroundViewControlIntent: ControlConfigurationIntent {
 
                 guard bbVehicle.showsSurroundView else {
                     throw IntentError.surroundViewUnsupported
+                }
+                guard account.supportsSurroundViewCapture else {
+                    throw IntentError.surroundViewCaptureUnsupported
                 }
 
                 try await account.requestSurroundViewCapture(for: bbVehicle, modelContext: context)
@@ -1021,6 +1030,7 @@ enum IntentError: Swift.Error, LocalizedError {
     case noVehicleSelected
     case noPresetSelected
     case surroundViewUnsupported
+    case surroundViewCaptureUnsupported
     case noSurroundViewCaptures
 
     var errorDescription: String? {
@@ -1037,6 +1047,9 @@ enum IntentError: Swift.Error, LocalizedError {
             "Please select a climate preset"
         case .surroundViewUnsupported:
             "Surround view isn't supported by this vehicle"
+        case .surroundViewCaptureUnsupported:
+            "This service can show surround view photos your vehicle has already taken, but can't ask "
+                + "for a new one. Start a capture from the brand's own app."
         case .noSurroundViewCaptures:
             "No surround view images are available yet — request a capture first"
         }

@@ -14,5 +14,15 @@
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<!-- Required for "Save Image" to appear in the surround-view share
+	     sheet. iOS hides the save-to-camera-roll activity outright when an
+	     app has no add-usage description, which is why Copy, Assign to
+	     Contact and Print all showed up and Save Image did not.
+
+	     Deliberately the ADD-only key, not NSPhotoLibraryUsageDescription:
+	     the app only ever writes a photo the user explicitly shared, and
+	     the read key would ask for access to their entire library. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>BetterBlue saves surround view photos to your photo library when you choose Save Image.</string>
 </dict>
 </plist>

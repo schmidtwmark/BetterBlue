@@ -136,8 +136,11 @@ struct SurroundViewMonitorView: View {
             Text("No Captures Yet")
                 .font(.headline)
 
-            Text("Ask the vehicle to take a set of surround-view photos. "
-                + "It wakes its cameras, shoots, and uploads them — usually within a few minutes.")
+            Text(canRequestCapture
+                ? "Ask the vehicle to take a set of surround-view photos. "
+                    + "It wakes its cameras, shoots, and uploads them — usually within a few minutes."
+                : "Photos your vehicle has taken show up here. Taking a new set isn't supported for "
+                    + "this service yet — start one from the brand's own app, then check again.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -301,6 +304,15 @@ struct SurroundViewMonitorView: View {
                 .buttonStyle(.bordered)
             }
             .frame(maxWidth: .infinity)
+        } else if !canRequestCapture {
+            Button {
+                Task { await loadCaptures() }
+            } label: {
+                Label("Check for New Photos", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isLoading)
         } else {
             VStack(spacing: 8) {
                 Button {
@@ -320,6 +332,17 @@ struct SurroundViewMonitorView: View {
                 }
             }
         }
+    }
+
+    /// Whether this account's service can be asked for a NEW capture.
+    ///
+    /// Not every service that can show the gallery can trigger one: Kia
+    /// exposes the images its vehicles have already uploaded, but its
+    /// capture endpoint isn't known, so the button hides rather than
+    /// offering an action with nothing behind it. The gallery, the
+    /// history picker and refresh all still work.
+    private var canRequestCapture: Bool {
+        bbVehicle.account?.supportsSurroundViewCapture == true
     }
 
     /// The vehicle won't take surround-view photos while it's on, so the

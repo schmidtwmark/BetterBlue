@@ -858,6 +858,15 @@ extension BBAccount {
     var supportsSurroundView: Bool {
         api?.supportsSurroundView() ?? false
     }
+
+    /// Whether this account's API can ask the vehicle for a NEW capture.
+    /// Always a subset of `supportsSurroundView` — Kia US can show the
+    /// gallery the vehicle has already uploaded but has no known capture
+    /// trigger, so the "New Capture" affordance hides itself there.
+    @MainActor
+    var supportsSurroundViewCapture: Bool {
+        api?.supportsSurroundViewCapture() ?? false
+    }
 }
 
 // MARK: - Static Helper Methods
