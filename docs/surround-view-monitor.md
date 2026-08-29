@@ -149,8 +149,18 @@ grammar this client already uses for `cmm/gvi` and `prof/authUser`.
 | `POST lbs/svm/info` | `{svmId}` | the capture in full: `payload.svmInfos[0]` with `image` (base64), **`imageSize`**, and a repeat of the location block |
 | `POST lbs/svm/dsi` | `{svmIds:[…]}` | deletes. Not used; recorded because it pins the verb family |
 
-So a fetch is one `inquire` plus one `info` per capture, merged back together
-before parsing. The vehicle is identified by the `vinkey` header, as for `cmm/gvi`.
+So Kia is a **three-call read model** where Hyundai needs two: a fetch is one
+`inquire` plus one `info` per capture, merged before parsing.
+
+**That per-capture cost is why the client caches imagery by `svmId`.** Kia bills a
+request *and* ~280 KB of base64 for every capture, so a full gallery is eleven
+requests and ~2.8 MB — where Hyundai returns everything in a single response. The
+capture poll re-fetches every 30 s for up to six minutes, so an uncached
+implementation re-downloaded the same unchanged images a dozen times over (~35 MB
+and ~144 requests for one capture, most of it on cellular). A capture is immutable
+once uploaded, so the cache is simply keyed by `svmId`; it is replaced by whatever
+the gallery currently lists, which evicts deleted captures and bounds it to Kia's
+ten. A poll now costs one `inquire`, and the new capture costs one `info`. The vehicle is identified by the `vinkey` header, as for `cmm/gvi`.
 
 A real `inquire` entry, from a live Carnival (coordinates altered):
 
