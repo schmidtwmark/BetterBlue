@@ -29,6 +29,10 @@ struct SurroundViewMonitorView: View {
     /// re-decoded on every switch.
     @State private var renderedTiles: [SurroundViewCameraPosition: UIImage] = [:]
     @State private var isLoading = true
+    /// The capture whose imagery is being fetched right now, if any.
+    /// Only regions that bill imagery per capture ever set this.
+    @State private var loadingCaptureID: String?
+    @State private var imageryTask: Task<Void, Never>?
     @State private var loadError: ActionError?
     @State private var capturePhase: CapturePhase?
     @State private var captureTask: Task<Void, Never>?
@@ -83,6 +87,7 @@ struct SurroundViewMonitorView: View {
                 }
                 .onDisappear {
                     captureTask?.cancel()
+                    imageryTask?.cancel()
                 }
         }
     }
@@ -195,7 +200,38 @@ struct SurroundViewMonitorView: View {
 
     /// Swipe between cameras, or use the picker — both drive the same
     /// selection, so they stay in step.
+    @ViewBuilder
     private var imagePager: some View {
+        if let capture = selectedCapture, !capture.isLoaded {
+            // Metadata-only: the picture is still on the server. Distinct
+            // from the decode-failure placeholder below, which is about a
+            // picture we have and could not read.
+            VStack(spacing: 12) {
+                if loadingCaptureID == capture.id {
+                    ProgressView()
+                    Text("Loading photo…")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                } else {
+                    // Not loading and not loaded means the fetch failed —
+                    // a spinner here would hang forever. Offer the retry
+                    // instead; the error itself is in the control strip.
+                    Image(systemName: "photo")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Button("Load Photo") {
+                        select(captureID: capture.id)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            loadedImagePager
+        }
+    }
+
+    private var loadedImagePager: some View {
         TabView(selection: Binding(
             get: { resolvedPosition },
             set: { selectedPosition = $0 }
@@ -370,8 +406,7 @@ struct SurroundViewMonitorView: View {
                 Picker("Capture", selection: Binding(
                     get: { selectedCaptureID ?? captures.first?.id ?? "" },
                     set: { newValue in
-                        selectedCaptureID = newValue
-                        renderTiles()
+                        select(captureID: newValue)
                     }
                 )) {
                     ForEach(captures) { capture in
@@ -471,6 +506,51 @@ struct SurroundViewMonitorView: View {
     /// half five times. Done on the main actor: it runs once per capture,
     /// and the alternative is shuttling images across actor boundaries
     /// for no user-visible gain.
+    /// Switches to a capture, fetching its imagery if the listing didn't
+    /// include it.
+    ///
+    /// Renders immediately with whatever is in hand so the caption and
+    /// timestamp update at once, then fills the picture in when it lands.
+    private func select(captureID: String) {
+        selectedCaptureID = captureID
+        renderTiles()
+
+        imageryTask?.cancel()
+        guard let capture = selectedCapture, !capture.isLoaded else { return }
+        guard let account = bbVehicle.account else { return }
+
+        imageryTask = Task {
+            loadingCaptureID = capture.id
+            loadError = nil
+            defer { loadingCaptureID = nil }
+
+            do {
+                let loaded = try await account.fetchSurroundViewImagery(
+                    for: capture,
+                    bbVehicle: bbVehicle,
+                    modelContext: modelContext
+                )
+                guard !Task.isCancelled else { return }
+                if let index = captures.firstIndex(where: { $0.id == loaded.id }) {
+                    captures[index] = loaded
+                }
+                // Only re-render if the user is still looking at it — they
+                // may have moved on while this was in flight.
+                if selectedCaptureID == loaded.id {
+                    renderTiles()
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                BBLogger.error(.api, "SurroundViewMonitorView: Failed to load capture imagery: \(error)")
+                loadError = ActionError(
+                    action: "Load surround view photo",
+                    error: error,
+                    accountId: account.id
+                )
+            }
+        }
+    }
+
     private func renderTiles() {
         guard let capture = selectedCapture else {
             renderedTiles = [:]

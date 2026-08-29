@@ -152,15 +152,29 @@ grammar this client already uses for `cmm/gvi` and `prof/authUser`.
 So Kia is a **three-call read model** where Hyundai needs two: a fetch is one
 `inquire` plus one `info` per capture, merged before parsing.
 
-**That per-capture cost is why the client caches imagery by `svmId`.** Kia bills a
-request *and* ~280 KB of base64 for every capture, so a full gallery is eleven
-requests and ~2.8 MB — where Hyundai returns everything in a single response. The
-capture poll re-fetches every 30 s for up to six minutes, so an uncached
-implementation re-downloaded the same unchanged images a dozen times over (~35 MB
-and ~144 requests for one capture, most of it on cellular). A capture is immutable
-once uploaded, so the cache is simply keyed by `svmId`; it is replaced by whatever
-the gallery currently lists, which evicts deleted captures and bounds it to Kia's
-ten. A poll now costs one `inquire`, and the new capture costs one `info`. The vehicle is identified by the `vinkey` header, as for `cmm/gvi`.
+**That per-capture cost drives two things Hyundai does not need: lazy loading and an
+imagery cache.** Kia bills a request *and* ~280 KB of base64 for every capture, where
+Hyundai returns the whole gallery in one response.
+
+- **Lazy.** `fetchSurroundViewCaptures` lists every capture but loads imagery only for
+  the **newest** — the one the screen opens on and the one the capture poll is waiting
+  for. The rest come back as metadata (`isLoaded == false`, timestamp/location/heading
+  intact) and are filled in by `fetchSurroundViewImagery` when the user selects them.
+  Opening the gallery is now 2 requests and ~280 KB instead of 11 and ~2.8 MB.
+- **Cached.** A capture is immutable once uploaded, so imagery is cached by `svmId`.
+  The cache is replaced by whatever the listing currently holds, which evicts deleted
+  captures and bounds it to Kia's retention of ten.
+
+Together these took waiting on a capture from ~144 requests and ~35 MB down to roughly
+a dozen cheap `inquire` calls plus one `info` for the picture that actually arrives.
+
+Two traps worth knowing. `SurroundViewCapture.providerID` carries the `svmId` so a
+capture can be re-requested later — but the id must go back on the wire with the **type
+the server sent** (a JSON number); `providerID` is its string form and is only ever a
+dictionary key. And `CachedAPIClient` **must** forward `fetchSurroundViewImagery`: the
+protocol's default returns the capture untouched, which is right for a region whose
+listing includes imagery and silently wrong here — inheriting it would make every
+on-demand load a no-op and leave the screen permanently blank. The vehicle is identified by the `vinkey` header, as for `cmm/gvi`.
 
 A real `inquire` entry, from a live Carnival (coordinates altered):
 

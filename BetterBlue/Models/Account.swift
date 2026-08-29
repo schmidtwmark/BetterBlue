@@ -850,6 +850,45 @@ extension BBAccount {
         }
     }
 
+    /// Fills in one capture's imagery, for regions that list captures
+    /// without it. A no-op where the images arrived with the listing, so
+    /// callers can call it for whatever the user selected.
+    @MainActor
+    func fetchSurroundViewImagery(
+        for capture: SurroundViewCapture,
+        bbVehicle: BBVehicle,
+        modelContext: ModelContext
+    ) async throws -> SurroundViewCapture {
+        guard let api, let authToken else {
+            try await initialize(modelContext: modelContext)
+            return try await fetchSurroundViewImagery(
+                for: capture,
+                bbVehicle: bbVehicle,
+                modelContext: modelContext
+            )
+        }
+
+        let vehicle = bbVehicle.toVehicle()
+
+        do {
+            return try await api.fetchSurroundViewImagery(
+                for: capture,
+                vehicle: vehicle,
+                authToken: authToken
+            )
+        } catch let error as APIError where shouldReauthenticate(for: error) {
+            try await handleAPIError(error, modelContext: modelContext)
+            guard let api = self.api, let authToken = self.authToken else {
+                throw APIError.failedRetryLogin()
+            }
+            return try await api.fetchSurroundViewImagery(
+                for: capture,
+                vehicle: vehicle,
+                authToken: authToken
+            )
+        }
+    }
+
     /// Whether this account's API exposes surround view. Like
     /// `supportedEVTripTypes`, this delegates to the client so new brand
     /// support lights up without app changes, and reads false until the

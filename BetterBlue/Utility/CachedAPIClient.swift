@@ -223,6 +223,25 @@ class CachedAPIClient: APIClientProtocol {
         try await underlyingClient.requestSurroundViewCapture(for: vehicle, authToken: authToken)
     }
 
+    func fetchSurroundViewImagery(
+        for capture: SurroundViewCapture,
+        vehicle: Vehicle,
+        authToken: AuthToken
+    ) async throws -> SurroundViewCapture {
+        // MUST be forwarded. The protocol's default returns the capture
+        // untouched, which is correct for a client whose listings already
+        // include imagery — but silently wrong here: inheriting it would
+        // make every on-demand load a no-op and leave the screen showing
+        // a permanently blank picture. The underlying client does its own
+        // per-svmId caching, so there is nothing to add at this layer.
+        BBLogger.debug(.api, "CachedAPIClient:Forwarding fetchSurroundViewImagery for VIN: \(vehicle.vin)")
+        return try await underlyingClient.fetchSurroundViewImagery(
+            for: capture,
+            vehicle: vehicle,
+            authToken: authToken
+        )
+    }
+
     func fetchSurroundViewCaptures(
         for vehicle: Vehicle,
         authToken: AuthToken
