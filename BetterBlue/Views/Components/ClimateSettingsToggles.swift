@@ -76,17 +76,17 @@ struct ClimateSettingsInfoSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    settingDescription(
+                    SettingDescription(
                         title: "Seat Heat Controls",
-                        body: "Seat heating and cooling controls are available " +
+                        text: "Seat heating and cooling controls are available " +
                             "for newer vehicles (generation 3+). " +
                             "If the MyHyundai / Kia Connect app supports enabling seat " +
                             "heat / cooling, BetterBlue should be able to set it as well."
                     )
 
-                    settingDescription(
+                    SettingDescription(
                         title: "Show Climate Duration",
-                        body: "Newer vehicles (generation 3+) support setting a duration " +
+                        text: "Newer vehicles (generation 3+) support setting a duration " +
                             "for climate control. If the MyHyundai / Kia Connect app " +
                             "supports setting a climate duration, BetterBlue should be " +
                             "able to set it as well."
@@ -102,18 +102,6 @@ struct ClimateSettingsInfoSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func settingDescription(title: String, body: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.headline)
-            Text(body)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

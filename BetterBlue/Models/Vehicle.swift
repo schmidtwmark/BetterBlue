@@ -167,13 +167,23 @@ class BBVehicle {
         generation == 0 || generation >= 3
     }
 
+    /// The effective per-vehicle preference: the user's override when
+    /// they've set one, otherwise the automatic default.
+    ///
+    /// Deliberately ignores whether the account's API implements surround
+    /// view at all — that's a separate question, and keeping them apart is
+    /// what lets the settings toggle read back what it wrote. Mirrors the
+    /// shape of `showClimateDuration`.
+    var surroundViewEnabled: Bool {
+        surroundViewOverride ?? autoShowsSurroundView
+    }
+
     /// Whether to surface surround view for this vehicle. The account's API
-    /// must implement it at all; then a user override wins, otherwise the
-    /// automatic per-generation default applies.
+    /// must implement it at all; then the per-vehicle preference decides.
     @MainActor
     var showsSurroundView: Bool {
         guard account?.supportsSurroundView == true else { return false }
-        return surroundViewOverride ?? autoShowsSurroundView
+        return surroundViewEnabled
     }
 
     /// User override for the inferred powertrain. `nil` means "use

@@ -22,29 +22,6 @@ struct VehicleInfoView: View {
         allClimatePresets.filter { $0.vehicle?.id == bbVehicle.id }.sorted { $0.sortOrder < $1.sortOrder }
     }
 
-    /// Three-way visibility choice, mapped onto the vehicle's optional
-    /// `surroundViewOverride` (nil = automatic).
-    private enum SurroundViewChoice { case automatic, show, hide }
-
-    private var surroundViewChoice: Binding<SurroundViewChoice> {
-        Binding(
-            get: {
-                switch bbVehicle.surroundViewOverride {
-                case .none: .automatic
-                case .some(true): .show
-                case .some(false): .hide
-                }
-            },
-            set: { choice in
-                switch choice {
-                case .automatic: bbVehicle.surroundViewOverride = nil
-                case .show: bbVehicle.surroundViewOverride = true
-                case .hide: bbVehicle.surroundViewOverride = false
-                }
-            }
-        )
-    }
-
     var body: some View {
         PersistentModelGuard(model: bbVehicle) {
             activeBody
@@ -83,36 +60,12 @@ struct VehicleInfoView: View {
                 }
             }
 
-            if bbVehicle.account?.supportsSurroundView == true {
-                Section {
-                    Picker("Surround View", selection: surroundViewChoice) {
-                        Text("Automatic").tag(SurroundViewChoice.automatic)
-                        Text("Always Show").tag(SurroundViewChoice.show)
-                        Text("Always Hide").tag(SurroundViewChoice.hide)
-                    }
-                } header: {
-                    HStack {
-                        Text("Surround View")
-                        Spacer()
-                        SurroundViewSettingsInfoButton()
-                    }
-                }
-            }
-            
-            // Climate Settings — toggles + info button extracted into
-            // shared components so the same controls back the toolbar
-            // half-sheet on `ClimateSettingsContent` for older vehicles.
-            if bbVehicle.generation < 3 {
-                Section {
-                    ClimateSettingsToggles(bbVehicle: bbVehicle)
-                } header: {
-                    HStack {
-                        Text("Climate Settings")
-                        Spacer()
-                        ClimateSettingsInfoButton()
-                    }
-                }
-            }
+            // Surround View and the climate switches answer the same
+            // question — "does this vehicle actually have that?" — so they
+            // share one section. `ClimateSettingsToggles` is still its own
+            // component because the toolbar half-sheet on
+            // `ClimateSettingsContent` presents it alone.
+            OptionalFeaturesSection(bbVehicle: bbVehicle)
 
             ClimatePresetsSection(bbVehicle: bbVehicle, vehiclePresets: vehiclePresets)
 
