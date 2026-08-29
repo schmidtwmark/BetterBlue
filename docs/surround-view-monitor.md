@@ -146,7 +146,7 @@ grammar this client already uses for `cmm/gvi` and `prof/authUser`.
 | Call | Body | Returns |
 |---|---|---|
 | `POST lbs/svm/inquire` | `{}` | `payload.svmInfos[]` — see the real entry below. **No imagery.** |
-| `POST lbs/svm/info` | `{svmId}` | `payload.svmInfos[0].image` — the base64 composite |
+| `POST lbs/svm/info` | `{svmId}` | the capture in full: `payload.svmInfos[0]` with `image` (base64), **`imageSize`**, and a repeat of the location block |
 | `POST lbs/svm/dsi` | `{svmIds:[…]}` | deletes. Not used; recorded because it pins the verb family |
 
 So a fetch is one `inquire` plus one `info` per capture, merged back together
@@ -188,21 +188,23 @@ covered by `URLProtocol`-stubbed tests.
 Three differences from Hyundai worth knowing:
 
 - The image field is **`image`**, not `svmImage`.
-- **There is no `imageSize`** — but the geometry is now known. A real capture from
-  a 2026 Carnival measures **4472×720**, byte-identical to Hyundai's stated
-  `[4472, 720, 960, 720, 632, 720]`, and the camera order matches too (front,
-  rear, left, right, bird's-eye). Kia's own app bundling debug frames at 960×720
-  and 632×720 was the earlier hint; the live capture confirmed it.
-  Rather than hardcode the array for Kia, `SurroundViewDecoder` now **reconstructs
-  it from the strip itself**: `pixelSize(ofJPEG:)` reads the SOF header (marker
-  walk, no image framework, so watchOS is fine) and `inferredImageSize(width:height:)`
-  rebuilds the panel widths when the aspect ratio matches the reference layout
-  within 1%. A stated `imageSize` always wins; anything not shaped like the known
-  layout stays whole rather than being sliced on a guess. This fixes any future
-  region that omits the field, not just Kia.
+- **`imageSize` arrives with `info`, not with `inquire`.** This caught us out: the
+  index entry has no geometry, so an early version merged only the base64 into it
+  and the strip descriptor was never seen. `lbs/svm/info` states it outright —
+  `[4472, 720, 960, 720, 632, 720]` on a live Carnival, identical to Hyundai's. The
+  fetch therefore merges the **whole detail entry** over its index entry, not just
+  the image. Anything the detail omits still falls back to the index.
+  As a backstop for a payload that genuinely states nothing, `SurroundViewDecoder`
+  can reconstruct the geometry from the strip itself: `pixelSize(ofJPEG:)` reads the
+  SOF header (marker walk, no image framework, so watchOS is fine) and
+  `inferredImageSize(width:height:)` rebuilds the panel widths when the aspect ratio
+  matches the reference layout within 1%. A stated `imageSize` always wins, and
+  anything not shaped like the known layout stays whole rather than being sliced on
+  a guess.
   (The portal's CSS crop offsets — x = −41, −1099, −2018, −2940, −3905 — are *not*
-  clean multiples of 960 and were the reason for the earlier caution. They turn out
-  to be display-centering offsets for the masked circles, not panel boundaries.)
+  clean multiples of 960 and were the reason for earlier caution about the geometry.
+  They turn out to be display-centering offsets for the masked circles, not panel
+  boundaries.)
 - **Heading and the door/trunk/mirror flags are left unmapped on purpose.** The
   portal never reads them, so where Kia reports them — or whether it does — is
   unknown. They surface as nil ("not reported"), which the UI already handles.
@@ -599,9 +601,9 @@ are persisted, iCloud-synced, and bundled into user debug exports.
 ## 11. Key facts to keep handy
 
 - Composite geometry: `imageSize = [4472, 720, 960, 720, 632, 720]` → 4× 960px
-  fisheye + 1× 632px bird's-eye, all 720 tall. Hyundai states it; **Kia sends no
-  `imageSize` but produces the identical 4472×720 strip** (confirmed on a live
-  Carnival), which the decoder reconstructs from the frame's own SOF header.
+  fisheye + 1× 632px bird's-eye, all 720 tall. Both brands state it — but on Kia it
+  comes from `lbs/svm/info`, never from `lbs/svm/inquire`. The decoder can also
+  reconstruct it from the frame's SOF header when a payload states nothing.
 - Camera order in the composite: front, rear, left, right, then bird's-eye.
 - Kia capability flag: `vehicleConfig.vehicleFeature.locationFeature.surroundView`
   (string `"1"`/`"0"`) from `cmm/gvi` with `vehicleFeature: "1"`.
