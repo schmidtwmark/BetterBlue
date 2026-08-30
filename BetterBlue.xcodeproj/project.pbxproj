@@ -1073,7 +1073,7 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		EDA7C7782E41A8D700C3174B /* XCRemoteSwiftPackageReference "Highlight" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/nkristek/Highlight?tab=readme-ov-file";
+			repositoryURL = "https://github.com/nkristek/Highlight";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.4.0;
