@@ -21,6 +21,7 @@ import BetterBlueKit
 import CoreLocation
 import SwiftData
 import SwiftUI
+import UIKit
 import WidgetKit
 
 /// Detent for the persistent vehicle sheet. Two snap heights —
@@ -599,6 +600,7 @@ struct PersistentVehicleSheet: View {
         let chargingColor = bbVehicle.chargingColor
         let isCharging = ev.charging
         let isPluggedIn = ev.pluggedIn
+        let menuActions = chargingMenuActions
         // `stop.fill` reads as "tap to stop" unambiguously — the
         // old `bolt.slash.fill` glyph said "no charging" and was
         // easily misread as "charging is unavailable / disabled."
@@ -630,27 +632,21 @@ struct PersistentVehicleSheet: View {
             // text (e.g. "Starting Charge", "Waiting for vehicle").
             // Falls back to the steady-state stateText when idle.
             subtitle: chargingStatusText ?? stateText,
-            menuContent: { chargingMenuContent(isCharging: isCharging) }
+            menuActions: menuActions
         ) {
-            // Menu(primaryAction:): tap → toggle, long-press → menu
-            // (charge limit settings). Confines the long-press
-            // recognizer to the small button area so it doesn't
-            // block horizontal swipes on the rest of the row.
-            Menu {
-                chargingMenuContent(isCharging: isCharging)
-            } label: {
-                CircularIconLabel(
-                    systemName: icon,
-                    // Stop state uses the customizable stopColor
-                    // (default red) so the button reads as
-                    // actionable. Previously used `.secondary`,
-                    // which made it look disabled / unresponsive.
-                    tint: isCharging
-                        ? bbVehicle.stopColor
-                        : (isPluggedIn ? chargingColor : .secondary.opacity(0.5)),
-                    isBusy: isChargingBusy
-                )
-            } primaryAction: {
+            ContextMenuCircularButton(
+                systemName: icon,
+                // Stop state uses the customizable stopColor
+                // (default red) so the button reads as
+                // actionable. Previously used `.secondary`,
+                // which made it look disabled / unresponsive.
+                tint: isCharging
+                    ? bbVehicle.stopColor
+                    : (isPluggedIn ? chargingColor : .secondary.opacity(0.5)),
+                isBusy: isChargingBusy,
+                accessibilityLabel: isCharging ? "Stop Charge" : "Start Charge",
+                menuActions: menuActions
+            ) {
                 Task { await toggleCharging(start: !isCharging) }
             }
             // Only disabled when an action is in-flight — NOT when
@@ -665,48 +661,22 @@ struct PersistentVehicleSheet: View {
     @ViewBuilder
     private var lockSection: some View {
         let isLocked = (bbVehicle.lockStatus == .locked)
+        let menuActions = lockMenuActions
         SectionRow(
             icon: Image(systemName: isLocked ? "lock.fill" : "lock.open.fill"),
             iconColor: isLocked ? bbVehicle.lockColor : bbVehicle.unlockColor,
             // No `title:` — the lock icon already implies "doors,"
             // so "Locked" / "Unlocked" alone reads cleanly.
             subtitle: lockStatusText ?? (isLocked ? "Locked" : "Unlocked"),
-            menuContent: {
-                // BOTH actions always available — server state can
-                // lag real-world lock state.
-                Button {
-                    Task { await toggleLock(targetLocked: true) }
-                } label: {
-                    Label("Lock", systemImage: "lock.fill")
-                }
-                Button {
-                    Task { await toggleLock(targetLocked: false) }
-                } label: {
-                    Label("Unlock", systemImage: "lock.open.fill")
-                }
-            }
+            menuActions: menuActions
         ) {
-            // Menu(primaryAction:) so long-press surfaces both
-            // Lock + Unlock actions (server state can lag, the
-            // user might want the opposite action anyway).
-            Menu {
-                Button {
-                    Task { await toggleLock(targetLocked: true) }
-                } label: {
-                    Label("Lock", systemImage: "lock.fill")
-                }
-                Button {
-                    Task { await toggleLock(targetLocked: false) }
-                } label: {
-                    Label("Unlock", systemImage: "lock.open.fill")
-                }
-            } label: {
-                CircularIconLabel(
-                    systemName: isLocked ? "lock.open.fill" : "lock.fill",
-                    tint: isLocked ? bbVehicle.unlockColor : bbVehicle.lockColor,
-                    isBusy: isLockBusy
-                )
-            } primaryAction: {
+            ContextMenuCircularButton(
+                systemName: isLocked ? "lock.open.fill" : "lock.fill",
+                tint: isLocked ? bbVehicle.unlockColor : bbVehicle.lockColor,
+                isBusy: isLockBusy,
+                accessibilityLabel: isLocked ? "Unlock" : "Lock",
+                menuActions: menuActions
+            ) {
                 Task { await toggleLock(targetLocked: !isLocked) }
             }
             .disabled(isLockBusy)
@@ -717,6 +687,7 @@ struct PersistentVehicleSheet: View {
     private var climateSection: some View {
         let isClimateOn = bbVehicle.climateStatus?.airControlOn ?? false
         let climateColor = bbVehicle.startClimateColor
+        let menuActions = climateMenuActions
         SectionRow(
             icon: Image(systemName: isClimateOn ? "fan" : "fan.slash"),
             iconColor: isClimateOn ? climateColor : .secondary,
@@ -725,24 +696,20 @@ struct PersistentVehicleSheet: View {
             // No `title:` — the fan icon already says "climate," so
             // the status text ("Off" / "Running at 72°F") is enough.
             subtitle: climateStatusText ?? climateSubtitle,
-            menuContent: { climateMenuContent(isClimateOn: isClimateOn) }
+            menuActions: menuActions
         ) {
-            // Tap → toggle, long-press → preset shortcuts +
-            // Climate Settings.
-            Menu {
-                climateMenuContent(isClimateOn: isClimateOn)
-            } label: {
-                CircularIconLabel(
-                    // `stop.fill` reads as "tap to stop" — same
-                    // reasoning as the charging button (the slash
-                    // glyph read as disabled/unavailable).
-                    systemName: isClimateOn ? "stop.fill" : "fan",
-                    // Stop state uses stopColor (default red) so
-                    // the button doesn't look disabled.
-                    tint: isClimateOn ? bbVehicle.stopColor : climateColor,
-                    isBusy: isClimateBusy
-                )
-            } primaryAction: {
+            ContextMenuCircularButton(
+                // `stop.fill` reads as "tap to stop" — same
+                // reasoning as the charging button (the slash
+                // glyph read as disabled/unavailable).
+                systemName: isClimateOn ? "stop.fill" : "fan",
+                // Stop state uses stopColor (default red) so
+                // the button doesn't look disabled.
+                tint: isClimateOn ? bbVehicle.stopColor : climateColor,
+                isBusy: isClimateBusy,
+                accessibilityLabel: isClimateOn ? "Stop Climate" : "Start Climate",
+                menuActions: menuActions
+            ) {
                 Task { await toggleClimate(start: !isClimateOn) }
             }
             .disabled(isClimateBusy)
@@ -933,57 +900,64 @@ struct PersistentVehicleSheet: View {
 
     // MARK: - Action menus (long-press on section circular button)
 
-    @ViewBuilder
-    private func chargingMenuContent(isCharging: Bool) -> some View {
+    private var lockMenuActions: [VehicleControlMenuAction] {
+        // BOTH actions always available — server state can lag
+        // real-world lock state.
+        [
+            VehicleControlMenuAction(title: "Lock", systemImage: "lock.fill") {
+                Task { await toggleLock(targetLocked: true) }
+            },
+            VehicleControlMenuAction(title: "Unlock", systemImage: "lock.open.fill") {
+                Task { await toggleLock(targetLocked: false) }
+            }
+        ]
+    }
+
+    private var chargingMenuActions: [VehicleControlMenuAction] {
         // BOTH actions always available — server state can lag
         // real-world charging state, so the user should always be
         // able to fire either command.
-        Button {
-            Task { await toggleCharging(start: true) }
-        } label: {
-            Label("Start Charge", systemImage: "bolt.fill")
-        }
-        Button {
-            Task { await toggleCharging(start: false) }
-        } label: {
-            Label("Stop Charge", systemImage: "bolt.slash")
-        }
-        Button {
-            sheetPresentation.show(.chargeLimitSettings(vehicle: bbVehicle))
-        } label: {
-            Label("Charge Limits", systemImage: "battery.100percent")
-        }
+        [
+            VehicleControlMenuAction(title: "Start Charge", systemImage: "bolt.fill") {
+                Task { await toggleCharging(start: true) }
+            },
+            VehicleControlMenuAction(title: "Stop Charge", systemImage: "bolt.slash") {
+                Task { await toggleCharging(start: false) }
+            },
+            VehicleControlMenuAction(title: "Charge Limits", systemImage: "battery.100percent") {
+                sheetPresentation.show(.chargeLimitSettings(vehicle: bbVehicle))
+            }
+        ]
     }
 
-    @ViewBuilder
-    private func climateMenuContent(isClimateOn: Bool) -> some View {
+    private var climateMenuActions: [VehicleControlMenuAction] {
         // BOTH actions always available — server state can lag
         // real-world climate state.
-        Button {
-            Task { await toggleClimate(start: true) }
-        } label: {
-            Label("Start Climate", systemImage: "fan")
-        }
-        Button {
-            Task { await toggleClimate(start: false) }
-        } label: {
-            Label("Stop Climate", systemImage: "fan.slash")
-        }
+        var actions = [
+            VehicleControlMenuAction(title: "Start Climate", systemImage: "fan") {
+                Task { await toggleClimate(start: true) }
+            },
+            VehicleControlMenuAction(title: "Stop Climate", systemImage: "fan.slash") {
+                Task { await toggleClimate(start: false) }
+            }
+        ]
         // Preset shortcuts (only the non-selected ones — selected is the
         // default behavior of the main tap).
-        ForEach(filteredClimatePresets.filter { !$0.isSelected }, id: \.id) { preset in
+        actions.append(contentsOf: filteredClimatePresets.filter { !$0.isSelected }.map { preset in
             let options = preset.climateOptions
-            Button {
+            return VehicleControlMenuAction(
+                title: "Start \(preset.name)",
+                systemImage: preset.iconName
+            ) {
                 Task { await toggleClimate(start: true, options: options) }
-            } label: {
-                Label("Start \(preset.name)", systemImage: preset.iconName)
             }
-        }
-        Button {
-            sheetPresentation.show(.climateSettings(vehicle: bbVehicle))
-        } label: {
-            Label("Climate Settings", systemImage: "gearshape.fill")
-        }
+        })
+        actions.append(
+            VehicleControlMenuAction(title: "Climate Settings", systemImage: "gearshape.fill") {
+                sheetPresentation.show(.climateSettings(vehicle: bbVehicle))
+            }
+        )
+        return actions
     }
 
     private var filteredClimatePresets: [ClimatePreset] {
@@ -1057,6 +1031,7 @@ struct PersistentVehicleSheet: View {
     @MainActor
     private func toggleLock(targetLocked: Bool) async {
         guard let account = bbVehicle.account else { return }
+        VehicleControlHaptics.commandDispatched()
         isLockBusy = true
         lockStatusText = targetLocked ? "Locking" : "Unlocking"
         defer {
@@ -1088,6 +1063,7 @@ struct PersistentVehicleSheet: View {
     @MainActor
     private func toggleCharging(start: Bool) async {
         guard let account = bbVehicle.account else { return }
+        VehicleControlHaptics.commandDispatched()
         isChargingBusy = true
         chargingStatusText = start ? "Starting Charge" : "Stopping Charge"
         defer {
@@ -1127,6 +1103,7 @@ struct PersistentVehicleSheet: View {
     @MainActor
     private func toggleClimate(start: Bool, options: ClimateOptions? = nil) async {
         guard let account = bbVehicle.account else { return }
+        VehicleControlHaptics.commandDispatched()
         isClimateBusy = true
         climateStatusText = start ? "Starting Climate" : "Stopping Climate"
         defer {
@@ -1375,12 +1352,14 @@ struct PersistentVehicleSheet: View {
 /// Left: status icon + title above subtitle (wrapped in a `Menu` so
 /// tapping the label area opens the same options as long-pressing
 /// the trailing quick-action button). Right: caller-supplied
-/// trailing content (the circular action button).
+/// trailing content (the circular action button). Both surfaces are
+/// generated from the same action descriptors so their menus cannot
+/// drift apart.
 ///
 /// The leading-area Menu is a tap-to-show Menu (not a contextMenu),
 /// so it doesn't add a competing long-press recognizer to the row
 /// — horizontal-swipe paging continues to work.
-private struct SectionRow<Trailing: View, MenuContent: View>: View {
+private struct SectionRow<Trailing: View>: View {
     let icon: Image
     let iconColor: Color
     var iconAnimation: AnimatedStatusIcon.Animation = .none
@@ -1392,13 +1371,13 @@ private struct SectionRow<Trailing: View, MenuContent: View>: View {
     /// which section they belong to).
     var title: String?
     let subtitle: String
-    @ViewBuilder var menuContent: () -> MenuContent
+    let menuActions: [VehicleControlMenuAction]
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Menu {
-                menuContent()
+                VehicleControlMenuItems(actions: menuActions)
             } label: {
                 HStack(alignment: .center, spacing: 12) {
                     AnimatedStatusIcon(
@@ -1433,6 +1412,30 @@ private struct SectionRow<Trailing: View, MenuContent: View>: View {
             .buttonStyle(.plain)
             Spacer()
             trailing()
+                .frame(width: 40, height: 40)
+        }
+    }
+}
+
+/// Platform-neutral description of one vehicle control menu command.
+/// `SectionRow` renders it as a SwiftUI menu item on the leading status
+/// area; `ContextMenuCircularButton` maps the same value to `UIAction`
+/// for the trailing button's native UIKit context menu.
+private struct VehicleControlMenuAction: Identifiable {
+    let id = UUID()
+    let title: String
+    let systemImage: String
+    let perform: () -> Void
+}
+
+private struct VehicleControlMenuItems: View {
+    let actions: [VehicleControlMenuAction]
+
+    var body: some View {
+        ForEach(actions) { action in
+            Button(action: action.perform) {
+                Label(action.title, systemImage: action.systemImage)
+            }
         }
     }
 }
@@ -1522,9 +1525,8 @@ private struct DetailRow: View {
 // MARK: - Circular icon button
 
 /// Just the visual — circle background, optional spinner or icon.
-/// Used as the label for both `Button` (refresh / lock) and
-/// `Menu(primaryAction:)` (charging / climate, where long-press
-/// surfaces extras like presets and charge limits).
+/// Used by the refresh `Button` and hosted inside the native context-
+/// menu buttons for lock, charging, and climate.
 struct CircularIconLabel: View {
     let systemName: String
     let tint: Color
@@ -1547,11 +1549,186 @@ struct CircularIconLabel: View {
             }
         }
         .frame(width: diameter, height: diameter)
+        .contentShape(Circle())
+    }
+}
+
+/// SwiftUI bridge for a UIKit `UIButton` with a contextual `UIMenu`.
+/// A normal tap performs `primaryAction`; a long press presents the
+/// native context menu. UIKit's presentation callback gives us the
+/// exact menu-reveal moment needed for reliable haptic feedback, which
+/// SwiftUI's `Menu(primaryAction:)` does not expose.
+private struct ContextMenuCircularButton: UIViewRepresentable {
+    let systemName: String
+    let tint: Color
+    let isBusy: Bool
+    let accessibilityLabel: String
+    let menuActions: [VehicleControlMenuAction]
+    let primaryAction: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(primaryAction: primaryAction)
+    }
+
+    func makeUIView(context: Context) -> HapticContextMenuButton {
+        let button = HapticContextMenuButton(type: .custom)
+        button.clipsToBounds = false
+        button.showsMenuAsPrimaryAction = false
+        button.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.performPrimaryAction),
+            for: .touchUpInside
+        )
+        context.coordinator.installLabel(in: button)
+        return button
+    }
+
+    func updateUIView(_ button: HapticContextMenuButton, context: Context) {
+        context.coordinator.primaryAction = primaryAction
+        context.coordinator.updateLabel(
+            systemName: systemName,
+            tint: tint,
+            isBusy: isBusy
+        )
+        context.coordinator.updateMenu(menuActions, on: button)
+        button.accessibilityLabel = accessibilityLabel
+        button.isEnabled = !isBusy
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var primaryAction: () -> Void
+        private let hostingController = UIHostingController(rootView: AnyView(EmptyView()))
+
+        init(primaryAction: @escaping () -> Void) {
+            self.primaryAction = primaryAction
+        }
+
+        func installLabel(in button: HapticContextMenuButton) {
+            let hostedView = hostingController.view!
+            hostedView.backgroundColor = .clear
+            hostedView.isUserInteractionEnabled = false
+            hostedView.translatesAutoresizingMaskIntoConstraints = false
+            button.addSubview(hostedView)
+            NSLayoutConstraint.activate([
+                hostedView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+                hostedView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+                hostedView.topAnchor.constraint(equalTo: button.topAnchor),
+                hostedView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
+            ])
+            button.highlightedContentView = hostedView
+        }
+
+        func updateLabel(systemName: String, tint: Color, isBusy: Bool) {
+            hostingController.rootView = AnyView(
+                CircularIconLabel(
+                    systemName: systemName,
+                    tint: tint,
+                    isBusy: isBusy
+                )
+            )
+        }
+
+        func updateMenu(
+            _ actions: [VehicleControlMenuAction],
+            on button: HapticContextMenuButton
+        ) {
+            let children = actions.map { action in
+                UIAction(
+                    title: action.title,
+                    image: UIImage(systemName: action.systemImage)
+                ) { _ in
+                    action.perform()
+                }
+            }
+            button.menu = UIMenu(children: children)
+        }
+
+        @objc func performPrimaryAction() {
+            primaryAction()
+        }
+    }
+}
+
+/// UIButton owns the native long-press menu interaction and reports
+/// exactly when its presentation starts. It also mirrors the familiar
+/// press-in scale while the finger is down.
+@MainActor
+private final class HapticContextMenuButton: UIButton {
+    private static let diameter: CGFloat = 40
+
+    weak var highlightedContentView: UIView?
+    private let menuFeedback = UIImpactFeedbackGenerator(style: .rigid)
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: Self.diameter, height: Self.diameter)
+    }
+
+    override var isHighlighted: Bool {
+        didSet {
+            if isHighlighted {
+                menuFeedback.prepare()
+            }
+            UIView.animate(
+                withDuration: isHighlighted ? 0.1 : 0.18,
+                delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction]
+            ) {
+                self.highlightedContentView?.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: 0.92, y: 0.92)
+                    : .identity
+            }
+        }
+    }
+
+    override func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        willDisplayMenuFor configuration: UIContextMenuConfiguration,
+        animator: (any UIContextMenuInteractionAnimating)?
+    ) {
+        super.contextMenuInteraction(
+            interaction,
+            willDisplayMenuFor: configuration,
+            animator: animator
+        )
+        menuFeedback.impactOccurred()
+    }
+
+    override func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        circularTargetedPreview()
+    }
+
+    override func contextMenuInteraction(
+        _ interaction: UIContextMenuInteraction,
+        previewForDismissingMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        circularTargetedPreview()
+    }
+
+    private func circularTargetedPreview() -> UITargetedPreview {
+        let previewView = highlightedContentView ?? self
+        let parameters = UIPreviewParameters()
+        parameters.backgroundColor = .clear
+        parameters.visiblePath = UIBezierPath(ovalIn: previewView.bounds)
+        return UITargetedPreview(view: previewView, parameters: parameters)
+    }
+}
+
+@MainActor
+private enum VehicleControlHaptics {
+    private static let commandFeedback = UIImpactFeedbackGenerator(style: .medium)
+
+    static func commandDispatched() {
+        commandFeedback.impactOccurred()
+        commandFeedback.prepare()
     }
 }
 
 /// Convenience Button wrapper around `CircularIconLabel` for cases
-/// without a long-press menu (refresh, lock).
+/// without a long-press menu (currently refresh).
 struct CircularIconButton: View {
     let systemName: String
     let tint: Color
