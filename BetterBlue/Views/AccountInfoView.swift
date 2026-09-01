@@ -149,20 +149,11 @@ struct AccountInfoView: View {
                 }
             }
 
-            // Hyundai Canada connection variant + session reset. Canada's
-            // backend behaves differently per user, so the picker lets a
-            // user try the identity that connects for them; Reset Session
-            // recovers from a stale token without re-adding the account.
+            // Session reset — recovers from a stale token without
+            // re-adding the account. (The Hyundai Canada connection
+            // picker that used to live here went away when the Canada
+            // client was collapsed to a single identity.)
             Section {
-                if account.isHyundaiCanada {
-                    Picker("Connection", selection: variantBinding) {
-                        ForEach(HyundaiCanadaVariant.allCases, id: \.self) { variant in
-                            Text(variant.displayName).tag(variant)
-                        }
-                    }
-                    .disabled(isResetting)
-                }
-
                 Button {
                     Task { await resetSession() }
                 } label: {
@@ -176,13 +167,9 @@ struct AccountInfoView: View {
                 }
                 .disabled(isResetting)
             } header: {
-                Text(account.isHyundaiCanada ? "Connection" : "Session")
+                Text("Session")
             } footer: {
-                if account.isHyundaiCanada {
-                    Text("\(account.hyundaiCanadaVariant.summary)\n\nReset Session forces a fresh login.")
-                } else {
-                    Text("Forces a fresh login — use if the app is stuck with a stale session.")
-                }
+                Text("Forces a fresh login — use if the app is stuck with a stale session.")
             }
 
             if AppSettings.shared.debugModeEnabled {
@@ -317,21 +304,7 @@ struct AccountInfoView: View {
         }
     }
 
-    /// Hyundai Canada connection variant — changing it persists the
-    /// choice and re-logs in so the new identity takes effect.
-    private var variantBinding: Binding<HyundaiCanadaVariant> {
-        Binding(
-            get: { account.hyundaiCanadaVariant },
-            set: { newValue in
-                guard newValue != account.hyundaiCanadaVariant else { return }
-                account.hyundaiCanadaVariant = newValue
-                try? modelContext.save()
-                Task { await resetSession() }
-            }
-        )
-    }
-
-    /// Clears the session and re-logs in (with the current variant), then
+    /// Clears the session and re-logs in, then
     /// refreshes status so the change is visible. Surfaces errors / MFA
     /// in the existing success/error rows.
     @MainActor

@@ -22,11 +22,6 @@ class BBAccount {
     var rememberMeToken: String?
     var serializedAuthToken: String?
     var deviceId: String?
-    /// Hyundai Canada connection variant (raw value). Only meaningful for
-    /// Hyundai Canada accounts; nil falls back to the default (web portal).
-    /// Lets a user switch how the app talks to Hyundai Canada when the
-    /// default doesn't connect for them (see `HyundaiCanadaVariant`).
-    var hyundaiCanadaVariantRaw: String?
     /// Timestamp of the most recent successful `fetchVehicles` call.
     /// Used by `fetchAndUpdateVehicleStatus` to decide whether the
     /// vehicle list (model name, fuelType, generation, vehicleKey,
@@ -106,17 +101,6 @@ class BBAccount {
         Region(rawValue: region) ?? .usa
     }
 
-    /// Selected Hyundai Canada connection variant (defaults to web portal).
-    var hyundaiCanadaVariant: HyundaiCanadaVariant {
-        get { HyundaiCanadaVariant(rawValue: hyundaiCanadaVariantRaw ?? "") ?? .default }
-        set { hyundaiCanadaVariantRaw = newValue.rawValue }
-    }
-
-    /// True for Hyundai Canada accounts — the only ones the variant
-    /// picker applies to.
-    var isHyundaiCanada: Bool {
-        brandEnum == .hyundai && regionEnum == .canada
-    }
 }
 
 // MARK: - API Client Management
@@ -184,7 +168,6 @@ extension BBAccount {
                 logSink: logSink,
                 rememberMeToken: rememberMeToken,
                 deviceId: deviceId,
-                hyundaiCanadaVariant: hyundaiCanadaVariant,
                 onRememberMeTokenRotated: onRotate
             )
             api = createAPIClient(configuration: configuration)
