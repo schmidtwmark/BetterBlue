@@ -7,5 +7,9 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>BBAppGroupIdentifier</key>
+	<string>$(BB_APP_GROUP)</string>
+	<key>BBICloudContainerIdentifier</key>
+	<string>$(BB_ICLOUD_CONTAINER)</string>
 </dict>
 </plist>

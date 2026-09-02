@@ -24,5 +24,9 @@
 	     the read key would ask for access to their entire library. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>BetterBlue saves surround view photos to your photo library when you choose Save Image.</string>
+	<key>BBAppGroupIdentifier</key>
+	<string>$(BB_APP_GROUP)</string>
+	<key>BBICloudContainerIdentifier</key>
+	<string>$(BB_ICLOUD_CONTAINER)</string>
 </dict>
 </plist>

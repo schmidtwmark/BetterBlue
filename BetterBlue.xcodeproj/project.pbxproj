@@ -97,6 +97,8 @@
 		ED81024E2F2921270072BDDE /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		ED8103292F2978550072BDDE /* WatchWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WatchWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED8110932F08B730003BD1FB /* serverless.yml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = serverless.yml; sourceTree = "<group>"; };
+		EDC0F1600000000000000001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		EDC0F1600000000000000002 /* Local.xcconfig.template */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.template; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -112,6 +114,7 @@
 				Models/VehicleButtonAction.swift,
 				Utility/AnimationExtensions.swift,
 				Utility/APIClientFactory.swift,
+				Utility/AppIdentifiers.swift,
 				Utility/AppLogger.swift,
 				Utility/AppSettings.swift,
 				Utility/Backgrounds.swift,
@@ -163,6 +166,7 @@
 				Models/VehicleButtonAction.swift,
 				Utility/AnimationExtensions.swift,
 				Utility/APIClientFactory.swift,
+				Utility/AppIdentifiers.swift,
 				Utility/AppLogger.swift,
 				Utility/AppSettings.swift,
 				Utility/Backgrounds.swift,
@@ -210,6 +214,7 @@
 				Models/VehicleButtonAction.swift,
 				Utility/AnimationExtensions.swift,
 				Utility/APIClientFactory.swift,
+				Utility/AppIdentifiers.swift,
 				Utility/AppLogger.swift,
 				Utility/AppSettings.swift,
 				Utility/Backgrounds.swift,
@@ -341,6 +346,7 @@
 		ED37F01B2DFB4E4F00C02398 = {
 			isa = PBXGroup;
 			children = (
+				EDC0F1600000000000000003 /* Config */,
 				ED8110912F08B6DE003BD1FB /* LiveActivityBackend */,
 				ED51C8952E706FCB0072B90D /* LICENSE */,
 				ED51C8962E706FCB0072B90D /* README.md */,
@@ -362,6 +368,15 @@
 				ED8103292F2978550072BDDE /* WatchWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		EDC0F1600000000000000003 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				EDC0F1600000000000000001 /* Shared.xcconfig */,
+				EDC0F1600000000000000002 /* Local.xcconfig.template */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		ED8110912F08B6DE003BD1FB /* LiveActivityBackend */ = {
@@ -622,6 +637,7 @@
 /* Begin XCBuildConfiguration section */
 		ED37F0302DFB4E5100C02398 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EDC0F1600000000000000001 /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -655,7 +671,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -687,6 +702,7 @@
 		};
 		ED37F0312DFB4E5100C02398 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EDC0F1600000000000000001 /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -720,7 +736,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -769,7 +784,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -803,7 +818,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -819,19 +834,18 @@
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 60;
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markschmidt.BetterBlue;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -854,19 +868,18 @@
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 60;
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markschmidt.BetterBlue;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -901,7 +914,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -933,7 +946,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.Widget;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -953,7 +966,6 @@
 				CODE_SIGN_ENTITLEMENTS = WatchWidget/WatchWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 60;
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchWidget;
@@ -965,7 +977,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp.WatchWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp.WatchWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -987,7 +999,6 @@
 				CODE_SIGN_ENTITLEMENTS = WatchWidget/WatchWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 60;
-				DEVELOPMENT_TEAM = C2UW47HS8X;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchWidget;
@@ -999,7 +1010,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 2026.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markschmidt.BetterBlue.watchkitapp.WatchWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp.WatchWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;

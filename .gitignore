@@ -1,4 +1,5 @@
 # Xcode
+*.bak
 *.xcuserstate
 *.xcuserdatad/
 *.xccheckout
@@ -67,6 +68,9 @@ Temporary Items
 
 # SwiftLint
 .swiftlint.yml
+
+# Per-machine signing configuration (see Config/Local.xcconfig.template)
+Config/Local.xcconfig
 
 # Personal data and secrets
 *.keychain

@@ -143,7 +143,7 @@ struct DiagnosticInfo {
     @MainActor
     private static func collectCloudKitStatus(from _: ModelContext) async -> CloudKitDiagnostic? {
         // Use the BetterBlue CloudKit container identifier
-        let containerID = "iCloud.com.markschmidt.BetterBlue"
+        let containerID = AppIdentifiers.iCloudContainer
         let container = CKContainer(identifier: containerID)
 
         do {
@@ -423,7 +423,7 @@ struct DiagnosticInfoView: View {
     /// Process-lifetime singleton — read directly so the view picks
     /// up live event updates as SwiftData runs imports / exports.
     @State private var syncMonitor = CloudKitSyncMonitor.shared
-    private let containerIdentifier = "iCloud.com.markschmidt.BetterBlue"
+    private let containerIdentifier = AppIdentifiers.iCloudContainer
 
     var body: some View {
         Group {

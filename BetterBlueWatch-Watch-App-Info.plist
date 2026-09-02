@@ -6,5 +6,9 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>BBAppGroupIdentifier</key>
+	<string>$(BB_APP_GROUP)</string>
+	<key>BBICloudContainerIdentifier</key>
+	<string>$(BB_ICLOUD_CONTAINER)</string>
 </dict>
 </plist>

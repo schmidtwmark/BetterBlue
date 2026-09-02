@@ -64,8 +64,9 @@ All models are in `BetterBlue/Models/`:
 #### Shared Model Container
 `SharedModelContainer.swift` provides the critical `createSharedModelContainer()` function:
 - **Simulator**: Uses `/tmp/BetterBlue_Shared` to work around App Group isolation
-- **Device**: Uses iCloud sync via `iCloud.com.markschmidt.BetterBlue` with App Group fallback (`group.com.betterblue.shared`)
+- **Device**: Uses iCloud sync with App Group fallback
 - All targets must use this function to ensure data sharing
+- The App Group and iCloud container identifiers come from `AppIdentifiers` (`BetterBlue/Utility/AppIdentifiers.swift`), which reads them from Info.plist keys injected from `Config/Shared.xcconfig` (defaults: `group.com.betterblue.shared`, `iCloud.com.markschmidt.BetterBlue`; per-machine overrides in gitignored `Config/Local.xcconfig`). Never hardcode these strings in source — use `AppIdentifiers`.
 
 ### API Client Architecture
 

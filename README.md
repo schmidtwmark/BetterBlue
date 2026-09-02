@@ -79,6 +79,31 @@ BetterBlue/
 
 ## Development
 
+### Building from source
+
+Code signing is configured through xcconfig files in `Config/`, so you can build
+with your own Apple Developer team without editing anything tracked by git:
+
+1. Copy the template:
+   ```bash
+   cp Config/Local.xcconfig.template Config/Local.xcconfig
+   ```
+2. Edit `Config/Local.xcconfig` and set your own `DEVELOPMENT_TEAM`,
+   `BB_BUNDLE_ID_PREFIX`, `BB_APP_GROUP`, and `BB_ICLOUD_CONTAINER`.
+3. Initialize the BetterBlueKit submodule and open the project:
+   ```bash
+   git submodule update --init --recursive
+   open BetterBlue.xcodeproj
+   ```
+
+`Config/Local.xcconfig` is gitignored and overrides the defaults in
+`Config/Shared.xcconfig` for every target (app, widgets, and watch app). With
+automatic signing, Xcode registers the bundle IDs, App Group, and iCloud
+container to your team on first build.
+
+Note: the CloudKit and push notification entitlements require a paid Apple
+Developer membership; free accounts can't sign them.
+
 ### Linting
 The project uses SwiftLint for code style enforcement:
 ```bash

@@ -127,7 +127,7 @@ private final class SimulatorSyncStore: SyncStore {
 class AppSettings {
     static let shared = AppSettings()
 
-    private let userDefaults = UserDefaults(suiteName: "group.com.betterblue.shared")!
+    private let userDefaults = UserDefaults(suiteName: AppIdentifiers.appGroup)!
     private let syncStore: SyncStore
     private let isSimulator: Bool
     private let distanceUnitKey = "DistanceUnit"
@@ -175,7 +175,7 @@ class AppSettings {
     // App Group UserDefaults directly each time, so extensions
     // always reflect the latest setting on their next reload.
 
-    nonisolated private static let appGroupSuiteName = "group.com.betterblue.shared"
+    nonisolated private static let appGroupSuiteName = AppIdentifiers.appGroup
     nonisolated private static let distanceUnitKey = "DistanceUnit"
     nonisolated private static let temperatureUnitKey = "TemperatureUnit"
 

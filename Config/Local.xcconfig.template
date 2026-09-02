@@ -1,0 +1,18 @@
+// Per-machine signing overrides.
+//
+// Copy this file to Config/Local.xcconfig and fill in your own values.
+// Local.xcconfig is gitignored, so building with your own team never
+// creates a diff against the repo.
+
+// Your Apple Developer Team ID (Xcode > Settings > Accounts, or
+// developer.apple.com/account > Membership details).
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// A bundle identifier prefix unique to your team. App IDs are globally
+// unique across teams, so you can't reuse com.markschmidt.
+BB_BUNDLE_ID_PREFIX = com.yourname
+
+// App Group and iCloud container identifiers registered to your team.
+// With automatic signing, Xcode registers these for you on first build.
+BB_APP_GROUP = group.com.yourname.betterblue
+BB_ICLOUD_CONTAINER = iCloud.com.yourname.BetterBlue

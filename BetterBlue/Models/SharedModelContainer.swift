@@ -21,7 +21,7 @@ func getSimulatorStoreURL() -> URL {
 }
 
 func getAppGroupStoreURL() throws -> URL {
-    let appGroupID = "group.com.betterblue.shared"
+    let appGroupID = AppIdentifiers.appGroup
     if let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
         return appGroupURL.appendingPathComponent("BetterBlue.sqlite")
     } else {
@@ -132,7 +132,7 @@ func createSharedModelContainer(enableCloudKit: Bool = true) throws -> ModelCont
         return try createContainer(storeURL: storeURL, schema: schema, cloudKitDatabase: cloudKitDatabase)
     #else
         let cloudConfig = ModelConfiguration(
-            "iCloud.com.markschmidt.BetterBlue",
+            AppIdentifiers.iCloudContainer,
             cloudKitDatabase: cloudKitDatabase
         )
 

@@ -1,0 +1,20 @@
+// Shared build configuration for all BetterBlue targets.
+//
+// To build with your own signing identity, don't edit this file — copy
+// Config/Local.xcconfig.template to Config/Local.xcconfig (gitignored) and
+// override these values there.
+
+// Apple Developer team used for code signing.
+DEVELOPMENT_TEAM = C2UW47HS8X
+
+// Reverse-DNS prefix for every target's bundle identifier
+// (com.example -> com.example.BetterBlue, com.example.BetterBlue.Widget, ...).
+BB_BUNDLE_ID_PREFIX = com.markschmidt
+
+// App Group shared by the app, widgets, and watch app.
+BB_APP_GROUP = group.com.betterblue.shared
+
+// CloudKit container used for iCloud sync.
+BB_ICLOUD_CONTAINER = iCloud.com.markschmidt.BetterBlue
+
+#include? "Local.xcconfig"
