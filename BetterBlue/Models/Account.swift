@@ -526,6 +526,7 @@ extension BBAccount {
                 existingBBVehicle.fuelType = vehicle.fuelType
                 existingBBVehicle.generation = vehicle.generation
                 existingBBVehicle.odometer = vehicle.odometer
+                existingBBVehicle.modelYear = vehicle.modelYear
                 existingBBVehicle.vehicleKey = vehicle.vehicleKey
             } else {
                 // Create new vehicle

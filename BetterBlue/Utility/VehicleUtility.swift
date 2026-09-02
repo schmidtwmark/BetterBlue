@@ -34,7 +34,8 @@ extension BBVehicle {
             generation: generation,
             odometer: odometer,
             vehicleKey: vehicleKey,
-            marketOptions: marketOptions
+            marketOptions: marketOptions,
+            modelYear: modelYear
         )
     }
 }

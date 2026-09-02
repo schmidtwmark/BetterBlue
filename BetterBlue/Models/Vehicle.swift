@@ -49,6 +49,11 @@ class BBVehicle {
     var fuelTypeRaw: String = FuelType.gas.rawValue
     var generation: Int = 0
     var odometer: Distance = Distance(length: 0, units: .miles)
+    /// Model year, where the API reports one (Hyundai Canada does).
+    /// Canada's HVAC temperature scale changed with MY2020, so the kit's
+    /// climate codec needs this threaded through every `toVehicle()` —
+    /// dropping it here regresses MY2020+ cars onto the wrong scale.
+    var modelYear: Int?
 
     // VehicleStatus fields (all optional since status might not be fetched)
     var lastUpdated: Date?
@@ -248,6 +253,7 @@ class BBVehicle {
         fuelType = vehicle.fuelType
         generation = vehicle.generation
         odometer = vehicle.odometer
+        modelYear = vehicle.modelYear
         maybeMarketOptions = vehicle.marketOptions
 
         // Initialize status fields as nil
