@@ -336,6 +336,8 @@ struct VehicleCardView: View {
             error.message
         case .regionNotSupported:
             "This region is not yet supported"
+        case .featureNotSupported:
+            error.message
         case .statusVerificationTimeout:
             "Command sent - the vehicle hasn't confirmed the change yet"
         }

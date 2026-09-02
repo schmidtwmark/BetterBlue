@@ -322,7 +322,12 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
               config.shouldFailSurroundView else {
             return
         }
-        throw APIError.logError("Surround view is not available for this vehicle", apiName: "FakeAPI")
+        // Typed like the real refusal (Hyundai's BLODS 502) so fake mode
+        // exercises the same "no cameras on this vehicle" UI state.
+        throw APIError.featureNotSupported(
+            "Your vehicle doesn't support surround view — it doesn't have the surround-view camera system.",
+            apiName: "FakeAPI"
+        )
     }
 
     public func getCustomCredentialErrorMessage(accountId: UUID) async throws -> String {

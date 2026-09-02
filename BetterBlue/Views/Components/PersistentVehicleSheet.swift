@@ -1235,6 +1235,8 @@ struct PersistentVehicleSheet: View {
             return error.message
         case .regionNotSupported:
             return "This region is not yet supported"
+        case .featureNotSupported:
+            return error.message
         case .statusVerificationTimeout:
             // Normally unreachable — handleError early-returns for this
             // type (soft state, no banner) — but keep a sane message in

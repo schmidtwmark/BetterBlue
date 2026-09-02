@@ -99,7 +99,11 @@ struct SurroundViewMonitorView: View {
         if isLoading {
             loadingView
         } else if let loadError, captures.isEmpty {
-            errorView(loadError)
+            if loadError.apiError?.errorType == .featureNotSupported {
+                unsupportedView
+            } else {
+                errorView(loadError)
+            }
         } else if captures.isEmpty {
             emptyView
         } else {
@@ -128,6 +132,30 @@ struct SurroundViewMonitorView: View {
                 Task { await loadCaptures() }
             }
             .buttonStyle(.bordered)
+        }
+        .padding()
+    }
+
+    /// The service refused because this vehicle lacks the feature — a
+    /// permanent fact about the car, not a failure. Hyundai's API can't
+    /// say up front which vehicles have the cameras, so this refusal is
+    /// the first chance to explain; no warning triangle, no retry
+    /// (issue #105).
+    private var unsupportedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "video.slash")
+                .font(.largeTitle)
+                .foregroundColor(.secondary)
+
+            Text("Not Available for This Vehicle")
+                .font(.headline)
+
+            Text("Your vehicle reported that it doesn't support surround view. "
+                + "It most likely doesn't have the surround-view camera system, "
+                + "which is only included on certain trims.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding()
     }

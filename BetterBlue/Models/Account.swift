@@ -333,6 +333,7 @@ extension BBAccount {
              .serverError,
              .concurrentRequest,
              .regionNotSupported,
+             .featureNotSupported,
              .statusVerificationTimeout,
              .general:
             return false
