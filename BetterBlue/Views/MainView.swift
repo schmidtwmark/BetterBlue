@@ -52,7 +52,13 @@ struct MainView: View {
     @State private var isLoading = false
     @State var lastError: APIError?
 
-    @State private var screenHeight: CGFloat = 0
+    /// Bottom inset the map keeps clear of the vehicle sheet,
+    /// reported by `VehicleSheetPager`: the selected vehicle's
+    /// collapsed card height while the card spans the window, 0
+    /// once the window is wide enough that the card sits beside
+    /// open map. Fed to `SimpleMapView` as a safe-area inset so the
+    /// marker is centered in whatever map area is unobstructed.
+    @State private var mapBottomInset: CGFloat = 0
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 25.0, longitude: -100.0),
         span: MKCoordinateSpan(latitudeDelta: 50.0, longitudeDelta: 60.0),
@@ -82,42 +88,16 @@ struct MainView: View {
         static let minimumSignificantChange: Double = 0.0001 // ~11 meters
     }
 
-    /// Calculate the latitude offset needed to center the vehicle properly
-    /// - simplified to quarter screen offset
-    private func calculateLatitudeOffset(
-        for _: CLLocationCoordinate2D,
-    ) -> Double {
-        // Simple approach: offset by 1/4 of the screen height (upward)
-        let quarterScreenOffset = screenHeight / 4
-
-        // Convert pixels to latitude degrees
-        let latitudePerPixel = MapCenteringConfig.defaultSpan.latitudeDelta /
-            screenHeight
-        let baseOffset = quarterScreenOffset * latitudePerPixel
-
-        // Add marker height compensation
-        let finalOffset = baseOffset
-
-        return finalOffset
-    }
-
-    /// Determine the optimal center coordinate for the map
+    /// Determine the map center for a vehicle. This is simply the
+    /// vehicle's own coordinate: the vertical offset that keeps the
+    /// marker clear of the sheet is handled by the map's bottom
+    /// safe-area inset (`mapBottomInset`) rather than by
+    /// shifting the region's center — a pixel-to-degree conversion
+    /// that only held for one screen aspect ratio.
     private func calculateMapCenter(
         for vehicle: BBVehicle,
     ) -> CLLocationCoordinate2D {
-        guard let vehicleCoordinate = vehicle.coordinate else {
-            return CLLocationCoordinate2D()
-        }
-
-        let latitudeOffset = calculateLatitudeOffset(
-            for: vehicleCoordinate,
-        )
-        let adjustedCenter = CLLocationCoordinate2D(
-            latitude: vehicleCoordinate.latitude - latitudeOffset,
-            longitude: vehicleCoordinate.longitude,
-        )
-
-        return adjustedCenter
+        vehicle.coordinate ?? CLLocationCoordinate2D()
     }
 
     /// Check if the current map region is significantly different from the target
@@ -133,108 +113,97 @@ struct MainView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            mainContent
-                .onChange(of: scenePhase) { old, new in
-                    BBLogger.info(.app, "[SVI-\(instanceTag)] scenePhase \(old) → \(new) (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
+        mainContent
+            .onChange(of: scenePhase) { old, new in
+                BBLogger.info(.app, "[SVI-\(instanceTag)] scenePhase \(old) → \(new) (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
+            }
+            .onAppear {
+                BBLogger.info(.app, "[SVI-\(instanceTag)] MainView .onAppear (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
+                // Center the map on the current vehicle. Pure
+                // map operation — does NOT touch
+                // `selectedVehicleIndex` (that was the bug
+                // `centerOnFirstAvailableVehicle` introduced on
+                // every return-from-background). On cold launch
+                // with cached SwiftData, currentVehicle is
+                // already populated here, so the map renders
+                // zoomed in on the right vehicle from the start
+                // instead of showing a continent-scale view
+                // until the user swipes. updateMapRegion falls
+                // back to the locale-region view when the vehicle
+                // has no usable coordinate.
+                if currentVehicle != nil {
+                    updateMapRegion(reason: "initial view appearance")
                 }
-                .onAppear {
-                    BBLogger.info(.app, "[SVI-\(instanceTag)] MainView .onAppear (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
-                    screenHeight = geometry.size.height
-                    BBLogger.debug(.app, "MapCentering: Screen height initialized: \(Int(screenHeight))px")
-                    // Center the map on the current vehicle. Pure
-                    // map operation — does NOT touch
-                    // `selectedVehicleIndex` (that was the bug
-                    // `centerOnFirstAvailableVehicle` introduced on
-                    // every return-from-background). On cold launch
-                    // with cached SwiftData, currentVehicle is
-                    // already populated here, so the map renders
-                    // zoomed in on the right vehicle from the start
-                    // instead of showing a continent-scale view
-                    // until the user swipes. updateMapRegion falls
-                    // back to the locale-region view when the vehicle
-                    // has no usable coordinate.
-                    if currentVehicle != nil {
-                        updateMapRegion(reason: "initial view appearance")
-                    }
-                    Task {
-                        await loadVehiclesForAllAccounts()
-                    }
+                Task {
+                    await loadVehiclesForAllAccounts()
                 }
-                .onChange(of: geometry.size.height) { _, newHeight in
-                    screenHeight = newHeight
-                    // Recalculate centering when screen size changes (rare)
-                    if currentVehicle != nil {
-                        updateMapRegion(reason: "screen size changed")
-                    }
+            }
+            .onChange(of: currentVehicle?.location, initial: true) { _, _ in
+                // `initial: true` catches the cold-launch case
+                // where displayedVehicles populates asynchronously
+                // — the .onAppear above runs before
+                // currentVehicle is valid, so we'd otherwise be
+                // stuck on the continent-scale default region
+                // until the user swiped. Runs for nil/(0,0)
+                // locations too: updateMapRegion then applies the
+                // missing-location fallback region instead.
+                if currentVehicle != nil {
+                    updateMapRegion(reason: "vehicle location updated")
                 }
-                .onChange(of: currentVehicle?.location, initial: true) { _, _ in
-                    // `initial: true` catches the cold-launch case
-                    // where displayedVehicles populates asynchronously
-                    // — the .onAppear above runs before
-                    // currentVehicle is valid, so we'd otherwise be
-                    // stuck on the continent-scale default region
-                    // until the user swiped. Runs for nil/(0,0)
-                    // locations too: updateMapRegion then applies the
-                    // missing-location fallback region instead.
-                    if currentVehicle != nil {
-                        updateMapRegion(reason: "vehicle location updated")
-                    }
+            }
+            .onChange(of: displayedVehicles.count) { oldCount, newCount in
+                BBLogger.info(.app, "[SVI] count: \(oldCount) → \(newCount), idx=\(selectedVehicleIndex)")
+                // If vehicles were removed/hidden, ensure selectedVehicleIndex is valid
+                if selectedVehicleIndex >= displayedVehicles.count,
+                   !displayedVehicles.isEmpty {
+                    let clamped = min(selectedVehicleIndex, displayedVehicles.count - 1)
+                    BBLogger.info(.app, "[SVI] clamping \(selectedVehicleIndex) → \(clamped) (count=\(displayedVehicles.count))")
+                    selectedVehicleIndex = clamped
                 }
-                .onChange(of: displayedVehicles.count) { oldCount, newCount in
-                    BBLogger.info(.app, "[SVI] count: \(oldCount) → \(newCount), idx=\(selectedVehicleIndex)")
-                    // If vehicles were removed/hidden, ensure selectedVehicleIndex is valid
-                    if selectedVehicleIndex >= displayedVehicles.count,
-                       !displayedVehicles.isEmpty {
-                        let clamped = min(selectedVehicleIndex, displayedVehicles.count - 1)
-                        BBLogger.info(.app, "[SVI] clamping \(selectedVehicleIndex) → \(clamped) (count=\(displayedVehicles.count))")
-                        selectedVehicleIndex = clamped
-                    }
 
-                    // Only update map region if this is a meaningful change after startup
-                    if currentVehicle != nil, oldCount > 0 {
-                        // Only recenter if we're removing vehicles,
-                        // not adding them during startup
-                        if newCount < oldCount {
-                            updateMapRegion(
-                                reason: "vehicles removed, recentering (onChange)",
-                            )
-                        } else {
-                            BBLogger.debug(.app, "MapCentering: Vehicles added, but keeping current position")
-                        }
+                // Only update map region if this is a meaningful change after startup
+                if currentVehicle != nil, oldCount > 0 {
+                    // Only recenter if we're removing vehicles,
+                    // not adding them during startup
+                    if newCount < oldCount {
+                        updateMapRegion(
+                            reason: "vehicles removed, recentering (onChange)",
+                        )
+                    } else {
+                        BBLogger.debug(.app, "MapCentering: Vehicles added, but keeping current position")
                     }
                 }
-                .onChange(of: selectedVehicleIndex) { old, new in
-                    BBLogger.info(.app, "[SVI] CHANGED \(old) → \(new) (vin=\(currentVehicle?.vin ?? "nil"))")
+            }
+            .onChange(of: selectedVehicleIndex) { old, new in
+                BBLogger.info(.app, "[SVI] CHANGED \(old) → \(new) (vin=\(currentVehicle?.vin ?? "nil"))")
+                Task {
+                    await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
+                }
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(for: .selectVehicle),
+            ) { notification in
+                guard let vin = notification.object as? String else { return }
+                if let index = displayedVehicles.firstIndex(where: {
+                    $0.vin == vin
+                }) {
+                    BBLogger.info(.app, "[SVI] selectVehicle notification → \(index) (vin=\(vin))")
+                    selectedVehicleIndex = index
+                    updateMapRegion(reason: "deep link to vehicle")
                     Task {
                         await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
                     }
                 }
-                .onReceive(
-                    NotificationCenter.default.publisher(for: .selectVehicle),
-                ) { notification in
-                    guard let vin = notification.object as? String else { return }
-                    if let index = displayedVehicles.firstIndex(where: {
-                        $0.vin == vin
-                    }) {
-                        BBLogger.info(.app, "[SVI] selectVehicle notification → \(index) (vin=\(vin))")
-                        selectedVehicleIndex = index
-                        updateMapRegion(reason: "deep link to vehicle")
-                        Task {
-                            await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
-                        }
-                    }
+            }
+            .task {
+                while true {
+                    try? await Task.sleep(for: .seconds(60))
+                    // Skip refresh when backgrounded to avoid 0xdead10cc crashes
+                    // from holding SQLite file locks during suspension
+                    guard scenePhase == .active else { continue }
+                    await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
                 }
-                .task {
-                    while true {
-                        try? await Task.sleep(for: .seconds(60))
-                        // Skip refresh when backgrounded to avoid 0xdead10cc crashes
-                        // from holding SQLite file locks during suspension
-                        guard scenePhase == .active else { continue }
-                        await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
-                    }
-                }
-        }
+            }
     }
 
     /// Map underneath, paged sheet on top.
@@ -244,6 +213,7 @@ struct MainView: View {
             SimpleMapView(
                 currentVehicle: currentVehicle,
                 mapRegion: $mapRegion,
+                bottomInset: mapBottomInset,
             )
             .overlay(alignment: .top) {
                 // Explains the marker-less, zoomed-out map when the API
@@ -257,7 +227,8 @@ struct MainView: View {
                 selectedVehicleIndex: $selectedVehicleIndex,
                 onSuccessfulRefresh: { lastError = nil },
                 mfaState: mfaState,
-                sheetPresentation: sheetPresentation
+                sheetPresentation: sheetPresentation,
+                mapBottomInset: $mapBottomInset
             )
         }
     }

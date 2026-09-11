@@ -5,6 +5,13 @@ import SwiftUI
 struct SimpleMapView: View {
     let currentVehicle: BBVehicle?
     @Binding var mapRegion: MKCoordinateRegion
+    /// Height of the persistent vehicle sheet in its collapsed
+    /// detent (measured from the bottom of the screen), or 0 when
+    /// the sheet doesn't span the window. Applied as a bottom
+    /// safe-area inset on the map so MapKit centers the camera —
+    /// and therefore the vehicle marker — in the visible area
+    /// *above* the card rather than behind it.
+    var bottomInset: CGFloat = 0
     @State private var mapPosition: MapCameraPosition = .automatic
 
     var body: some View {
@@ -18,6 +25,11 @@ struct SimpleMapView: View {
                 }
             }
         }
+        // Inset FIRST, then ignore the device safe area: the map
+        // fills the screen edge-to-edge, and the only safe-area
+        // inset MapKit sees is the card height below. MapKit fits
+        // and centers the region camera inside that safe area.
+        .safeAreaPadding(.bottom, bottomInset)
         .ignoresSafeArea(.all)
         .onChange(of: mapRegion.center.latitude) { _, _ in
             updateMapPosition()

@@ -1645,6 +1645,16 @@ struct VehicleSheetPager: View {
     /// Same hoisting rationale — shared presentation for all
     /// per-vehicle sheets.
     let sheetPresentation: VehicleSheetPresentation
+    /// Bottom inset the map should keep clear of the sheet. While
+    /// the card spans the full window width this is the distance
+    /// from the bottom of the screen to the visible top edge of the
+    /// *collapsed* card for the selected vehicle, so `MainView` can
+    /// inset the map's safe area and MapKit centers the vehicle
+    /// marker in the area above the card. Once the window is wide
+    /// enough that a marker centered in the whole frame clears the
+    /// card horizontally (see `markerClearsSheet`), this is 0 and
+    /// the marker is centered in the frame instead.
+    @Binding var mapBottomInset: CGFloat
 
     /// Per-VIN detent state — each vehicle remembers whether the
     /// user left its sheet collapsed or expanded. Swiping to a
@@ -1729,6 +1739,35 @@ struct VehicleSheetPager: View {
     /// both, otherwise the ScrollView frame clips one of them and
     /// the visible outer margin reads as smaller on that side.
     private let chromeOuterInset: CGFloat = 16
+    /// Outer inset on ONE side of the main card (half of
+    /// `chromeOuterInset`). Used to convert the card's frame height
+    /// into the distance from the screen bottom to its visible top
+    /// edge.
+    private let cardOuterInset: CGFloat = 8
+    /// Widest the pager (and therefore each card) will grow. Below
+    /// this the card fills the window edge-to-edge; above it the
+    /// card stops growing and stays pinned to the leading edge,
+    /// Apple-Maps-sidebar style. A continuous cap rather than a
+    /// size-class switch, so resizing a window (iPad windowing,
+    /// Stage Manager, Mac) never snaps the card between two widths.
+    /// 440pt is the widest iPhone portrait width (Pro Max), so every
+    /// iPhone keeps its full-bleed card in portrait.
+    private let maxSheetWidth: CGFloat = 440
+    /// Horizontal room the vehicle marker needs on either side of
+    /// its center: half the 50pt marker circle plus the widest
+    /// display-name label that hangs below it. Used to decide when
+    /// a frame-centered marker is clear of the card.
+    private let markerClearance: CGFloat = 80
+
+    /// True when a marker centered in the full frame would sit
+    /// entirely to the right of the card (card width + its outer
+    /// inset + `markerClearance`). Below this the map is inset so
+    /// the marker rides above the card; at or above it the marker
+    /// is simply centered in the frame.
+    private func markerClearsSheet(geo: GeometryProxy) -> Bool {
+        let sheetRightEdge = min(maxSheetWidth, geo.size.width) + cardOuterInset
+        return geo.size.width / 2 - markerClearance > sheetRightEdge
+    }
 
 
     var body: some View {
@@ -1754,10 +1793,22 @@ struct VehicleSheetPager: View {
             let scrollViewHeight = (bbVehicles
                 .map { cardHeight(for: $0.vin, geo: geo) + (errorOverheads[$0.vin] ?? 0) }
                 .max() ?? 0) + chromeOuterInset
+            let bottomInset = markerClearsSheet(geo: geo)
+                ? 0
+                : currentCollapsedSheetHeight(geo: geo)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 pagerScrollView(geo: geo)
+                    // Cap the pager width so the cards don't stretch
+                    // across a wide window. `containerRelativeFrame`
+                    // inside `pagerScrollView` sizes each card to the
+                    // ScrollView, so narrowing the ScrollView narrows
+                    // the cards with it and paging math stays correct.
+                    .frame(maxWidth: maxSheetWidth)
                     .frame(height: scrollViewHeight)
+                    // Pin to the leading edge once the cap kicks in
+                    // (no-op below it, where the frame already fills).
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     // Vertical swipe-anywhere — attached as a
                     // `simultaneousGesture` on the pager's ScrollView.
                     // Direction-dominance check in the gesture keeps
@@ -1785,6 +1836,21 @@ struct VehicleSheetPager: View {
                     // band overdrag (set via `withAnimation` in
                     // `onEnded`) to animate naturally.
             }
+            .onChange(of: bottomInset, initial: true) { old, new in
+                guard mapBottomInset != new else { return }
+                // Animate only the above-card ↔ frame-centered mode
+                // flip (a window resize crossing the clearance
+                // threshold). Measurement-driven height changes at
+                // launch stay instant so the map doesn't slide
+                // around while the card is still sizing itself.
+                if (old == 0) != (new == 0) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        mapBottomInset = new
+                    }
+                } else {
+                    mapBottomInset = new
+                }
+            }
         }
         // Extend through the bottom safe area so the card's outer
         // edge sits the same 8pt off the physical screen on ALL
@@ -1800,11 +1866,14 @@ struct VehicleSheetPager: View {
         naturalHeights.values.max() ?? 0
     }
 
-    /// Per-vehicle card height — driven by THAT vehicle's own
-    /// controls/natural measurements so each card slides into view
-    /// at the correct height during a swipe, not at whatever the
-    /// previous card was.
-    private func cardHeight(for vin: String, geo: GeometryProxy) -> CGFloat {
+    /// The two snap heights for a vehicle's main card, from its own
+    /// measured controls/natural heights. `collapsed` may exceed
+    /// `expanded` before measurements land (floor vs. tiny geo), so
+    /// callers clamp with `min(collapsed, expanded)`.
+    private func detentHeights(
+        for vin: String,
+        geo: GeometryProxy
+    ) -> (collapsed: CGFloat, expanded: CGFloat) {
         // `geo.size.height` can be 0 (or briefly tiny) on first
         // GeometryReader pass before layout completes. Without the
         // `max(0, ...)` clamp, `screenMax` goes negative, which
@@ -1829,10 +1898,31 @@ struct VehicleSheetPager: View {
         let naturalWithBuffer = perVehicleNatural > 0
             ? perVehicleNatural + expandedBuffer
             : 0
-
         let expanded: CGFloat = naturalWithBuffer > 0
             ? min(naturalWithBuffer, screenMax)
             : screenMax
+        return (collapsed, expanded)
+    }
+
+    /// Distance from the physical bottom of the screen to the
+    /// visible top edge of the selected vehicle's collapsed card:
+    /// the collapsed card frame plus the 8pt outer inset below it.
+    /// Ignores the live drag and the card's actual detent. The
+    /// transient error card above the main card is deliberately
+    /// NOT included — it would shift the map every time an error
+    /// appeared or cleared.
+    private func currentCollapsedSheetHeight(geo: GeometryProxy) -> CGFloat {
+        guard let vin = currentVin else { return 0 }
+        let heights = detentHeights(for: vin, geo: geo)
+        return min(heights.collapsed, heights.expanded).rounded() + cardOuterInset
+    }
+
+    /// Per-vehicle card height — driven by THAT vehicle's own
+    /// controls/natural measurements so each card slides into view
+    /// at the correct height during a swipe, not at whatever the
+    /// previous card was.
+    private func cardHeight(for vin: String, geo: GeometryProxy) -> CGFloat {
+        let (collapsed, expanded) = detentHeights(for: vin, geo: geo)
         // Each card respects ITS OWN detent — swiping between
         // vehicles preserves whatever expanded/collapsed state the
         // user left them in.
