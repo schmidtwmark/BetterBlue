@@ -526,7 +526,13 @@ extension BBAccount {
                 existingBBVehicle.model = vehicle.model
                 existingBBVehicle.fuelType = vehicle.fuelType
                 existingBBVehicle.generation = vehicle.generation
-                existingBBVehicle.odometer = vehicle.odometer
+                // Not every region's vehicle list reports an odometer
+                // (Hyundai Canada's never does — it comes from the status
+                // refresh instead). A zero here means "not reported", so
+                // keep the stored reading rather than resetting it.
+                if vehicle.odometer.length > 0 {
+                    existingBBVehicle.odometer = vehicle.odometer
+                }
                 existingBBVehicle.modelYear = vehicle.modelYear
                 existingBBVehicle.vehicleKey = vehicle.vehicleKey
             } else {
