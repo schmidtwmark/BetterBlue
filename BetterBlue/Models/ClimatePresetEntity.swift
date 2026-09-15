@@ -91,9 +91,14 @@ private struct ClimatePresetFetcher {
             // didn't finish and we don't want Siri/widget pickers to surface
             // them. They'll be purged on the next app launch by
             // `cleanupOrphanedVehicles()`.
+            // Hidden vehicles are left out of suggestions too, but still
+            // resolve by id so a shortcut configured before the vehicle
+            // was hidden keeps working.
+            let suggesting = ids == nil
             for preset in allPresets {
                 guard let vehicle = preset.vehicle, vehicle.account != nil else { continue }
                 vehiclesWithPresets.insert(vehicle.id)
+                if suggesting, vehicle.isHidden { continue }
 
                 if ids == nil || ids?.contains(preset.id) == true {
                     entities.append(ClimatePresetEntity(
@@ -110,6 +115,7 @@ private struct ClimatePresetFetcher {
             // Add default presets for vehicles without any presets (still
             // filtering out orphaned zombies).
             for vehicle in allVehicles where !vehiclesWithPresets.contains(vehicle.id) && vehicle.account != nil {
+                if suggesting, vehicle.isHidden { continue }
                 if ids == nil || ids?.contains(vehicle.id) == true {
                     entities.append(ClimatePresetEntity(
                         id: vehicle.id,

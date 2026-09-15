@@ -54,10 +54,12 @@ struct BetterBlueApp: App {
             HTTPLogSinkManager.shared.configure(with: container, deviceType: deviceType)
 
             // Order matters: purge zombie vehicles first so their cascaded
-            // presets are removed, *then* sweep up any presets still left
-            // dangling (which can happen independently via an interrupted
-            // delete on an earlier schema).
+            // presets are removed, then collapse duplicate VINs (which
+            // only considers vehicles that still have an account), *then*
+            // sweep up any presets still left dangling (which can happen
+            // independently via an interrupted delete on an earlier schema).
             cleanupOrphanedVehicles(container: container)
+            cleanupDuplicateVehicles(container: container)
             cleanupOrphanedClimatePresets(container: container)
 
             return .ready(container)

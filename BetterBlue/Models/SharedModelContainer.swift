@@ -113,6 +113,53 @@ func cleanupOrphanedVehicles(container: ModelContainer) {
     }
 }
 
+/// Removes duplicate `BBVehicle` rows that share a VIN within one account.
+/// `BBAccount.updateVehicles()` keys existing vehicles by VIN, so it never
+/// creates a second row itself — but an iCloud merge (reinstall, second
+/// device) can land one, and once two exist neither is ever swept up
+/// because both match the fetched VIN. The duplicate is worse than
+/// cosmetic: intents and widgets resolve vehicles by VIN and can land on
+/// the wrong copy, running commands with that copy's presets. Keep the
+/// visible row (then lowest sort order) and delete the rest; their
+/// cascaded presets go with them.
+@MainActor
+func cleanupDuplicateVehicles(container: ModelContainer) {
+    let context = container.mainContext
+
+    do {
+        let allVehicles = try context.fetch(FetchDescriptor<BBVehicle>())
+
+        var groups: [String: [BBVehicle]] = [:]
+        for vehicle in allVehicles {
+            guard let account = vehicle.account else { continue }
+            groups["\(account.id)|\(vehicle.vin)", default: []].append(vehicle)
+        }
+
+        var deletedCount = 0
+        for (_, rows) in groups where rows.count > 1 {
+            let ordered = rows.sorted {
+                ($0.isHidden ? 1 : 0, $0.sortOrder) < ($1.isHidden ? 1 : 0, $1.sortOrder)
+            }
+            let keeper = ordered[0]
+            for duplicate in ordered.dropFirst() {
+                BBLogger.info(
+                    .app,
+                    "Purging duplicate vehicle \(duplicate.vin.suffix(6)) (\(duplicate.displayName)), keeping \(keeper.displayName)"
+                )
+                context.delete(duplicate)
+                deletedCount += 1
+            }
+        }
+
+        if deletedCount > 0 {
+            try context.save()
+            BBLogger.info(.app, "Cleaned up \(deletedCount) duplicate vehicle(s)")
+        }
+    } catch {
+        BBLogger.error(.app, "Failed to cleanup duplicate vehicles: \(error)")
+    }
+}
+
 /// Creates a shared ModelContainer for use across main app, widget, and watch app.
 /// - Parameter enableCloudKit: Whether to enable CloudKit sync. Set to `false` for
 ///   App Intents and widgets running in the background to avoid `0xdead10cc` crashes

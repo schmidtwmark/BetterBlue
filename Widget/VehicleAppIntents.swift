@@ -407,6 +407,22 @@ struct GetChargeTimeRemainingIntent: AppIntent {
 
 // MARK: - Helper Functions
 
+/// Finds the `BBVehicle` (and its account) for a VIN. When several rows
+/// share the VIN — duplicates can survive an iCloud merge until the
+/// next launch's `cleanupDuplicateVehicles()` — prefer the visible one,
+/// then the lowest sort order, so intents act on the car the user sees.
+@MainActor
+private func resolveVehicle(vin: String, in context: ModelContext) throws -> (BBVehicle, BBAccount) {
+    let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
+    let matches = vehicles.filter { $0.vin == vin && $0.account != nil }
+    guard let vehicle = matches.min(by: {
+        ($0.isHidden ? 1 : 0, $0.sortOrder) < ($1.isHidden ? 1 : 0, $1.sortOrder)
+    }), let account = vehicle.account else {
+        throw IntentError.vehicleNotFound
+    }
+    return (vehicle, account)
+}
+
 @MainActor
 private func performVehicleActionWithVin(
     _ vin: String,
@@ -415,15 +431,37 @@ private func performVehicleActionWithVin(
     let modelContainer = try createSharedModelContainer(enableCloudKit: false)
     let context = ModelContext(modelContainer)
 
-    let vehicles = try context.fetch(FetchDescriptor<BBVehicle>())
+    let (vehicle, account) = try resolveVehicle(vin: vin, in: context)
+    try await action(vehicle, account, context)
+}
 
-    guard let vehicle = vehicles.first(where: { $0.vin == vin }),
-          let account = vehicle.account
-    else {
-        throw IntentError.vehicleNotFound
+/// Runs `action` against the vehicle that owns climate preset `presetId`.
+/// The preset is looked up directly rather than via the VIN so the
+/// command targets the exact record the user picked the preset from —
+/// with duplicate vehicle rows, a VIN lookup could land on the other
+/// copy, fail to find the preset there, and silently fall back to that
+/// copy's selected preset. Falls back to the VIN for the synthetic
+/// "Default" entity, whose id is a vehicle id rather than a preset id;
+/// `action` then receives a nil preset.
+@MainActor
+private func performVehicleActionWithPreset(
+    _ presetId: UUID,
+    fallbackVin vin: String,
+    action: @escaping @MainActor (BBVehicle, ClimatePreset?, BBAccount, ModelContext) async throws -> Void,
+) async throws {
+    let modelContainer = try createSharedModelContainer(enableCloudKit: false)
+    let context = ModelContext(modelContainer)
+
+    let descriptor = FetchDescriptor<ClimatePreset>(predicate: #Predicate { $0.id == presetId })
+    if let preset = try context.fetch(descriptor).first,
+       let vehicle = preset.vehicle,
+       let account = vehicle.account {
+        try await action(vehicle, preset, account, context)
+        return
     }
 
-    try await action(vehicle, account, context)
+    let (vehicle, account) = try resolveVehicle(vin: vin, in: context)
+    try await action(vehicle, nil, account, context)
 }
 
 public func refreshWidgets() {
@@ -588,23 +626,14 @@ struct StartClimateControlIntent: ControlConfigurationIntent {
         WidgetCenter.shared.reloadAllTimelines()
 
         do {
-            try await performVehicleActionWithVin(targetVin) { bbVehicle, account, context in
-                if let climatePreset = bbVehicle.safeClimatePresets.first(where: { $0.id == presetId }) {
-                    try await account.startClimate(
-                        bbVehicle,
-                        options: climatePreset.climateOptions,
-                        modelContext: context,
-                        presetName: presetName,
-                        presetIcon: presetIcon
-                    )
-                } else {
-                    try await account.startClimate(
-                        bbVehicle,
-                        modelContext: context,
-                        presetName: presetName,
-                        presetIcon: presetIcon
-                    )
-                }
+            try await performVehicleActionWithPreset(presetId, fallbackVin: targetVin) { bbVehicle, climatePreset, account, context in
+                try await account.startClimate(
+                    bbVehicle,
+                    options: climatePreset?.climateOptions,
+                    modelContext: context,
+                    presetName: presetName,
+                    presetIcon: presetIcon
+                )
             }
         } catch {
             WidgetCommandStatus.clear(vin: targetVin)
