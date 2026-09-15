@@ -12,6 +12,11 @@ struct SimpleMapView: View {
     /// and therefore the vehicle marker — in the visible area
     /// *above* the card rather than behind it.
     var bottomInset: CGFloat = 0
+    /// Extra safe-area insets on the trailing and bottom edges for
+    /// the part of an oversized map canvas that lies outside the
+    /// window (see `MapCanvas` in `MainView`). Zero when the map is
+    /// sized to the window.
+    var canvasSlack: (trailing: CGFloat, bottom: CGFloat) = (0, 0)
     @State private var mapPosition: MapCameraPosition = .automatic
 
     var body: some View {
@@ -29,7 +34,12 @@ struct SimpleMapView: View {
         // fills the screen edge-to-edge, and the only safe-area
         // inset MapKit sees is the card height below. MapKit fits
         // and centers the region camera inside that safe area.
-        .safeAreaPadding(.bottom, bottomInset)
+        .safeAreaPadding(EdgeInsets(
+            top: 0,
+            leading: 0,
+            bottom: bottomInset + canvasSlack.bottom,
+            trailing: canvasSlack.trailing
+        ))
         .ignoresSafeArea(.all)
         .onChange(of: mapRegion.center.latitude) { _, _ in
             updateMapPosition()
@@ -48,8 +58,25 @@ struct SimpleMapView: View {
         }
     }
 
+    /// Camera altitude used whenever the map is focused on a vehicle.
+    /// A fixed distance (rather than fitting `mapRegion` into the view)
+    /// keeps the zoom level independent of the visible area, so window
+    /// resizes and safe-area inset changes only pan the map instead of
+    /// rescaling it every step.
+    private static let vehicleCameraDistance: CLLocationDistance = 6000
+
     private func updateMapPosition() {
-        mapPosition = .region(mapRegion)
+        if mapRegion.span.latitudeDelta <= 0.02 {
+            // Vehicle focus (MainView's `defaultSpan` is 0.01): fixed
+            // zoom, centered on the vehicle.
+            mapPosition = .camera(MapCamera(
+                centerCoordinate: mapRegion.center,
+                distance: Self.vehicleCameraDistance
+            ))
+        } else {
+            // Country-scale "no location" fallback: fit the region.
+            mapPosition = .region(mapRegion)
+        }
     }
 }
 

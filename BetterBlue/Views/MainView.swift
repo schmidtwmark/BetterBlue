@@ -119,6 +119,7 @@ struct MainView: View {
             }
             .onAppear {
                 BBLogger.info(.app, "[SVI-\(instanceTag)] MainView .onAppear (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
+                applyMinimumWindowSize()
                 // Center the map on the current vehicle. Pure
                 // map operation — does NOT touch
                 // `selectedVehicleIndex` (that was the bug
@@ -210,11 +211,7 @@ struct MainView: View {
     @ViewBuilder
     private var vehiclePager: some View {
         ZStack(alignment: .bottom) {
-            SimpleMapView(
-                currentVehicle: currentVehicle,
-                mapRegion: $mapRegion,
-                bottomInset: mapBottomInset,
-            )
+            mapLayer
             .overlay(alignment: .top) {
                 // Explains the marker-less, zoomed-out map when the API
                 // returned no GPS fix for the selected vehicle.
@@ -229,6 +226,46 @@ struct MainView: View {
                 mfaState: mfaState,
                 sheetPresentation: sheetPresentation,
                 mapBottomInset: $mapBottomInset
+            )
+        }
+    }
+
+    /// The map, sized so that interactive window resizes never change
+    /// MapKit's drawable size. On iPad (windowing, split view, Stage
+    /// Manager) MapKit takes on the order of seconds to re-render a
+    /// resized view in the simulator, during which the system shows a
+    /// stretched snapshot of the whole app — the sheet appeared to
+    /// wobble and lag the window edge. Rendering into a fixed canvas
+    /// the size of the screen's larger dimension, anchored top-leading,
+    /// means a resize only reveals more or less of an already-rendered
+    /// map. Safe-area insets tell MapKit where the window's visible
+    /// region is (the canvas overhang plus the sheet), so the camera
+    /// still centers the marker in the visible area. iPhone windows
+    /// don't resize interactively, so they keep the live-sized map.
+    @ViewBuilder
+    private var mapLayer: some View {
+        if let canvas = MapCanvas.size {
+            GeometryReader { geo in
+                Color.clear
+                    .background(alignment: .topLeading) {
+                        SimpleMapView(
+                            currentVehicle: currentVehicle,
+                            mapRegion: $mapRegion,
+                            bottomInset: mapBottomInset,
+                            canvasSlack: (
+                                trailing: max(0, canvas.width - geo.size.width),
+                                bottom: max(0, canvas.height - geo.size.height)
+                            )
+                        )
+                        .frame(width: canvas.width, height: canvas.height)
+                    }
+            }
+            .ignoresSafeArea()
+        } else {
+            SimpleMapView(
+                currentVehicle: currentVehicle,
+                mapRegion: $mapRegion,
+                bottomInset: mapBottomInset,
             )
         }
     }
@@ -260,12 +297,7 @@ struct MainView: View {
             stateContent
                 .toolbar {
                     // Real toolbar button — system-sized hit target
-                    // (44pt). Previously this lived as a glass-backed
-                    // floating overlay in the top-trailing corner,
-                    // but its visible bounds were a small Circle and
-                    // the actual tap target ended up tiny (`.plain`
-                    // buttonStyle on a non-padded label means hits
-                    // only land on the icon pixels themselves).
+                    // (44pt) in the navigation bar's trailing slot.
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showingSettings = true
@@ -439,6 +471,23 @@ struct MainView: View {
                     // the shared chrome (glass + drag handle).
                     vehiclePager
                 }
+        }
+    }
+}
+
+// MARK: - Window sizing
+
+extension MainView {
+    /// Smallest window iPadOS / Mac may resize us to. Tall enough
+    /// that the collapsed card plus a strip of map stay usable; the
+    /// card's content scrolls (see `VehicleSheetPager.contentScrolls`)
+    /// if the window is still too short for a given vehicle. No-op on
+    /// iPhone, where scenes aren't resizable (`sizeRestrictions` is nil).
+    private static let minimumWindowSize = CGSize(width: 375, height: 480)
+
+    private func applyMinimumWindowSize() {
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            scene.sizeRestrictions?.minimumSize = Self.minimumWindowSize
         }
     }
 }
@@ -677,4 +726,23 @@ extension MainView {
 
 #Preview {
     MainView()
+}
+
+
+/// Fixed render canvas for the map on resizable-window platforms.
+/// `nil` on iPhone, where the map should simply fill the window.
+@MainActor
+enum MapCanvas {
+    static let size: CGSize? = {
+        guard UIDevice.current.userInterfaceIdiom != .phone else { return nil }
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?
+            .screen
+        let bounds = screen?.bounds.size ?? CGSize(width: 1400, height: 1400)
+        // Square on the larger dimension so rotation never needs a
+        // bigger canvas either.
+        let side = max(bounds.width, bounds.height)
+        return CGSize(width: side, height: side)
+    }()
 }

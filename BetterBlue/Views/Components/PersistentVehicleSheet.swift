@@ -51,6 +51,32 @@ struct PersistentVehicleSheet: View {
     /// pager handles sizing so it can constrain its outer ScrollView
     /// frame and let map taps pass through above the card.
     let cardHeight: CGFloat
+    /// True when the card's vertical gesture is owned by its inner
+    /// ScrollView (see `VehicleSheetPager.scrollDriven(for:geo:)`):
+    /// there is content to expand into and/or scroll. The scroll offset
+    /// then drives the card height, so a flick carries continuously
+    /// from growing the card into scrolling its content and back.
+    /// When false the ScrollView is disabled and inert.
+    let scrollDriven: Bool
+    /// Distance the card grows from collapsed to expanded. The first
+    /// `expansionTravel` points of scroll offset grow the card (the
+    /// content stays pinned); beyond that the content scrolls.
+    let expansionTravel: CGFloat
+    /// The card's fully expanded height. While `scrollDriven`, the
+    /// inner ScrollView keeps this fixed frame (top-aligned inside the
+    /// card's clip) instead of following `cardHeight`: resizing a
+    /// ScrollView mid-interaction makes SwiftUI insert a compensating
+    /// content inset that never unwinds, and drops programmatic scrolls.
+    /// The card sits on the window's bottom edge, so the part of the
+    /// ScrollView below the clip is offscreen and untouchable.
+    let expandedHeight: CGFloat
+    /// Live vertical content offset of the inner ScrollView. Reported
+    /// to the pager via `ScrollOffsetPreferenceKey`, which turns it
+    /// into the card height.
+    @State private var scrollOffset: CGFloat = 0
+    /// Explicit scroll position, used for the drag-handle tap (detent
+    /// toggled from outside the scroll).
+    @State private var scrollPosition = ScrollPosition(edge: .top)
     let onSuccessfulRefresh: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
@@ -104,10 +130,14 @@ struct PersistentVehicleSheet: View {
     /// Outer padding on all four sides — the card "floats" inside
     /// this gap. Bottom matches sides so the spacing is uniform.
     private let outerInset: CGFloat = 8
-    /// Corner radius for the card's top corners. Picked to be
-    /// large enough that the inline refresh button at the trailing
-    /// edge of the headerRow visually sits in the corner curve.
-    private let cornerRadius: CGFloat = 40
+    /// Floor for the card's corner radius. The real radius comes from
+    /// `ConcentricRectangle`: SwiftUI derives it from the enclosing
+    /// container's corner — the device display when the app is full
+    /// screen, the window when it's an iPadOS / Mac window — minus the
+    /// card's inset from that corner. `isUniform` then applies that
+    /// same radius to all four corners, so the top corners match the
+    /// bottom-left one instead of using an unrelated fixed value.
+    private let minimumCornerRadius: CGFloat = 24
     /// Total vertical space the drag handle occupies inside the
     /// card (8pt top pad + 5pt capsule + 4pt bottom pad). Used to
     /// size the contentArea's bounded frame.
@@ -187,50 +217,100 @@ struct PersistentVehicleSheet: View {
     ///       four sides)
     @ViewBuilder
     private var mainCardBody: some View {
-        let bottomCornerRadius = max(8, DisplayCornerRadius.value - outerInset)
-        let shape = UnevenRoundedRectangle(
-            topLeadingRadius: cornerRadius,
-            bottomLeadingRadius: bottomCornerRadius,
-            bottomTrailingRadius: bottomCornerRadius,
-            topTrailingRadius: cornerRadius,
-            style: .continuous
+        let shape = ConcentricRectangle(
+            corners: .concentric(minimum: .fixed(minimumCornerRadius)),
+            isUniform: true
         )
-        contentStack
-            // Inner content margin. Horizontal + bottom = 22pt so
-            // text sits an even distance from the card edge. Top
-            // is only 8pt because the headerRow ZStack stacks the
-            // drag handle at y=0 inside contentStack and offsets
-            // the title HStack down by 14pt — so the title ends
-            // up at 8 + 14 = 22pt from the card edge (matching
-            // horizontal), and the drag handle sits visibly near
-            // the very top.
-            .padding(.horizontal, 22)
-            .padding(.top, 8)
-            .padding(.bottom, 22)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            // Take the natural height (before the cardHeight clip)
-            // and report it up so the pager knows how tall
-            // "expanded" should be.
-            .fixedSize(horizontal: false, vertical: true)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(
-                        key: ContentHeightPreferenceKey.self,
-                        value: proxy.size.height
+        Group {
+            // Vertical ScrollView that owns the card's vertical gesture
+            // whenever there is anything to expand into or scroll (see
+            // `scrollDriven`). The first `expansionTravel` points of
+            // scroll offset are absorbed into growing the card — the
+            // content is shifted down by the same amount so it stays
+            // pinned — and past that the content scrolls. Because it is
+            // one UIScrollView pan the whole way, a flick's momentum
+            // carries continuously from expanding into scrolling, and
+            // scrolling back through the top continues into collapsing.
+            // When `scrollDriven` is false the ScrollView is disabled
+            // and inert: touches fall through to the pager's gestures.
+            ScrollView(.vertical) {
+                contentStack
+                    // Inner content margin. Horizontal + bottom = 22pt so
+                    // text sits an even distance from the card edge. Top
+                    // is only 8pt because the headerRow ZStack stacks the
+                    // drag handle at y=0 inside contentStack and offsets
+                    // the title HStack down by 14pt — so the title ends
+                    // up at 8 + 14 = 22pt from the card edge (matching
+                    // horizontal), and the drag handle sits visibly near
+                    // the very top.
+                    .padding(.horizontal, 22)
+                    .padding(.top, 8)
+                    .padding(.bottom, 22)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    // The ScrollView lays the content out at its natural
+                    // height; report that up so the pager knows how tall
+                    // "expanded" should be.
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: ContentHeightPreferenceKey.self,
+                                value: proxy.size.height
+                            )
+                        }
                     )
+                    // Extra scrollable room equal to the expansion
+                    // travel, so the bottom of the content is still
+                    // reachable after the first `expansionTravel` points
+                    // of offset were spent growing the card.
+                    .padding(.bottom, scrollDriven ? expansionTravel : 0)
+                    // Pin the content while the card grows.
+                    .offset(y: scrollDriven ? min(max(0, scrollOffset), expansionTravel) : 0)
+            }
+            .scrollPosition($scrollPosition)
+            .scrollDisabled(!scrollDriven)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollTargetBehavior(DetentSnapBehavior(travel: expansionTravel))
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y
+            } action: { _, offset in
+                scrollOffset = offset
+            }
+            .preference(key: ScrollOffsetPreferenceKey.self, value: scrollOffset)
+            // Settle the detent flag from where the scroll came to rest.
+            .onScrollPhaseChange { _, new in
+                guard new == .idle, scrollDriven else { return }
+                let settled: SheetDetent = scrollOffset >= expansionTravel - 0.5
+                    ? .expanded
+                    : .collapsed
+                if detent != settled { detent = settled }
+            }
+            // Detent changed from outside the scroll (drag-handle tap):
+            // scroll to the matching offset so the height follows.
+            .onChange(of: detent) { _, new in
+                guard scrollDriven else { return }
+                let needsMove = new == .expanded
+                    ? scrollOffset < expansionTravel - 0.5
+                    : scrollOffset > 0.5
+                guard needsMove else { return }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    scrollPosition.scrollTo(y: new == .expanded ? expansionTravel : 0)
                 }
-            )
-            // Constrain to the current detent height. Content above
-            // the clip line is preserved (top alignment); overflow
-            // is removed by the .clipShape below.
+            }
+            // Fixed ScrollView frame (see `expandedHeight`), then the
+            // card's clip frame at the current card height. Content
+            // above the clip line is preserved (top alignment); overflow
+            // is removed by the clip in `SheetChrome`.
+            .frame(height: scrollDriven ? expandedHeight : cardHeight, alignment: .top)
             .frame(height: cardHeight, alignment: .top)
+        }
             // Glass behind content, in the SAME shape used by clip.
             .background {
                 Color.clear.glassEffect(.regular, in: shape)
             }
-            // Clip both the glass and any overflowing content to
-            // the rounded shape.
-            .clipShape(shape)
+            // Rim + clip + shadow. `SheetChrome` clips both the glass
+            // and any overflowing content to the rounded shape.
+            .modifier(SheetChrome(shape: shape))
             // ONE uniform outer padding → equal gap on every side.
             .padding(outerInset)
     }
@@ -292,6 +372,7 @@ struct PersistentVehicleSheet: View {
                 }
                 .mask(shape)
             )
+            .modifier(SheetChrome(shape: shape))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, outerInset)
@@ -1534,21 +1615,23 @@ struct CircularIconLabel: View {
     var diameter: CGFloat = 40
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(tint.opacity(0.18))
-            Group {
-                if isBusy {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                } else {
-                    Image(systemName: systemName)
-                        .font(.system(size: diameter * 0.42, weight: .semibold))
-                        .foregroundStyle(tint)
-                }
+        Group {
+            if isBusy {
+                ProgressView()
+                    .scaleEffect(0.7)
+            } else {
+                Image(systemName: systemName)
+                    .font(.system(size: diameter * 0.42, weight: .semibold))
+                    .foregroundStyle(tint)
             }
         }
         .frame(width: diameter, height: diameter)
+        // Raised system-style glass button — the same neutral glass
+        // circle as the close / share buttons on the Apple Maps
+        // place sheet, with the state color carried by the symbol
+        // (red stop / green unlock) rather than a tinted fill.
+        // `.interactive()` gives the native press bounce + shimmer.
+        .glassEffect(.regular.interactive(), in: .circle)
     }
 }
 
@@ -1571,6 +1654,89 @@ struct CircularIconButton: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Sheet chrome
+
+/// Border + drop shadow that make a glass card read like the system
+/// map sheet: a thin light rim along the edge, and a soft shadow
+/// that falls only *outside* the shape so the glass itself isn't
+/// darkened. `glassEffect` alone draws a faint specular edge but no
+/// shadow, which is why the card looked flatter than Apple Maps'
+/// sheet sitting on the same map.
+private struct SheetChrome<S: Shape>: ViewModifier {
+    let shape: S
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            // 2pt centered stroke, then clip: the outer half is cut
+            // away, leaving a 1pt rim just inside the edge (what
+            // `strokeBorder` would give, but that needs an
+            // `InsettableShape`, which `ConcentricRectangle` isn't).
+            .overlay(
+                shape.stroke(
+                    .white.opacity(colorScheme == .dark ? 0.18 : 0.5),
+                    lineWidth: 2
+                )
+            )
+            .clipShape(shape)
+            .background {
+                // Draw an opaque copy of the shape with a shadow,
+                // then punch the shape itself back out so only the
+                // shadow that spills past the edge remains.
+                shape
+                    .fill(.black)
+                    .shadow(
+                        color: .black.opacity(colorScheme == .dark ? 0.45 : 0.2),
+                        radius: 18,
+                        y: 8
+                    )
+                    .mask {
+                        ZStack {
+                            Rectangle().padding(-80)
+                            shape.blendMode(.destinationOut)
+                        }
+                        .compositingGroup()
+                    }
+            }
+    }
+}
+
+// MARK: - Scroll-driven expansion support
+
+/// A card's live inner-ScrollView content offset. The pager turns the
+/// first `expansionTravel` points of it into card height.
+private struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Snaps a scroll that would come to rest partway through the card's
+/// expansion travel to one end — collapsed at 0, expanded at `travel`
+/// — so the card never rests half-open. Offsets past `travel` (plain
+/// content scrolling) are left to decelerate naturally. A decisive
+/// flick goes with its direction; a slow release goes to the nearer
+/// end.
+private struct DetentSnapBehavior: ScrollTargetBehavior {
+    let travel: CGFloat
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        let y = target.rect.origin.y
+        guard travel > 1, y > 0, y < travel else { return }
+        let velocity = context.velocity.dy
+        let snapped: CGFloat
+        if velocity > 150 {
+            snapped = travel
+        } else if velocity < -150 {
+            snapped = 0
+        } else {
+            snapped = y < travel / 2 ? 0 : travel
+        }
+        target.rect.origin.y = snapped
     }
 }
 
@@ -1695,6 +1861,10 @@ struct VehicleSheetPager: View {
     /// can be left stuck between pages when the user transitions
     /// from a horizontal pan into a vertical resize mid-gesture.
     @State private var verticalDragActive = false
+    /// Per-VIN live inner-ScrollView offset, from
+    /// `ScrollOffsetPreferenceKey`. Drives the card height for
+    /// scroll-driven cards (see `cardHeight(for:geo:)`).
+    @State private var scrollOffsets: [String: CGFloat] = [:]
     /// Bumped on every vertical-drag-end. The pager's ScrollViewReader
     /// watches this and re-snaps to `selectedVehicleIndex` so we
     /// recover from any partial horizontal offset that slipped in
@@ -1759,6 +1929,18 @@ struct VehicleSheetPager: View {
     /// a frame-centered marker is clear of the card.
     private let markerClearance: CGFloat = 80
 
+    /// Width of the pager and of every card in it: the window
+    /// width up to `maxSheetWidth`. Computed from the
+    /// GeometryReader rather than via `containerRelativeFrame`
+    /// because the latter resolves against the ScrollView's
+    /// container a layout pass late — during a live window resize
+    /// the card's trailing edge visibly trailed and bounced behind
+    /// the pane edge. Explicit widths derived from `geo` resolve
+    /// synchronously, so the card tracks the pane like a plain view.
+    private func pageWidth(geo: GeometryProxy) -> CGFloat {
+        max(0, min(maxSheetWidth, geo.size.width))
+    }
+
     /// True when a marker centered in the full frame would sit
     /// entirely to the right of the card (card width + its outer
     /// inset + `markerClearance`). Below this the map is inset so
@@ -1798,14 +1980,12 @@ struct VehicleSheetPager: View {
                 : currentCollapsedSheetHeight(geo: geo)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                pagerScrollView(geo: geo)
+                pagerScrollView(geo: geo, pageWidth: pageWidth(geo: geo))
                     // Cap the pager width so the cards don't stretch
-                    // across a wide window. `containerRelativeFrame`
-                    // inside `pagerScrollView` sizes each card to the
-                    // ScrollView, so narrowing the ScrollView narrows
-                    // the cards with it and paging math stays correct.
-                    .frame(maxWidth: maxSheetWidth)
-                    .frame(height: scrollViewHeight)
+                    // across a wide window. Explicit width (not
+                    // `maxWidth`) so it resolves in the same layout
+                    // pass as the GeometryReader — see `pageWidth`.
+                    .frame(width: pageWidth(geo: geo), height: scrollViewHeight)
                     // Pin to the leading edge once the cap kicks in
                     // (no-op below it, where the frame already fills).
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1814,7 +1994,7 @@ struct VehicleSheetPager: View {
                     // Direction-dominance check in the gesture keeps
                     // it from firing on horizontal pans so the
                     // pager's paging snap stays clean.
-                    .simultaneousGesture(verticalCardDragGesture)
+                    .simultaneousGesture(verticalCardDragGesture(geo: geo))
                     // Animate when the current vehicle's detent flips
                     // (the user pulled / tapped the handle / drag
                     // gesture settled). Keyed on the dictionary so any
@@ -1874,15 +2054,6 @@ struct VehicleSheetPager: View {
         for vin: String,
         geo: GeometryProxy
     ) -> (collapsed: CGFloat, expanded: CGFloat) {
-        // `geo.size.height` can be 0 (or briefly tiny) on first
-        // GeometryReader pass before layout completes. Without the
-        // `max(0, ...)` clamp, `screenMax` goes negative, which
-        // propagates through `expanded`/`base`/`resolved` and ends
-        // up as a negative `.frame(height:)`, producing the
-        // "Invalid frame dimension (negative or non-finite)"
-        // runtime warnings.
-        let screenMax = max(0, geo.size.height - expandedTopInset)
-
         let perVehicleControls = controlsHeights[vin] ?? 0
         let perVehicleNatural = naturalHeights[vin] ?? 0
         // Collapsed = controls VStack + the contentStack's outer
@@ -1892,6 +2063,26 @@ struct VehicleSheetPager: View {
             collapsedHeightFloor,
             perVehicleControls > 0 ? perVehicleControls + contentVerticalPadding : 0
         )
+        // The expanded card normally stops `expandedTopInset` short of
+        // the top so a strip of map stays visible. In a short window
+        // that strip would leave the expanded detent no taller than
+        // the collapsed one, so it shrinks as the room above the
+        // collapsed card runs out: full strip while there's at least
+        // 2× the inset of room, tapering to none when there's only the
+        // inset's worth left. The card then eats into the map strip
+        // and its content scrolls for whatever still doesn't fit.
+        // (`geo` already excludes the navigation bar, so a zero strip
+        // still leaves the toolbar row clear.)
+        let room = geo.size.height - collapsed
+        let strip = min(expandedTopInset, max(0, room - expandedTopInset))
+        // `geo.size.height` can be 0 (or briefly tiny) on first
+        // GeometryReader pass before layout completes. Without the
+        // `max(0, ...)` clamp, `screenMax` goes negative, which
+        // propagates through `expanded`/`base`/`resolved` and ends
+        // up as a negative `.frame(height:)`, producing the
+        // "Invalid frame dimension (negative or non-finite)"
+        // runtime warnings.
+        let screenMax = max(0, geo.size.height - strip)
         // Expanded = full content (already includes its own padding,
         // since ContentHeightPreferenceKey measures the outer padded
         // chain) + a small breathing buffer.
@@ -1902,6 +2093,24 @@ struct VehicleSheetPager: View {
             ? min(naturalWithBuffer, screenMax)
             : screenMax
         return (collapsed, expanded)
+    }
+
+    /// True when the card's vertical gesture belongs to its inner
+    /// ScrollView: there is content to expand into (the usual case —
+    /// the detail rows make expanded taller than collapsed) and/or the
+    /// window is too short even for the collapsed content. The scroll
+    /// offset then drives the card height (see `cardHeight(for:geo:)`).
+    private func scrollDriven(for vin: String, geo: GeometryProxy) -> Bool {
+        guard (naturalHeights[vin] ?? 0) > 0 else { return false }
+        let heights = detentHeights(for: vin, geo: geo)
+        return expansionTravel(for: vin, geo: geo) > 1
+            || (naturalHeights[vin] ?? 0) + expandedBuffer > heights.expanded + 0.5
+    }
+
+    /// How far the card grows from collapsed to expanded.
+    private func expansionTravel(for vin: String, geo: GeometryProxy) -> CGFloat {
+        let heights = detentHeights(for: vin, geo: geo)
+        return max(0, heights.expanded - min(heights.collapsed, heights.expanded))
     }
 
     /// Distance from the physical bottom of the screen to the
@@ -1923,6 +2132,13 @@ struct VehicleSheetPager: View {
     /// previous card was.
     private func cardHeight(for vin: String, geo: GeometryProxy) -> CGFloat {
         let (collapsed, expanded) = detentHeights(for: vin, geo: geo)
+        // Scroll-driven: the card's inner ScrollView offset IS the
+        // expansion. The first `expansionTravel` points grow the card
+        // from collapsed to expanded; anything beyond scrolls content.
+        if scrollDriven(for: vin, geo: geo) {
+            let offset = max(0, scrollOffsets[vin] ?? 0)
+            return min(min(collapsed, expanded) + offset, expanded).rounded()
+        }
         // Each card respects ITS OWN detent — swiping between
         // vehicles preserves whatever expanded/collapsed state the
         // user left them in.
@@ -1977,7 +2193,7 @@ struct VehicleSheetPager: View {
     /// vertical and subtracts it from subsequent updates, so the
     /// card's `dragTranslation` starts at 0 — no jump from the
     /// gesture's deadzone.
-    private var verticalCardDragGesture: some Gesture {
+    private func verticalCardDragGesture(geo: GeometryProxy) -> some Gesture {
         // CRITICAL: `coordinateSpace: .global` — translation reads
         // from the fixed window space, not the ScrollView's local
         // space. The ScrollView's frame moves as `cardHeight`
@@ -1995,6 +2211,13 @@ struct VehicleSheetPager: View {
                 let dx = value.translation.width
                 if dragActivationOffset == nil {
                     guard abs(dy) > abs(dx) else { return }
+                    // Scroll-driven cards: every vertical pan belongs to
+                    // the inner ScrollView, which grows/shrinks the card
+                    // itself. This gesture only resizes cards that have
+                    // nothing to scroll into.
+                    if let vin = currentVin, scrollDriven(for: vin, geo: geo) {
+                        return
+                    }
                     dragActivationOffset = dy
                     // Lock the horizontal pager for the rest of
                     // the gesture so the ScrollView can't end up
@@ -2046,8 +2269,76 @@ struct VehicleSheetPager: View {
             }
     }
 
+    /// Instant (non-animated) scroll to the selected page.
+    private func resnap(_ proxy: ScrollViewProxy) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            proxy.scrollTo(selectedVehicleIndex, anchor: .leading)
+        }
+    }
+
+    /// One card per vehicle, laid out side by side at `pageWidth`.
     @ViewBuilder
-    private func pagerScrollView(geo: GeometryProxy) -> some View {
+    private func cardsRow(geo: GeometryProxy, pageWidth: CGFloat) -> some View {
+        let isWidthCapped = geo.size.width > maxSheetWidth
+        HStack(alignment: .bottom, spacing: 0) {
+            ForEach(Array(bbVehicles.enumerated()), id: \.element.id) { index, vehicle in
+                PersistentVehicleSheet(
+                    bbVehicle: vehicle,
+                    bbVehicles: bbVehicles,
+                    selectedIndex: selectedVehicleIndex,
+                    detent: detentBinding(for: vehicle.vin),
+                    cardHeight: cardHeight(for: vehicle.vin, geo: geo),
+                    scrollDriven: scrollDriven(for: vehicle.vin, geo: geo),
+                    expansionTravel: expansionTravel(for: vehicle.vin, geo: geo),
+                    expandedHeight: detentHeights(for: vehicle.vin, geo: geo).expanded,
+                    onSuccessfulRefresh: onSuccessfulRefresh,
+                    mfaState: mfaState,
+                    sheetPresentation: sheetPresentation
+                )
+                .frame(width: pageWidth)
+                .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                    // `phase.value` runs -1 (one page left)
+                    // → 0 (on page) → 1 (one page right).
+                    content
+                        .opacity(isWidthCapped ? 1 - abs(phase.value) : 1)
+                }
+                .onPreferenceChange(ContentHeightPreferenceKey.self) { value in
+                    let rounded = (value * 2).rounded() / 2
+                    let vin = vehicle.vin
+                    if abs((naturalHeights[vin] ?? 0) - rounded) > 0.5 {
+                        naturalHeights[vin] = rounded
+                    }
+                }
+                .onPreferenceChange(ErrorOverheadPreferenceKey.self) { value in
+                    let rounded = (value * 2).rounded() / 2
+                    let vin = vehicle.vin
+                    if abs((errorOverheads[vin] ?? 0) - rounded) > 0.5 {
+                        errorOverheads[vin] = rounded
+                    }
+                }
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                    let rounded = (value * 2).rounded() / 2
+                    let vin = vehicle.vin
+                    if abs((scrollOffsets[vin] ?? 0) - rounded) > 0.25 {
+                        scrollOffsets[vin] = rounded
+                    }
+                }
+                .onPreferenceChange(ControlsHeightPreferenceKey.self) { value in
+                    let rounded = (value * 2).rounded() / 2
+                    let vin = vehicle.vin
+                    if abs((controlsHeights[vin] ?? 0) - rounded) > 0.5 {
+                        controlsHeights[vin] = rounded
+                    }
+                }
+                .id(index)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pagerScrollView(geo: GeometryProxy, pageWidth: CGFloat) -> some View {
         // ScrollViewReader (+ `.onScrollPhaseChange` for sync)
         // instead of `.scrollPosition(id:)`. The latter's
         // bidirectional binding was interacting badly with our
@@ -2067,46 +2358,25 @@ struct VehicleSheetPager: View {
                 // the 1–2pt up/down judder. Bottom alignment pins
                 // each card's bottom to the HStack's bottom, so
                 // resize only moves the top edge.
-                HStack(alignment: .bottom, spacing: 0) {
-                    ForEach(Array(bbVehicles.enumerated()), id: \.element.id) { index, vehicle in
-                        PersistentVehicleSheet(
-                            bbVehicle: vehicle,
-                            bbVehicles: bbVehicles,
-                            selectedIndex: selectedVehicleIndex,
-                            detent: detentBinding(for: vehicle.vin),
-                            cardHeight: cardHeight(for: vehicle.vin, geo: geo),
-                            onSuccessfulRefresh: onSuccessfulRefresh,
-                            mfaState: mfaState,
-                            sheetPresentation: sheetPresentation
-                        )
-                        .containerRelativeFrame(.horizontal)
-                        .onPreferenceChange(ContentHeightPreferenceKey.self) { value in
-                            let rounded = (value * 2).rounded() / 2
-                            let vin = vehicle.vin
-                            if abs((naturalHeights[vin] ?? 0) - rounded) > 0.5 {
-                                naturalHeights[vin] = rounded
-                            }
-                        }
-                        .onPreferenceChange(ErrorOverheadPreferenceKey.self) { value in
-                            let rounded = (value * 2).rounded() / 2
-                            let vin = vehicle.vin
-                            if abs((errorOverheads[vin] ?? 0) - rounded) > 0.5 {
-                                errorOverheads[vin] = rounded
-                            }
-                        }
-                        .onPreferenceChange(ControlsHeightPreferenceKey.self) { value in
-                            let rounded = (value * 2).rounded() / 2
-                            let vin = vehicle.vin
-                            if abs((controlsHeights[vin] ?? 0) - rounded) > 0.5 {
-                                controlsHeights[vin] = rounded
-                            }
-                        }
-                        .id(index)
-                    }
-                }
+                // Width-capped (card floating over open map): the
+                // pager's edge is mid-map, so with clipping a sliding
+                // card would materialize at a hard edge. Instead the
+                // pager is unclipped (see `scrollClipDisabled` below)
+                // and each card fades up as it slides in — a page
+                // away it's invisible, on-page it's solid. Full-width:
+                // no fade, the card enters from the window edge.
+                cardsRow(geo: geo, pageWidth: pageWidth)
                 .scrollTargetLayout()
             }
             .scrollTargetBehavior(.paging)
+            // Don't clip at the pager's bounds: the card's drop
+            // shadow extends past the 8pt outer inset and was being
+            // cut off flat at the edge, and in width-capped mode an
+            // incoming card should slide in over the map rather than
+            // appear at the pager's edge. Off-page neighbours are
+            // either offscreen (full-width) or at opacity 0
+            // (width-capped fade), so nothing else shows at rest.
+            .scrollClipDisabled()
             // Disable horizontal scrolling while a vertical drag
             // is in progress — otherwise the user can leave the
             // pager stuck between pages when they transition from
@@ -2136,6 +2406,26 @@ struct VehicleSheetPager: View {
                 withAnimation {
                     proxy.scrollTo(new, anchor: .leading)
                 }
+            }
+            // The scroll offset is stored in points, so when the
+            // page width changes (window resize, split-view drag,
+            // crossing the width cap) the offset no longer lands on
+            // a page boundary and the card drifts or gets stuck
+            // part-way across. `.paging` only re-snaps after a user
+            // scroll, so re-snap on every width change — instantly,
+            // so the card tracks the resize instead of springing
+            // after it. Keyed on our own `pageWidth` (synchronous
+            // with layout); the scroll-geometry hook below catches
+            // the case where the content size hadn't grown yet when
+            // the first re-snap ran and the offset got clamped.
+            .onChange(of: pageWidth) { _, _ in
+                resnap(proxy)
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.containerSize.width
+            } action: { old, new in
+                guard old != new, new > 0 else { return }
+                resnap(proxy)
             }
             // Re-snap after a vertical drag — if a few pixels of
             // horizontal offset slipped in before the gesture
