@@ -1975,9 +1975,22 @@ struct VehicleSheetPager: View {
             let scrollViewHeight = (bbVehicles
                 .map { cardHeight(for: $0.vin, geo: geo) + (errorOverheads[$0.vin] ?? 0) }
                 .max() ?? 0) + chromeOuterInset
-            let bottomInset = markerClearsSheet(geo: geo)
-                ? 0
-                : currentCollapsedSheetHeight(geo: geo)
+            // Hold the last reported inset while `geo` is degenerate
+            // (the zero-height first layout pass). Reporting from it
+            // feeds back: a tiny `geo` clamps the collapsed height to
+            // ~0, the 8pt inset pads the map, the padded map grows the
+            // ZStack — and this `geo` — by 8pt, and so on. Each lap is
+            // an `onChange` in the same frame; SwiftUI drops the
+            // surplus ones, including the real value once layout
+            // lands, leaving the map stuck with a ~24pt inset and the
+            // marker hidden behind the card (seen on iPhone Duo).
+            let bottomInset: CGFloat = if geo.size.height < collapsedHeightFloor {
+                mapBottomInset
+            } else if markerClearsSheet(geo: geo) {
+                0
+            } else {
+                currentCollapsedSheetHeight(geo: geo)
+            }
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 pagerScrollView(geo: geo, pageWidth: pageWidth(geo: geo))
