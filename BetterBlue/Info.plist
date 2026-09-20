@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BBAppGroupIdentifier</key>
+	<string>$(BB_APP_GROUP)</string>
+	<key>BBICloudContainerIdentifier</key>
+	<string>$(BB_ICLOUD_CONTAINER)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>maps</string>
@@ -12,21 +16,5 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<!-- Required for "Save Image" to appear in the surround-view share
-	     sheet. iOS hides the save-to-camera-roll activity outright when an
-	     app has no add-usage description, which is why Copy, Assign to
-	     Contact and Print all showed up and Save Image did not.
-
-	     Deliberately the ADD-only key, not NSPhotoLibraryUsageDescription:
-	     the app only ever writes a photo the user explicitly shared, and
-	     the read key would ask for access to their entire library. -->
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>BetterBlue saves surround view photos to your photo library when you choose Save Image.</string>
-	<key>BBAppGroupIdentifier</key>
-	<string>$(BB_APP_GROUP)</string>
-	<key>BBICloudContainerIdentifier</key>
-	<string>$(BB_ICLOUD_CONTAINER)</string>
 </dict>
 </plist>

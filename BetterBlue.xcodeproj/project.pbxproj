@@ -370,15 +370,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		EDC0F1600000000000000003 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				EDC0F1600000000000000001 /* Shared.xcconfig */,
-				EDC0F1600000000000000002 /* Local.xcconfig.template */,
-			);
-			path = Config;
-			sourceTree = "<group>";
-		};
 		ED8110912F08B6DE003BD1FB /* LiveActivityBackend */ = {
 			isa = PBXGroup;
 			children = (
@@ -389,6 +380,15 @@
 				ED81024E2F2921270072BDDE /* README.md */,
 			);
 			path = LiveActivityBackend;
+			sourceTree = "<group>";
+		};
+		EDC0F1600000000000000003 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				EDC0F1600000000000000001 /* Shared.xcconfig */,
+				EDC0F1600000000000000002 /* Local.xcconfig.template */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		EDC9B1CD2DFC677000C602F4 /* Frameworks */ = {
@@ -671,6 +671,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -736,6 +737,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = C2UW47HS8X;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -773,11 +775,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "comgooglemaps waze maps";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BetterBlue saves surround view photos to your photo library when you choose Save Image.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -807,11 +810,12 @@
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "comgooglemaps waze maps";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "BetterBlue saves surround view photos to your photo library when you choose Save Image.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
