@@ -444,20 +444,31 @@ extension BBVehicle {
 
             // Post-command verification needs to reflect the vehicle's
             // actual state, not the backend's cached snapshot.
-            let updatedStatus = try await account.fetchVehicleStatus(
-                for: self,
-                modelContext: modelContext,
-                cached: false
-            )
-
-            // Update the vehicle's status
-            updateStatus(with: updatedStatus)
-
-            if condition(updatedStatus) {
-                print(
-                    "✅ [BBVehicle] Status condition met for vehicle \(displayName)",
+            do {
+                let updatedStatus = try await account.fetchVehicleStatus(
+                    for: self,
+                    modelContext: modelContext,
+                    cached: false
                 )
-                return
+
+                // Update the vehicle's status
+                updateStatus(with: updatedStatus)
+
+                if condition(updatedStatus) {
+                    print(
+                        "✅ [BBVehicle] Status condition met for vehicle \(displayName)",
+                    )
+                    return
+                }
+            } catch let error as APIError where Self.isTransientPollingError(error) {
+                // The command was already accepted — a transient failure on
+                // the verification fetch (e.g. Hyundai US answering 502
+                // "previous request is pending" while the vehicle is still
+                // busy with the command itself) isn't a command failure.
+                // Count it as an attempt and keep polling.
+                print(
+                    "⚠️ [BBVehicle] Transient error polling status for \(displayName), will retry: \(error.message)",
+                )
             }
 
             currentAttempt += 1
@@ -477,6 +488,17 @@ extension BBVehicle {
                 + "It may still complete — refresh in a minute to check.",
             errorType: .statusVerificationTimeout
         )
+    }
+
+    /// Errors that shouldn't abort post-command polling: the backend is
+    /// busy or briefly unavailable, and the next attempt may well succeed.
+    private static func isTransientPollingError(_ error: APIError) -> Bool {
+        switch error.errorType {
+        case .serverError, .concurrentRequest:
+            true
+        default:
+            false
+        }
     }
 
     @MainActor
