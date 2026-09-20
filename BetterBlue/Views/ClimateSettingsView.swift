@@ -204,7 +204,10 @@ struct ClimateSettingsContent: View {
                     Picker("Climate Duration", selection: $preset.climateOptions.duration) {
                         Text("5 minutes").tag(5)
                         Text("10 minutes").tag(10)
+                        Text("15 minutes").tag(15)
                         Text("20 minutes").tag(20)
+                        Text("25 minutes").tag(25)
+                        Text("30 minutes").tag(30)
                     }
                     .pickerStyle(.menu)
                 }

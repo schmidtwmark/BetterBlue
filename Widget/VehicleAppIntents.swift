@@ -1050,6 +1050,75 @@ struct GetSurroundViewImageIntent: AppIntent {
     }
 }
 
+// MARK: - Directions
+
+/// Maps app choices for `GetDirectionsToVehicleIntent`. Mirrors the
+/// in-app `MapApp` menu, but every case resolves to a universal link
+/// (`OpenURLIntent` can't open custom schemes like `maps://`) — an
+/// uninstalled app falls back to its website rather than failing.
+enum DirectionsMapAppEnum: String, AppEnum {
+    case appleMaps, googleMaps, waze
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Maps App")
+
+    static let caseDisplayRepresentations: [DirectionsMapAppEnum: DisplayRepresentation] = [
+        .appleMaps: "Apple Maps",
+        .googleMaps: "Google Maps",
+        .waze: "Waze"
+    ]
+
+    func directionsURL(latitude: Double, longitude: Double) -> URL? {
+        let destination = "\(latitude),\(longitude)"
+        switch self {
+        case .appleMaps:
+            return URL(string: "https://maps.apple.com/?daddr=\(destination)")
+        case .googleMaps:
+            return URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(destination)")
+        case .waze:
+            return URL(string: "https://waze.com/ul?ll=\(destination)&navigate=yes")
+        }
+    }
+}
+
+/// Opens directions to the vehicle's last reported location.
+///
+/// Reads the stored location only — it never wakes the vehicle. Put
+/// `RefreshVehicleStatusIntent` ahead of it in a Shortcut when the
+/// position needs to be current.
+struct GetDirectionsToVehicleIntent: AppIntent {
+    static let title: LocalizedStringResource = "Get Directions to Vehicle"
+    static let description = IntentDescription(
+        "Open directions to your vehicle's last known location in the maps app of your choice."
+    )
+    static let openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle to navigate to")
+    var vehicle: VehicleEntity
+
+    @Parameter(title: "Maps App", description: "Which app to open directions in", default: .appleMaps)
+    var mapApp: DirectionsMapAppEnum
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Get directions to \(\.$vehicle) in \(\.$mapApp)")
+    }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & OpensIntent {
+        let context = ModelContext(try createSharedModelContainer(enableCloudKit: false))
+        let bbVehicle = try fetchBBVehicle(forVin: vehicle.vin, context: context)
+
+        guard let location = bbVehicle.location, location.hasCoordinates,
+              let url = mapApp.directionsURL(latitude: location.latitude, longitude: location.longitude)
+        else {
+            throw IntentError.locationUnavailable
+        }
+
+        return .result(opensIntent: OpenURLIntent(url))
+    }
+}
+
 // MARK: - Intent Errors
 
 enum IntentError: Swift.Error, LocalizedError {
@@ -1061,6 +1130,7 @@ enum IntentError: Swift.Error, LocalizedError {
     case surroundViewUnsupported
     case surroundViewCaptureUnsupported
     case noSurroundViewCaptures
+    case locationUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -1081,6 +1151,8 @@ enum IntentError: Swift.Error, LocalizedError {
                 + "for a new one. Start a capture from the brand's own app."
         case .noSurroundViewCaptures:
             "No surround view images are available yet — request a capture first"
+        case .locationUnavailable:
+            "This vehicle hasn't reported a location yet — refresh its status and try again"
         }
     }
 }
