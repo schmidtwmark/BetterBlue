@@ -85,6 +85,21 @@ struct AnyJSONValue: Encodable {
         var container = encoder.singleValueContainer()
 
         switch value {
+        case let number as NSNumber:
+            // JSONSerialization returns every number and boolean as an
+            // NSNumber, and `as Bool` matches any NSNumber that's 0 or 1
+            // — so a Kia `fuelLevel: 0` used to export as `false`. Ask
+            // CoreFoundation what the value really is.
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                try container.encode(number.boolValue)
+            } else if CFNumberIsFloatType(number) {
+                try container.encode(number.doubleValue)
+            } else if String(cString: number.objCType) == "Q" {
+                // Above Int64.max — `int64Value` would wrap negative.
+                try container.encode(number.uint64Value)
+            } else {
+                try container.encode(number.int64Value)
+            }
         case let bool as Bool:
             try container.encode(bool)
         case let int as Int:

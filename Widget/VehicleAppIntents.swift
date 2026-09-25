@@ -211,7 +211,7 @@ struct GetVehicleStatusIntent: AppIntent {
             if evStatus.pluggedIn {
                 if evStatus.charging {
                     if evStatus.chargeSpeed > 0 {
-                        statusComponents.append("Charging at \(evStatus.chargeSpeed) kW")
+                        statusComponents.append("Charging at \(String(format: "%.1f", evStatus.chargeSpeed)) kW")
                     } else {
                         statusComponents.append("Plugged in and charging")
                     }

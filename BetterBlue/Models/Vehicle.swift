@@ -144,13 +144,12 @@ class BBVehicle {
     //
     // The Kia/Hyundai vehicle-list endpoints don't always return a
     // reliable powertrain marker (Kia USA in particular only confirms
-    // `fuelType == 4` as EV; everything else falls into `.gas`). The
-    // self-heal in `updateStatus` infers the real type from the status
-    // payload's shape, but the API can still mis-shape its own response
-    // — e.g. issue #41 has a real EV that returns both an `evStatus`
-    // and a phantom `gasRange` (length matching the EV range), which
-    // promotes the vehicle to PHEV and won't demote even after
-    // re-adding the account.
+    // `fuelType` 4 as EV and 7 as PHEV; everything else falls into
+    // `.gas`). The self-heal in `updateStatus` infers the real type from
+    // the status payload's shape, but a payload can still be misread —
+    // e.g. issues #41 / #107, where the EV9's `fuelLevel: 0` parsed as a
+    // phantom 0% `gasRange` (length matching the EV range) and promoted
+    // the EV to PHEV.
     //
     // This stored override lets the user pin the powertrain manually.
     // `nil` = trust the inferred value (default behaviour).
@@ -330,9 +329,9 @@ extension BBVehicle {
         // Borrowed from `hyundai_kia_connect_api`'s `KiaUvoApiUSA`
         // `_update_vehicle_properties`: when the vehicles-list parser
         // can't authoritatively classify the powertrain (Kia USA only
-        // confirms `fuelType == 4` as EV; everything else falls into
-        // `.gas` as a conservative default), the status response's
-        // structure is the source of truth.
+        // confirms `fuelType` 4 as EV and 7 as PHEV; everything else
+        // falls into `.gas` as a conservative default), the status
+        // response's structure is the source of truth.
         //
         //   - `evStatus` present                ⇒ has a high-voltage battery
         //   - `evStatus` + `gasRange` present   ⇒ PHEV
