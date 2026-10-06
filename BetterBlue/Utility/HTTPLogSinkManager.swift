@@ -30,6 +30,17 @@ class HTTPLogSinkManager {
         self.deviceType = deviceType
     }
 
+    /// Adopts `container` when nothing has configured this process yet.
+    /// The main app, watch app and widget timeline provider configure up
+    /// front, but an App Intent (Control Center / Lock Screen control,
+    /// widget button, Siri) can run in a freshly launched widget extension
+    /// where none of them has — `createLogSink()` then returned nil and the
+    /// commands it sent were never logged (BetterBlue#109).
+    func configureIfNeeded(with container: ModelContainer) {
+        guard modelContainer == nil else { return }
+        configure(with: container, deviceType: Self.detectCurrentProcessDeviceType())
+    }
+
     func createLogSink() -> HTTPLogSink? {
         guard let deviceType else { return nil }
         return createLogSink(for: deviceType)
@@ -95,6 +106,16 @@ class HTTPLogSinkManager {
             }
         #else
             return .iPhone
+        #endif
+    }
+
+    /// `.widget` inside the widget extension — which also runs the control
+    /// and widget-button intents — otherwise the containing app's type.
+    static func detectCurrentProcessDeviceType() -> DeviceType {
+        #if os(watchOS)
+            return .watch
+        #else
+            return Bundle.main.bundleURL.pathExtension == "appex" ? .widget : detectMainAppDeviceType()
         #endif
     }
 }

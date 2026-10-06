@@ -123,6 +123,7 @@ extension BBAccount {
 
         // If a specific device type is requested, always reinitialize the API client
         if api == nil || deviceType != nil {
+            HTTPLogSinkManager.shared.configureIfNeeded(with: modelContext.container)
             let logSink = if let deviceType {
                 HTTPLogSinkManager.shared.createLogSink(for: deviceType)
             } else {
