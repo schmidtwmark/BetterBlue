@@ -59,6 +59,14 @@ struct MainView: View {
     /// open map. Fed to `SimpleMapView` as a safe-area inset so the
     /// marker is centered in whatever map area is unobstructed.
     @State private var mapBottomInset: CGFloat = 0
+    /// True while an expanded vehicle sheet stands over the settings
+    /// button, reported by `VehicleSheetPager`. The button fades out
+    /// for as long as it is (see `SettingsButton`).
+    @State private var sheetCoversToolbar = false
+    /// Whether a vehicle sheet can rise over the toolbar's trailing item
+    /// at all in this window, reported by `VehicleSheetPager` — the
+    /// common case, an iPhone in portrait, until it says otherwise.
+    @State private var sheetCanCoverToolbar = true
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 25.0, longitude: -100.0),
         span: MKCoordinateSpan(latitudeDelta: 50.0, longitudeDelta: 60.0),
@@ -207,11 +215,17 @@ struct MainView: View {
             }
     }
 
-    /// Map underneath, paged sheet on top.
+    /// True when there are vehicles to show: the map fills the
+    /// navigation stack and the vehicle sheet rides on top of it.
+    private var showsVehicles: Bool {
+        !accounts.isEmpty && !displayedVehicles.isEmpty && lastError == nil
+    }
+
+    /// The map under the vehicle sheet (the sheet itself is layered
+    /// on in `mainContent`).
     @ViewBuilder
-    private var vehiclePager: some View {
-        ZStack(alignment: .bottom) {
-            mapLayer
+    private var vehicleMap: some View {
+        mapLayer
             .overlay(alignment: .top) {
                 // Explains the marker-less, zoomed-out map when the API
                 // returned no GPS fix for the selected vehicle.
@@ -219,15 +233,6 @@ struct MainView: View {
                     missingLocationBanner(for: vehicle)
                 }
             }
-            VehicleSheetPager(
-                bbVehicles: displayedVehicles,
-                selectedVehicleIndex: $selectedVehicleIndex,
-                onSuccessfulRefresh: { lastError = nil },
-                mfaState: mfaState,
-                sheetPresentation: sheetPresentation,
-                mapBottomInset: $mapBottomInset
-            )
-        }
     }
 
     /// The map, sized so that interactive window resizes never change
@@ -291,21 +296,76 @@ struct MainView: View {
         .animation(.easeInOut(duration: 0.25), value: vehicle.coordinate == nil)
     }
 
+    /// How far in from the side of the window the navigation bar keeps
+    /// its items.
+    private static let navigationBarMargin: CGFloat = 16
+
+    /// Whether the settings button floats over the navigation stack
+    /// (`SettingsButton`) rather than sitting in its toolbar: only where
+    /// a vehicle sheet can rise over the toolbar's trailing item, which
+    /// is what the floating button gets out of the way of. Everywhere
+    /// else — beside a sheet that's a column in a wide window, in iPhone
+    /// Duo's side toolbar, with no vehicles to show — the toolbar places
+    /// the button itself.
+    private var settingsButtonFloats: Bool {
+        showsVehicles && sheetCanCoverToolbar
+    }
+
     @ViewBuilder
     private var mainContent: some View {
+        ZStack {
+            navigationContent
+            // Where the navigation bar would put its trailing item — see
+            // `SettingsButton` for why it isn't one here.
+            if settingsButtonFloats {
+                SettingsButton(isCovered: $sheetCoversToolbar) {
+                    showingSettings = true
+                }
+                .matchedTransitionSource(id: "settings", in: transition)
+                .padding(.trailing, Self.navigationBarMargin)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+            // Apple-Maps-style layout: map under, paged sheet on top.
+            // `VehicleSheetPager` owns the horizontal ScrollView that
+            // pages between vehicles, plus each card's chrome (glass +
+            // drag handle). It sits ABOVE the navigation stack and the
+            // settings button so an expanded card can rise through the
+            // toolbar row to the status bar, the way a system sheet
+            // would (the settings button fades out of its way —
+            // `sheetCoversToolbar`); collapsed, everything above the
+            // card (settings button, map marker) stays tappable.
+            if showsVehicles {
+                VehicleSheetPager(
+                    bbVehicles: displayedVehicles,
+                    selectedVehicleIndex: $selectedVehicleIndex,
+                    onSuccessfulRefresh: { lastError = nil },
+                    mfaState: mfaState,
+                    sheetPresentation: sheetPresentation,
+                    mapBottomInset: $mapBottomInset,
+                    coversToolbar: $sheetCoversToolbar,
+                    canCoverToolbar: $sheetCanCoverToolbar
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var navigationContent: some View {
         NavigationStack {
             stateContent
                 .toolbar {
-                    // Real toolbar button — system-sized hit target
-                    // (44pt) in the navigation bar's trailing slot.
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            Image(systemName: "gearshape.fill")
-                                .foregroundStyle(.primary)
+                    if !settingsButtonFloats {
+                        // Real toolbar button — system-sized hit target
+                        // (44pt) in the navigation bar's trailing slot.
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                showingSettings = true
+                            } label: {
+                                Image(systemName: "gearshape.fill")
+                                    .foregroundStyle(.primary)
+                            }
+                            .matchedTransitionSource(id: "settings", in: transition)
                         }
-                        .matchedTransitionSource(id: "settings", in: transition)
                     }
                 }
             .sheet(isPresented: $showingSettings) {
@@ -463,15 +523,56 @@ struct MainView: View {
                     EmptyVehiclesView(
                         isLoading: $isLoading,
                         lastError: $lastError,
+                        onRetry: { await loadVehiclesForAllAccounts() },
                     )
                 } else {
-                    // Apple-Maps-style layout: map under, paged sheet
-                    // on top. `VehicleSheetPager` owns the horizontal
-                    // ScrollView that pages between vehicles, plus
-                    // the shared chrome (glass + drag handle).
-                    vehiclePager
+                    // Same condition as `showsVehicles`, which layers
+                    // the vehicle sheet over this map.
+                    vehicleMap
                 }
         }
+    }
+}
+
+/// The settings button where a vehicle sheet can rise over the toolbar's
+/// trailing item (`MainView.settingsButtonFloats` — an iPhone in
+/// portrait): a 44pt glass circle around the gear, drawn the way the
+/// navigation bar draws a trailing item, but floating over the
+/// navigation stack (and under the vehicle sheet) instead of living in
+/// its toolbar. While an expanded sheet stands over it, it fades out and
+/// stops taking taps — the sheet's rounded corner would otherwise leave
+/// a slice of it showing, out of reach behind the sheet.
+///
+/// A toolbar item can't step aside like that. The bar draws an item's
+/// glass itself, and the glass stays put when the item's content fades
+/// or shrinks — its top shows above the expanded sheet. Without that
+/// glass, the map draws its scroll edge effect behind the bar for the
+/// item's legibility: a blurred band across the top of the screen.
+/// Removing and re-adding the item as the sheet went up and down has
+/// left it on screen, dead. And hiding the whole bar slides it away and
+/// re-lays out everything under it, stalling the sheet mid-spring.
+private struct SettingsButton: View {
+    /// True while an expanded vehicle sheet stands over the button. A
+    /// binding so that only this button reads it: flipping it mid-
+    /// animation then re-renders the button alone, not all of
+    /// `MainView` (which costs a frame).
+    @Binding var isCovered: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "gearshape.fill")
+                // The size the navigation bar gives a symbol.
+                .imageScale(.large)
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                // The whole circle takes taps, not just the symbol.
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+        }
+        .buttonStyle(.plain)
+        .opacity(isCovered ? 0 : 1)
+        .allowsHitTesting(!isCovered)
     }
 }
 
@@ -480,9 +581,10 @@ struct MainView: View {
 extension MainView {
     /// Smallest window iPadOS / Mac may resize us to. Tall enough
     /// that the collapsed card plus a strip of map stay usable; the
-    /// card's content scrolls (see `VehicleSheetPager.contentScrolls`)
-    /// if the window is still too short for a given vehicle. No-op on
-    /// iPhone, where scenes aren't resizable (`sizeRestrictions` is nil).
+    /// card's content scrolls in place (see
+    /// `VehicleSheetPager.cardLayout(for:geo:)`) if the window is
+    /// still too short for it. No-op on iPhone, where scenes aren't
+    /// resizable (`sizeRestrictions` is nil).
     private static let minimumWindowSize = CGSize(width: 375, height: 480)
 
     private func applyMinimumWindowSize() {

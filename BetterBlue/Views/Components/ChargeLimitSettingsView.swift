@@ -9,7 +9,8 @@ import BetterBlueKit
 import SwiftData
 import SwiftUI
 
-/// Sheet wrapper for modal presentation (from ChargingButton menu)
+/// Sheet wrapper for modal presentation (from the vehicle sheet: the
+/// charging row's menu and the action list)
 struct ChargeLimitSettingsSheet: View {
     let vehicle: BBVehicle
     @Environment(\.dismiss) private var dismiss

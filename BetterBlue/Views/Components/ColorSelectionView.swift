@@ -18,7 +18,9 @@ enum ColorPreviewStyle: Hashable {
     /// `VehicleMapMarker` in SimpleMapView.
     case mapMarker
     /// Quick-action button: rounded glass chip with a tinted SF Symbol
-    /// — matches the right-side button in `VehicleControlButton`.
+    /// — the tint the vehicle sheet's action buttons
+    /// (`CircularIconLabel`) take. The chip is a rounded square; the
+    /// sheet's buttons are circles.
     case quickAction(symbol: String)
 }
 
@@ -166,11 +168,10 @@ struct ColorPreviewView: View {
                         .font(.system(size: size * 0.42, weight: .semibold))
                 )
         case .quickAction(let symbol):
-            // Mirrors `quickActionButtonLabel`: tinted SF Symbol on the
-            // shared `vehicleCardGlassEffect` chip. The real button is
-            // 52pt with a 12pt corner radius, so we scale the radius
-            // proportionally — otherwise small previews look like
-            // circles instead of rounded squares.
+            // Tinted SF Symbol on the shared `vehicleCardGlassEffect`
+            // chip. The chip's corner radius is 12pt at 52pt, so we
+            // scale the radius proportionally — otherwise small
+            // previews look like circles instead of rounded squares.
             let radius = size * (12.0 / 52.0)
             Image(systemName: symbol)
                 .foregroundColor(color)

@@ -83,9 +83,8 @@ struct FakeVehicleListView: View {
                 // `newVehicle.account` is populated immediately. Appending
                 // only to the account's collection can leave the inverse
                 // nil until SwiftData's relationship tracker catches up,
-                // which in turn makes the first `VehicleCardView` refresh
-                // fail with "Account not found for vehicle" (surfaced in
-                // the UI as the generic "Unable to refresh" message).
+                // which in turn makes the vehicle's first status refresh
+                // fail with "Account not found for vehicle".
                 newVehicle.account = account
                 account.vehicles?.append(newVehicle)
             }

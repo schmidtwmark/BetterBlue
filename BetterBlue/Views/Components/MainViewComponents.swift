@@ -56,6 +56,11 @@ struct EmptyAccountsView: View {
 struct EmptyVehiclesView: View {
     @Binding var isLoading: Bool
     @Binding var lastError: APIError?
+    /// Reloads every account's vehicles — what "Try Again" runs.
+    /// `MainView` owns the load, which also drives `isLoading` and
+    /// `lastError`: both are reset as it starts, so the error and
+    /// this button give way to the spinner until it finishes.
+    let onRetry: () async -> Void
 
     var body: some View {
         VStack(spacing: 20) {
@@ -88,99 +93,11 @@ struct EmptyVehiclesView: View {
                 .padding(.horizontal)
 
                 Button("Try Again") {
-                    Task {
-                        // Would need to pass this up somehow
-                    }
+                    Task { await onRetry() }
                 }
                 .buttonStyle(.borderedProminent)
             }
         }
         .padding()
-    }
-}
-
-struct VehicleCardsView: View {
-    let displayedVehicles: [BBVehicle]
-    let accounts: [BBAccount]
-    @Binding var selectedVehicleIndex: Int
-    let onSuccessfulRefresh: (() -> Void)?
-    @State private var scrollPosition: Int? = 0
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(
-                        Array(displayedVehicles.enumerated()),
-                        id: \.element.id,
-                    ) { index, bbVehicle in
-                        VehicleCardView(
-                            bbVehicle: bbVehicle,
-                            bbVehicles: displayedVehicles,
-                            accounts: accounts,
-                            onVehicleSelected: { selectedVehicle in
-                                if let newIndex = displayedVehicles.firstIndex(where: {
-                                    $0.vin == selectedVehicle.vin
-                                }) {
-                                    selectedVehicleIndex = newIndex
-                                }
-                            },
-                            onSuccessfulRefresh: onSuccessfulRefresh,
-                        )
-                        .frame(maxWidth: 600)
-                        .containerRelativeFrame(.horizontal)
-                        .id(index)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $scrollPosition)
-            .scrollClipDisabled()
-            .onChange(of: scrollPosition) { _, newValue in
-                if let newValue {
-                    selectedVehicleIndex = newValue
-                }
-            }
-            .onChange(of: selectedVehicleIndex) { _, newValue in
-                if scrollPosition != newValue {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        scrollPosition = newValue
-                    }
-                }
-            }
-            .onAppear {
-                scrollPosition = selectedVehicleIndex
-            }
-            .background(Color.clear) // Explicit clear background
-            .allowsHitTesting(true) // Only allow hits on actual content
-
-            if displayedVehicles.count > 1 {
-                PageIndicators(
-                    currentPage: selectedVehicleIndex,
-                    totalPages: displayedVehicles.count,
-                )
-                .padding(.top, 10)
-            }
-        }
-        .background(Color.clear) // Ensure the whole VStack has clear background
-    }
-}
-
-struct PageIndicators: View {
-    let currentPage: Int
-    let totalPages: Int
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0 ..< totalPages, id: \.self) { index in
-                Circle()
-                    .fill(
-                        index == currentPage ?
-                            Color.primary : Color.secondary.opacity(0.5),
-                    )
-                    .frame(width: 8, height: 8)
-            }
-        }
     }
 }

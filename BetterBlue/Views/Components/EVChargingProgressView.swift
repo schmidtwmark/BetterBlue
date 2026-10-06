@@ -3,13 +3,13 @@
 //  BetterBlue
 //
 //  Shared view for EV charging progress display
-//  Used by both EVRangeChargingCard and Live Activity
+//  Used by both the vehicle sheet and the Live Activity
 //
 
 import SwiftUI
 
 /// Shared view for displaying EV charging progress
-/// Used by EVRangeChargingCard in the main app and VehicleActivityWidget for Live Activities
+/// Used by PersistentVehicleSheet in the main app and VehicleActivityWidget for Live Activities
 struct EVChargingProgressView: View {
     let icon: Image?
     let formattedRange: String

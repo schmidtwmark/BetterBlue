@@ -101,8 +101,9 @@ struct ErrorDetailsView: View {
 /// produced by Settings → Export Debug Data (redacted), so when a user
 /// sends a report I get exactly the same shape of info.
 ///
-/// Not private: `VehicleCardView` and `VehicleControlButton` present
-/// this directly so the banner → details flow is a single tap.
+/// Not private: `MainView` presents this directly (through
+/// `VehicleSheetPresentation`) so the banner → details flow is a
+/// single tap.
 struct ErrorDetailsSheet: View {
     let error: ActionError
     let onDismiss: () -> Void

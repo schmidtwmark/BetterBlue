@@ -17,20 +17,6 @@ protocol VehicleAction {
     var inProgressLabel: String { get }
 }
 
-struct MenuVehicleAction: VehicleAction {
-    var action: VehicleButtonAction
-    var icon: Image
-    var label: String
-    var inProgressLabel: String
-
-    init(action: @escaping VehicleButtonAction, icon: Image, label: String, inProgressLabel: String = "") {
-        self.action = action
-        self.icon = icon
-        self.label = label
-        self.inProgressLabel = inProgressLabel
-    }
-}
-
 struct MainVehicleAction: VehicleAction {
     var action: VehicleButtonAction
     var icon: Image // Icon showing current state when this is the primary action
@@ -39,9 +25,6 @@ struct MainVehicleAction: VehicleAction {
     var completedText: String
     var color: Color // Color for the state icon
     var stateLabel: String // Label showing current state (e.g., "Locked")
-    var quickActionColor: Color = .accentColor // Color for the quick action button icon
-    var additionalText: String = ""
     var shouldPulse: Bool = false
     var shouldRotate: Bool = false
-    var menuIcon: Image? // Alternative icon for menu items and quick action button
 }

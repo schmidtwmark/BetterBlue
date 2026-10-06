@@ -77,7 +77,7 @@ struct WatchVehicleView: View {
     //
     // The status icon is anchored to the *current* vehicle state (not the
     // action's destination), so the colors here pair with the action's
-    // `stateLabel` to match the iOS LockButton convention:
+    // `stateLabel` to match the iOS app's lock row:
     //   • lockAction is shown when the car is currently UNLOCKED → use unlockColor
     //   • unlockAction is shown when the car is currently LOCKED → use lockColor
     private var lockAction: MainVehicleAction {
@@ -413,7 +413,7 @@ struct WatchVehicleView: View {
         }
 
         // Charging state propagates slowest through the backends — give it
-        // a longer window than the default (matches the iOS ChargingButton).
+        // a longer window than the default (matches the iOS app).
         try await currentVehicle.waitForStatusChange(
             modelContext: modelContext,
             condition: { status in
