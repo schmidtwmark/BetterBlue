@@ -34,21 +34,34 @@ struct ClimateSettingsContent: View {
             // Preset info section with editable name and icon
             Section {
                 HStack {
-                    Menu {
-                        ForEach(ClimatePreset.availableIcons, id: \.icon) { option in
-                            Button {
-                                preset.iconName = option.icon
-                                savePreset(preset)
+                    let icon = Image(systemName: preset.iconName)
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                        .frame(width: 32)
+                    // The row is laid out by the bare icon; the menu
+                    // floats over it with a full-size frame. (A menu's
+                    // tap target is its label's frame, so
+                    // `expandedTapTarget()` can't grow it — and outside
+                    // that frame a tap goes to the rename button, which
+                    // answers for the whole row.)
+                    icon
+                        .hidden()
+                        .overlay {
+                            Menu {
+                                ForEach(ClimatePreset.availableIcons, id: \.icon) { option in
+                                    Button {
+                                        preset.iconName = option.icon
+                                        savePreset(preset)
+                                    } label: {
+                                        Label(option.name, systemImage: option.icon)
+                                    }
+                                }
                             } label: {
-                                Label(option.name, systemImage: option.icon)
+                                icon
+                                    .frame(minWidth: TapTarget.minimumSize, minHeight: TapTarget.minimumSize)
+                                    .contentShape(Rectangle())
                             }
                         }
-                    } label: {
-                        Image(systemName: preset.iconName)
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                            .frame(width: 32)
-                    }
 
                     Button {
                         newName = preset.name

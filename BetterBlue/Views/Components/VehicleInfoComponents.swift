@@ -159,8 +159,11 @@ struct VehicleCustomizationSection: View {
                 // Hidden when nothing is overridden so the header doesn't
                 // shout at users who haven't customized anything yet.
                 if hasAnyOverride {
-                    Button("Reset") {
+                    Button {
                         showingResetConfirm = true
+                    } label: {
+                        Text("Reset")
+                            .expandedTapTarget()
                     }
                     .font(.caption)
                     .textCase(nil)

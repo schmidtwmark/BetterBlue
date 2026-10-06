@@ -54,8 +54,11 @@ struct FakeVehicleListView: View {
                 Text("Fake Vehicles")
                 Spacer()
 
-                Button("Add Vehicle") {
+                Button {
                     addNewVehicle()
+                } label: {
+                    Text("Add Vehicle")
+                        .expandedTapTarget()
                 }
                 .font(.caption)
                 .foregroundColor(.blue)

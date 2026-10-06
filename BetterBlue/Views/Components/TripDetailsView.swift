@@ -152,6 +152,7 @@ struct TripDetailsView: View {
                     .frame(width: 32, height: 32)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(Circle())
+                    .expandedTapTarget()
             }
             .buttonStyle(.plain)
             .disabled(!canNavigateBack)
@@ -178,6 +179,7 @@ struct TripDetailsView: View {
                     .frame(width: 32, height: 32)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(Circle())
+                    .expandedTapTarget()
             }
             .buttonStyle(.plain)
             .disabled(periodOffset >= 0)

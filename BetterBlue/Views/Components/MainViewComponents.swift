@@ -44,6 +44,7 @@ struct EmptyAccountsView: View {
             } label: {
                 Label("Trouble signing in?", systemImage: "questionmark.circle")
                     .font(.callout)
+                    .expandedTapTarget()
             }
             .buttonStyle(.plain)
             .foregroundStyle(.blue)

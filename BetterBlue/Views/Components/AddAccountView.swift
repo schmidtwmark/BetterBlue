@@ -307,6 +307,7 @@ struct AddAccountView: View {
                         }
                     } label: {
                         Text(useToken ? "Use Password" : "Use Refresh Token")
+                            .expandedTapTarget()
                     }
                     .font(.caption)
                     .textCase(nil)

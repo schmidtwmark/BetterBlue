@@ -57,6 +57,9 @@ struct SeatHeatControl: View {
 
                     Spacer()
                 }
+                // The whole strip cycles the level, not just the icon
+                // and the text between the spacers.
+                .expandedTapTarget()
             }
             .buttonStyle(.plain)
             .animation(.easeInOut(duration: 0.2), value: level)

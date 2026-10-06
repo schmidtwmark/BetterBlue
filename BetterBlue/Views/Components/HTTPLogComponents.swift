@@ -62,6 +62,8 @@ struct HTTPLogFilterSheet: View {
                                     .foregroundColor(.primary)
                                 Spacer()
                             }
+                            // The whole row toggles the filter, not just its text.
+                            .expandedTapTarget()
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -69,13 +71,19 @@ struct HTTPLogFilterSheet: View {
                     HStack {
                         Text("Request Types")
                         Spacer()
-                        Button("All") {
+                        Button {
                             selectedRequestTypes = Set(HTTPRequestType.allCases)
+                        } label: {
+                            Text("All")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
-                        Button("None") {
+                        Button {
                             selectedRequestTypes = []
+                        } label: {
+                            Text("None")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
@@ -101,6 +109,8 @@ struct HTTPLogFilterSheet: View {
                                     .foregroundColor(.primary)
                                 Spacer()
                             }
+                            // The whole row toggles the filter, not just its text.
+                            .expandedTapTarget()
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -108,13 +118,19 @@ struct HTTPLogFilterSheet: View {
                     HStack {
                         Text("Device Types")
                         Spacer()
-                        Button("All") {
+                        Button {
                             selectedDeviceTypes = Set(DeviceType.allCases)
+                        } label: {
+                            Text("All")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
-                        Button("None") {
+                        Button {
                             selectedDeviceTypes = []
+                        } label: {
+                            Text("None")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
@@ -147,6 +163,8 @@ struct HTTPLogFilterSheet: View {
                                     }
                                     Spacer()
                                 }
+                                // The whole row toggles the filter, not just its text.
+                                .expandedTapTarget()
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -154,13 +172,19 @@ struct HTTPLogFilterSheet: View {
                         HStack {
                             Text("Accounts")
                             Spacer()
-                            Button("All") {
+                            Button {
                                 selectedAccountIds = Set(allAccounts.map(\.id))
+                            } label: {
+                                Text("All")
+                                    .expandedTapTarget()
                             }
                             .font(.caption)
                             .foregroundColor(.blue)
-                            Button("None") {
+                            Button {
                                 selectedAccountIds = []
+                            } label: {
+                                Text("None")
+                                    .expandedTapTarget()
                             }
                             .font(.caption)
                             .foregroundColor(.blue)

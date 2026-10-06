@@ -87,8 +87,11 @@ struct SettingsView: View {
                     HStack {
                         Text("Accounts")
                         Spacer()
-                        NavigationLink("Add Account") {
+                        NavigationLink {
                             AddAccountView()
+                        } label: {
+                            Text("Add Account")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
@@ -116,6 +119,7 @@ struct SettingsView: View {
                                     .background(Color.blue)
                                     .foregroundColor(.white)
                                     .clipShape(Capsule())
+                                    .expandedTapTarget()
                             }
                             .buttonStyle(.plain)
                         }

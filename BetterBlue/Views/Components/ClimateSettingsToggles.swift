@@ -57,6 +57,7 @@ struct ClimateSettingsInfoButton: View {
         } label: {
             Image(systemName: "info.circle")
                 .foregroundColor(.blue)
+                .expandedTapTarget()
         }
         .buttonStyle(.plain)
         // `textCase(nil)` so SwiftUI doesn't try to uppercase the

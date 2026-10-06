@@ -25,6 +25,7 @@ struct ClimatePresetsSection: View {
                             Image(systemName: preset.isSelected ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(preset.isSelected ? .green : .gray)
                                 .frame(width: 32)
+                                .expandedTapTarget()
                         }
                         .buttonStyle(.plain)
 
@@ -49,8 +50,11 @@ struct ClimatePresetsSection: View {
                 HStack {
                     Text("Climate Presets")
                     Spacer()
-                    Button("Add Preset") {
+                    Button {
                         createNewPreset()
+                    } label: {
+                        Text("Add Preset")
+                            .expandedTapTarget()
                     }
                     .font(.caption)
                     .foregroundColor(.blue)

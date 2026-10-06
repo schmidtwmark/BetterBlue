@@ -142,6 +142,7 @@ struct AccountInfoView: View {
                             }
                         } label: {
                             Text(useToken ? "Use Password" : "Use Refresh Token")
+                                .expandedTapTarget()
                         }
                         .font(.caption)
                         .textCase(nil)
@@ -201,13 +202,16 @@ struct AccountInfoView: View {
 
                             Spacer()
 
-                            Button("Show") {
+                            Button {
                                 bbVehicle.isHidden = false
                                 do {
                                     try modelContext.save()
                                 } catch {
                                     BBLogger.error(.app, "Failed to show vehicle: \(error)")
                                 }
+                            } label: {
+                                Text("Show")
+                                    .expandedTapTarget()
                             }
                             .buttonStyle(.borderless)
                             .foregroundColor(.blue)
