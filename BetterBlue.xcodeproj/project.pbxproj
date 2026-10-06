@@ -767,7 +767,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -786,7 +786,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -802,7 +802,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = BetterBlue/BetterBlue.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				DEVELOPMENT_ASSET_PATHS = "\"BetterBlue/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -821,7 +821,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -837,7 +837,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
@@ -848,7 +848,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -871,7 +871,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "BetterBlueWatch Watch App/BetterBlueWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "BetterBlueWatch-Watch-App-Info.plist";
@@ -882,7 +882,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -905,7 +905,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
@@ -917,7 +917,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -937,7 +937,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BetterBlue;
@@ -949,7 +949,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.Widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -969,7 +969,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WatchWidget/WatchWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchWidget;
@@ -980,7 +980,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp.WatchWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -1002,7 +1002,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = WatchWidget/WatchWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WatchWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchWidget;
@@ -1013,7 +1013,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 2026.9.3;
+				MARKETING_VERSION = 2026.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BB_BUNDLE_ID_PREFIX).BetterBlue.watchkitapp.WatchWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
