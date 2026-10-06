@@ -78,22 +78,26 @@ struct VehicleActivityWidget: Widget {
                     Text(formattedRange(for: context.state.status))
                         .font(.caption2)
                         .fontWeight(.medium)
+                        .compactIslandText()
                 }
             } compactTrailing: {
                 if context.state.activityType == .debug {
                     Text("#\(context.state.wakeupCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
+                        .compactIslandText()
                 } else if context.state.activityType == .climate,
                           context.state.status.climateStatus.temperature.isPlausibleForDisplay {
                     let temp = context.state.status.climateStatus.temperature
                     Text("\(Int(temp.value))\(temp.units.symbol)")
                         .font(.caption2)
                         .fontWeight(.medium)
+                        .compactIslandText()
                 } else {
                     Text("\(batteryPercentage(for: context.state.status))%")
                         .font(.caption2)
                         .fontWeight(.medium)
+                        .compactIslandText()
                 }
             } minimal: {
                 if context.state.activityType == .debug {
@@ -110,6 +114,7 @@ struct VehicleActivityWidget: Widget {
                 } else {
                     Text("\(batteryPercentage(for: context.state.status))%")
                         .font(.caption2)
+                        .compactIslandText()
                 }
             }
             .widgetURL(URL(string: "betterblue://vehicle/\(context.attributes.vin)"))
@@ -134,6 +139,19 @@ struct VehicleActivityWidget: Widget {
             return Int(gasRange.percentage)
         }
         return 0
+    }
+}
+
+private extension Text {
+    /// Compact/minimal Dynamic Island slots can be narrower than the text
+    /// (e.g. iPhone 18 Pro's smaller island sharing space with another
+    /// activity). Keep it on one line and shrink instead of wrapping ("329\nmi")
+    /// or clipping ("82%" → "32%").
+    func compactIslandText() -> some View {
+        self
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
     }
 }
 
