@@ -536,6 +536,14 @@ extension BBAccount {
                 }
                 existingBBVehicle.modelYear = vehicle.modelYear
                 existingBBVehicle.vehicleKey = vehicle.vehicleKey
+                // EU picks CCS2 vs legacy command bodies from this flag.
+                // It used to be set only when the row was created, so
+                // cars added before the CCS2 parse fix (`!= 0`, was
+                // `== 1`) kept a stale `false` and every command went to
+                // the legacy v1 endpoints — climate included, with its
+                // duration in the legacy `igniOnDuration` slot instead
+                // of the CCS2 `ignitionDuration`.
+                existingBBVehicle.maybeMarketOptions = vehicle.marketOptions
             } else {
                 // Create new vehicle
                 let bbVehicle = BBVehicle(from: vehicle)
