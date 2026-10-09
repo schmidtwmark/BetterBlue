@@ -29,7 +29,11 @@ struct ClimatePresetsSection: View {
                         }
                         .buttonStyle(.plain)
 
-                        NavigationLink(destination: ClimateSettingsContent(vehicle: bbVehicle, preset: preset)) {
+                        NavigationLink(destination: ClimateSettingsContent(
+                            vehicle: bbVehicle,
+                            preset: preset,
+                            dismissesOnDelete: true
+                        )) {
                             HStack {
                                 Image(systemName: preset.iconName)
                                     .foregroundColor(.blue)

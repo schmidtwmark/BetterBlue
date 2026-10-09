@@ -12,8 +12,14 @@ import SwiftUI
 struct ClimateSettingsContent: View {
     let vehicle: BBVehicle
     @Bindable var preset: ClimatePreset
+    /// Pop back after "Delete Preset" — for the copy pushed from the
+    /// presets list. In `ClimateSettingsSheet`'s tabs the deleted
+    /// preset's tab just goes away (`dismiss` there would close the
+    /// whole sheet).
+    var dismissesOnDelete = false
     @State private var appSettings = AppSettings.shared
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query private var allClimatePresets: [ClimatePreset]
     @State private var editingName = false
     @State private var newName = ""
@@ -23,8 +29,14 @@ struct ClimateSettingsContent: View {
     }
 
     var body: some View {
+        // The preset too: "Delete Preset" deletes it while this view is
+        // still on screen, and SwiftUI re-renders it once more before the
+        // tab or navigation entry holding it goes away. Reading
+        // `preset.climateOptions` then traps in SwiftData.
         PersistentModelGuard(model: vehicle) {
-            activeBody
+            PersistentModelGuard(model: preset) {
+                activeBody
+            }
         }
     }
 
@@ -348,12 +360,15 @@ extension ClimateSettingsContent {
     private func deleteCurrentPreset() {
         guard vehiclePresets.count > 1 else { return }
 
+        // Read everything needed from the preset before deleting it.
+        let deletedID = preset.id
         let wasSelected = preset.isSelected
+        if dismissesOnDelete { dismiss() }
         modelContext.delete(preset)
 
         // If we deleted the selected preset, select the first remaining one
         if wasSelected {
-            let remainingPresets = vehiclePresets.filter { $0.id != preset.id }
+            let remainingPresets = vehiclePresets.filter { $0.id != deletedID }
             remainingPresets.first?.isSelected = true
         }
 

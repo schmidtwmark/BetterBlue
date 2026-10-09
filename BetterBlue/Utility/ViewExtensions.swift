@@ -97,7 +97,10 @@ struct PersistentModelGuard<Content: View, Model: PersistentModel>: View {
     }
 
     var body: some View {
-        if model.modelContext == nil {
+        // Both checks: a model deleted but not yet saved still has its
+        // context (only `isDeleted` says so), and one deleted and saved
+        // reads `isDeleted == false` with no context.
+        if model.isDeleted || model.modelContext == nil {
             EmptyView()
         } else {
             content()

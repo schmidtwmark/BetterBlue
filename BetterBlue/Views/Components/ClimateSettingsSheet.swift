@@ -80,6 +80,11 @@ struct ClimateSettingsSheet: View {
         .onAppear {
             createDefaultPresetIfNeeded()
         }
+        // Tabs are tagged by position, so deleting the last preset leaves
+        // the selection pointing past the end — onto no tab at all.
+        .onChange(of: vehiclePresets.count) { _, count in
+            if selectedTab >= count { selectedTab = max(0, count - 1) }
+        }
     }
 }
 
