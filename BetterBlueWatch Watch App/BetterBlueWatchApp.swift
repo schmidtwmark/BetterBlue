@@ -29,6 +29,7 @@ struct BetterBlueWatchApp: App {
 
             // Configure the HTTP log sink manager for watch
             HTTPLogSinkManager.shared.configure(with: container, deviceType: .watch)
+            Task { @MainActor in WatchComplicationReloader.observeCloudKitImports(in: container) }
 
             print("✅ [WatchApp] Created shared ModelContainer")
             return container
@@ -43,7 +44,24 @@ extension BetterBlueWatchApp {
     var body: some Scene {
         WindowGroup {
             WatchMainView()
+                .modifier(ComplicationReloadOnBackground())
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+/// Catch-all for edits no explicit path reloads for (a status poll the
+/// user wrist-downed out of, say): flush them and refresh the
+/// complication on the way out, if it would change.
+private struct ComplicationReloadOnBackground: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                WatchComplicationReloader.reloadIfChanged(modelContext)
+            }
+        }
     }
 }

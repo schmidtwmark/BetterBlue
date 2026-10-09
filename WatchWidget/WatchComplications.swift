@@ -21,6 +21,26 @@ struct WatchComplicationEntry: TimelineEntry {
     var isElectric: Bool = true
     /// User-selected ring tint; `.automatic` follows the watch face.
     var tint: WatchComplicationColor = .automatic
+
+    /// Everything that renders, minus `date` — two entries with equal
+    /// content draw the same complication.
+    struct Content: Equatable {
+        let vehicleName: String?
+        let rangeText: String?
+        let batteryPercentage: Double?
+        let isElectric: Bool
+        let tint: WatchComplicationColor
+    }
+
+    var content: Content {
+        Content(
+            vehicleName: vehicleName,
+            rangeText: rangeText,
+            batteryPercentage: batteryPercentage,
+            isElectric: isElectric,
+            tint: tint
+        )
+    }
 }
 
 struct WatchComplicationProvider: TimelineProvider {
@@ -53,55 +73,64 @@ struct WatchComplicationProvider: TimelineProvider {
     private func fetchEntry() async -> WatchComplicationEntry {
         do {
             let modelContainer = try createSharedModelContainer(enableCloudKit: false)
-            let context = ModelContext(modelContainer)
-            let vehicles = try context.fetch(FetchDescriptor<BBVehicle>(
-                predicate: #Predicate { !$0.isHidden },
-                sortBy: [SortDescriptor(\.sortOrder)]
-            ))
-
-            // The watch app's Settings can pin the complication to a
-            // specific vehicle; otherwise the first visible one. Live
-            // read — this extension process outlives settings changes.
-            let selectedVIN = AppSettings.liveWatchComplicationVIN()
-            let vehicle = vehicles.first(where: { $0.vin == selectedVIN }) ?? vehicles.first
-            guard let vehicle else {
-                return WatchComplicationEntry(date: Date(), vehicleName: nil, rangeText: nil, batteryPercentage: nil)
-            }
-
-            let settings = AppSettings.shared
-            var rangeText: String?
-            var percentage: Double?
-
-            if vehicle.fuelType.hasElectricCapability, let evStatus = vehicle.evStatus {
-                percentage = evStatus.evRange.percentage
-                if evStatus.evRange.range.length > 0 {
-                    rangeText = evStatus.evRange.range.units.format(
-                        evStatus.evRange.range.length,
-                        to: settings.preferredDistanceUnit
-                    )
-                }
-            } else if let gasRange = vehicle.gasRange {
-                percentage = gasRange.percentage
-                if gasRange.range.length > 0 {
-                    rangeText = gasRange.range.units.format(
-                        gasRange.range.length,
-                        to: settings.preferredDistanceUnit
-                    )
-                }
-            }
-
-            return WatchComplicationEntry(
-                date: Date(),
-                vehicleName: vehicle.displayName,
-                rangeText: rangeText,
-                batteryPercentage: percentage,
-                isElectric: vehicle.fuelType.hasElectricCapability,
-                tint: AppSettings.liveWatchComplicationColor()
-            )
+            return try Self.entry(in: ModelContext(modelContainer))
         } catch {
             BBLogger.error(.app, "WatchComplicationProvider: \(error)")
             return WatchComplicationEntry(date: Date(), vehicleName: nil, rangeText: nil, batteryPercentage: nil)
         }
+    }
+
+    /// What the complication shows for the store's current contents.
+    /// Also compiled into the watch app, which compares it before and
+    /// after a change to decide whether a reload is worth spending.
+    @MainActor
+    static func entry(in context: ModelContext) throws -> WatchComplicationEntry {
+        let vehicles = try context.fetch(FetchDescriptor<BBVehicle>(
+            predicate: #Predicate { !$0.isHidden },
+            sortBy: [SortDescriptor(\.sortOrder)]
+        ))
+
+        // The watch app's Settings can pin the complication to a
+        // specific vehicle; otherwise the first visible one. Live
+        // read — this extension process outlives settings changes.
+        let selectedVIN = AppSettings.liveWatchComplicationVIN()
+        let vehicle = vehicles.first(where: { $0.vin == selectedVIN }) ?? vehicles.first
+        guard let vehicle else {
+            return WatchComplicationEntry(date: Date(), vehicleName: nil, rangeText: nil, batteryPercentage: nil)
+        }
+
+        // Live read, same reason as the VIN above: the cached
+        // singleton would keep this process's launch-time unit.
+        let distanceUnit = AppSettings.liveDistanceUnit()
+        var rangeText: String?
+        var percentage: Double?
+
+        if vehicle.fuelType.hasElectricCapability, let evStatus = vehicle.evStatus {
+            percentage = evStatus.evRange.percentage
+            if evStatus.evRange.range.length > 0 {
+                rangeText = evStatus.evRange.range.units.format(
+                    evStatus.evRange.range.length,
+                    to: distanceUnit
+                )
+            }
+        } else if let gasRange = vehicle.gasRange {
+            percentage = gasRange.percentage
+            if gasRange.range.length > 0 {
+                rangeText = gasRange.range.units.format(
+                    gasRange.range.length,
+                    to: distanceUnit
+                )
+            }
+        }
+
+        return WatchComplicationEntry(
+            date: Date(),
+            vehicleName: vehicle.displayName,
+            rangeText: rangeText,
+            batteryPercentage: percentage,
+            isElectric: vehicle.fuelType.hasElectricCapability,
+            tint: AppSettings.liveWatchComplicationColor()
+        )
     }
 }
 
