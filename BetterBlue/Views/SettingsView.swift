@@ -191,6 +191,16 @@ struct SettingsView: View {
                     Button("Export Debug Data") {
                         showingExportSheet = true
                     }
+
+                    // Outside debug mode on purpose: it's how a tester whose
+                    // app froze and was killed — no crash log for TestFlight
+                    // to attach — can still send the hang's call stack.
+                    let systemReports = SystemDiagnostics.shared.reportURLs
+                    if !systemReports.isEmpty {
+                        ShareLink(items: systemReports) {
+                            Text("Share Crash & Hang Reports (\(systemReports.count))")
+                        }
+                    }
                 } header: {
                     Text("Debug Settings")
                 }
