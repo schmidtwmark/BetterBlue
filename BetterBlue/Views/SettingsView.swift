@@ -140,6 +140,16 @@ struct SettingsView: View {
                             Text(unit.displayName).tag(unit)
                         }
                     }
+
+                    // Only the EV trip screen uses it, so hide it from
+                    // gas-only garages.
+                    if displayedVehicles.contains(where: { $0.fuelType.hasElectricCapability }) {
+                        Picker("Efficiency Unit", selection: $appSettings.preferredEfficiencyUnit) {
+                            ForEach(EfficiencyUnit.allCases) { unit in
+                                Text(unit.abbreviation).tag(unit)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Units")
                 }

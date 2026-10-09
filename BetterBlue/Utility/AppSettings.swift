@@ -48,6 +48,66 @@ enum WatchComplicationColor: String, CaseIterable, Identifiable {
     }
 }
 
+/// How the EV trip screen expresses efficiency. Distance-per-energy
+/// (mi/kWh) reads higher-is-better; energy-per-distance (kWh/100 km,
+/// Wh/mi) is the common European convention and reads lower-is-better.
+enum EfficiencyUnit: String, CaseIterable, Identifiable {
+    case milesPerKWh, kilometersPerKWh
+    case kWhPer100Miles, kWhPer100Kilometers
+    case whPerMile, whPerKilometer
+
+    var id: String { rawValue }
+
+    var abbreviation: String {
+        switch self {
+        case .milesPerKWh: "mi/kWh"
+        case .kilometersPerKWh: "km/kWh"
+        case .kWhPer100Miles: "kWh/100 mi"
+        case .kWhPer100Kilometers: "kWh/100 km"
+        case .whPerMile: "Wh/mi"
+        case .whPerKilometer: "Wh/km"
+        }
+    }
+
+    private var distanceUnit: Distance.Units {
+        switch self {
+        case .milesPerKWh, .kWhPer100Miles, .whPerMile: .miles
+        case .kilometersPerKWh, .kWhPer100Kilometers, .whPerKilometer: .kilometers
+        }
+    }
+
+    /// What the trip screen showed before this was configurable:
+    /// distance-per-kWh in the user's distance unit.
+    static func defaultUnit(for distanceUnit: Distance.Units) -> EfficiencyUnit {
+        distanceUnit == .miles ? .milesPerKWh : .kilometersPerKWh
+    }
+
+    /// `nil` when the divisor is zero (no energy recorded for a
+    /// distance-per-energy unit, or no distance for an energy-per-distance
+    /// one) — there's no meaningful number to show.
+    func value(distance: Distance, energyWh: Int) -> Double? {
+        let length = distance.units.convert(distance.length, to: distanceUnit)
+        let kWh = Double(energyWh) / 1000.0
+        switch self {
+        case .milesPerKWh, .kilometersPerKWh:
+            return kWh > 0 ? length / kWh : nil
+        case .kWhPer100Miles, .kWhPer100Kilometers:
+            return length > 0 ? kWh / length * 100 : nil
+        case .whPerMile, .whPerKilometer:
+            return length > 0 ? Double(energyWh) / length : nil
+        }
+    }
+
+    func format(distance: Distance, energyWh: Int) -> String {
+        guard let value = value(distance: distance, energyWh: energyWh) else {
+            return "-- \(abbreviation)"
+        }
+        // Wh/distance lands in the hundreds, so a decimal is noise there.
+        let fractionDigits = (self == .whPerMile || self == .whPerKilometer) ? 0 : 1
+        return "\(value.formatted(.number.precision(.fractionLength(fractionDigits)))) \(abbreviation)"
+    }
+}
+
 enum WidgetRefreshInterval: Int, CaseIterable {
     case oneHour = 1
     case twoHours = 2
@@ -132,6 +192,7 @@ class AppSettings {
     private let isSimulator: Bool
     private let distanceUnitKey = "DistanceUnit"
     private let temperatureUnitKey = "TemperatureUnit"
+    private let efficiencyUnitKey = "EfficiencyUnit"
     private let notificationsEnabledKey = "NotificationsEnabled"
     private let widgetRefreshIntervalKey = "WidgetRefreshInterval"
     private let debugModeEnabledKey = "DebugModeEnabled"
@@ -155,6 +216,24 @@ class AppSettings {
             syncStore.performSync()
             refreshWidgetsAndLiveActivities()
         }
+    }
+
+    /// The user's explicit efficiency-unit pick; `nil` until they make
+    /// one, so the default keeps following their distance unit.
+    private var efficiencyUnitChoice: EfficiencyUnit? {
+        didSet {
+            guard let efficiencyUnitChoice else { return }
+            syncStore.setString(efficiencyUnitChoice.rawValue, forKey: efficiencyUnitKey)
+            userDefaults.set(efficiencyUnitChoice.rawValue, forKey: efficiencyUnitKey)
+            syncStore.performSync()
+        }
+    }
+
+    /// Unit for EV trip efficiency. Only the main app's trip screen
+    /// shows it, so unlike the other units there's nothing to reload.
+    var preferredEfficiencyUnit: EfficiencyUnit {
+        get { efficiencyUnitChoice ?? .defaultUnit(for: preferredDistanceUnit) }
+        set { efficiencyUnitChoice = newValue }
     }
 
     // MARK: - Live cross-process reads
@@ -304,6 +383,10 @@ class AppSettings {
             ?? Temperature.Units.fahrenheit.rawValue
         preferredTemperatureUnit = Temperature.Units(rawValue: savedTemperatureUnit) ?? .fahrenheit
 
+        efficiencyUnitChoice = (userDefaults.string(forKey: efficiencyUnitKey)
+            ?? syncStore.string(forKey: efficiencyUnitKey))
+            .flatMap(EfficiencyUnit.init(rawValue:))
+
         notificationsEnabled = userDefaults.bool(forKey: notificationsEnabledKey)
 
         let savedRefreshInterval = userDefaults.integer(forKey: widgetRefreshIntervalKey)
@@ -375,6 +458,13 @@ class AppSettings {
            let unit = Temperature.Units(rawValue: value),
            unit != preferredTemperatureUnit {
             preferredTemperatureUnit = unit
+        }
+
+        if changedKeys.contains(efficiencyUnitKey),
+           let value = syncStore.string(forKey: efficiencyUnitKey),
+           let unit = EfficiencyUnit(rawValue: value),
+           unit != efficiencyUnitChoice {
+            efficiencyUnitChoice = unit
         }
     }
 

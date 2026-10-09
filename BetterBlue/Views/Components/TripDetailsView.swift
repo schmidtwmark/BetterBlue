@@ -38,6 +38,11 @@ struct TripDetailsView: View {
             }
             .navigationTitle("Trip History")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    efficiencyUnitMenu
+                }
+            }
             .task {
                 await loadTripDetails()
             }
@@ -46,6 +51,18 @@ struct TripDetailsView: View {
                     await loadDetailedTripsForSelectedPeriod()
                 }
             }
+        }
+    }
+
+    private var efficiencyUnitMenu: some View {
+        Menu {
+            Picker("Efficiency Unit", selection: $appSettings.preferredEfficiencyUnit) {
+                ForEach(EfficiencyUnit.allCases) { unit in
+                    Text(unit.abbreviation).tag(unit)
+                }
+            }
+        } label: {
+            Label("Efficiency Unit", systemImage: "gauge.with.dots.needle.67percent")
         }
     }
 
@@ -121,6 +138,7 @@ struct TripDetailsView: View {
                         TripDetailRow(
                             trip: trip,
                             distanceUnit: appSettings.preferredDistanceUnit,
+                            efficiencyUnit: appSettings.preferredEfficiencyUnit,
                             isDailySummary: isDailySummaryData,
                             bbVehicle: bbVehicle,
                             supportsTripInfo: supportsTripInfo,
@@ -430,6 +448,7 @@ struct EnergyDataPoint: Identifiable {
 struct TripDetailRow: View {
     let trip: EVTripSummary
     let distanceUnit: Distance.Units
+    let efficiencyUnit: EfficiencyUnit
     let isDailySummary: Bool
     var bbVehicle: BBVehicle? = nil
     var supportsTripInfo: Bool = false
@@ -479,7 +498,7 @@ struct TripDetailRow: View {
     }
 
     private var formattedEfficiency: String {
-        String(format: "%.1f %@/kWh", trip.efficiency(in: distanceUnit), distanceUnit.abbreviation)
+        efficiencyUnit.format(distance: trip.distance, energyWh: trip.totalEnergyUsed)
     }
 
     private var formattedTotalEnergy: String {
@@ -802,6 +821,7 @@ extension EVTripInfo {
         TripDetailRow(
             trip: .sample,
             distanceUnit: .miles,
+            efficiencyUnit: .milesPerKWh,
             isDailySummary: false
         )
     }
@@ -812,6 +832,7 @@ extension EVTripInfo {
         TripDetailRow(
             trip: .sampleDaySummary,
             distanceUnit: .kilometers,
+            efficiencyUnit: .kWhPer100Kilometers,
             isDailySummary: true,
             supportsTripInfo: true,
             detailedTrips: EVTripInfo.sampleTrips
