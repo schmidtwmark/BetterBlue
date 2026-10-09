@@ -124,6 +124,9 @@ struct MainView: View {
         mainContent
             .onChange(of: scenePhase) { old, new in
                 BBLogger.info(.app, "[SVI-\(instanceTag)] scenePhase \(old) → \(new) (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
+                if new == .background {
+                    finishStoreWorkBeforeSuspension()
+                }
             }
             .onAppear {
                 BBLogger.info(.app, "[SVI-\(instanceTag)] MainView .onAppear (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
@@ -213,6 +216,20 @@ struct MainView: View {
                     await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
                 }
             }
+    }
+
+    /// Leaving the app: save now rather than let autosave fire after the
+    /// app is suspended, and stay awake while CloudKit exports the save
+    /// (and finishes anything else under way) — a write to the App Group
+    /// store still in progress at suspension gets the app killed
+    /// (0xdead10cc).
+    private func finishStoreWorkBeforeSuspension() {
+        let backgroundTask = BackgroundTask(name: "BetterBlue.enterBackground")
+        try? modelContext.save()
+        Task {
+            await CloudKitSyncMonitor.shared.waitUntilIdle(deadline: .now + .seconds(20))
+            backgroundTask.end()
+        }
     }
 
     /// True when there are vehicles to show: the map fills the

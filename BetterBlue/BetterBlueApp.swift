@@ -7,6 +7,7 @@
 
 import AppIntents
 import BetterBlueKit
+import CloudKit
 import SwiftData
 import SwiftUI
 import UserNotifications
@@ -48,6 +49,7 @@ struct BetterBlueApp: App {
 
         do {
             let container = try createSharedModelContainer()
+            appModelContainer = container
 
             // Configure the HTTP log sink manager with auto-detected device type
             let deviceType = HTTPLogSinkManager.detectMainAppDeviceType()
@@ -225,16 +227,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
         AppLogger.push.info("Received remote notification: \(userInfo, privacy: .public)")
+        // Taken here, synchronously, where background time is still
+        // guaranteed. Pushes are when the app runs in the background, and
+        // CloudKit writes to the App Group store for a while after each
+        // one; a write still under way when the app is suspended gets it
+        // killed (0xdead10cc). Keep the app awake until it's done, within
+        // the ~30 s a push allows.
+        let backgroundTask = BackgroundTask(name: "BetterBlue.push")
+        let deadline = ContinuousClock.now + .seconds(25)
 
-        // Check if this is a Live Activity wakeup
         if userInfo["liveActivityWakeup"] != nil {
             AppLogger.push.info("Processing Live Activity wakeup push")
             Task {
                 await LiveActivityManager.shared.handleWakeupPush()
+                // The wakeup's save sets off a CloudKit export.
+                await CloudKitSyncMonitor.shared.waitUntilIdle(deadline: deadline)
                 completionHandler(.newData)
+                backgroundTask.end()
+            }
+        } else if CKNotification(fromRemoteNotificationDictionary: userInfo) != nil {
+            // A change from another device: Core Data imports it.
+            Task {
+                await CloudKitSyncMonitor.shared.waitUntilIdle(grace: .seconds(2), deadline: deadline)
+                completionHandler(.newData)
+                backgroundTask.end()
             }
         } else {
             completionHandler(.noData)
+            backgroundTask.end()
         }
     }
 
@@ -263,6 +283,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
         completionHandler()
+    }
+}
+
+/// A `UIApplication` background task: asks for background time on
+/// creation and gives it back on `end()` — or when the time runs out,
+/// which iOS requires to happen right away. Safe to end more than once.
+@MainActor
+final class BackgroundTask {
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+
+    init(name: String) {
+        identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
     }
 }
 

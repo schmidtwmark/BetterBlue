@@ -101,8 +101,14 @@ final class CloudKitSyncMonitor {
             // hand only the Sendable copy across the actor boundary.
             let key = NSPersistentCloudKitContainer.eventNotificationUserInfoKey
             guard let ckEvent = note.userInfo?[key]
-                    as? NSPersistentCloudKitContainer.Event,
-                  ckEvent.endDate != nil else { return }
+                    as? NSPersistentCloudKitContainer.Event else { return }
+            let identifier = ckEvent.identifier
+            guard ckEvent.endDate != nil else {
+                MainActor.assumeIsolated {
+                    _ = self?.inFlightEvents.insert(identifier)
+                }
+                return
+            }
             let projected = Event(
                 date: ckEvent.endDate ?? Date(),
                 type: Self.classify(ckEvent.type),
@@ -110,8 +116,30 @@ final class CloudKitSyncMonitor {
                 error: Self.describe(ckEvent.error)
             )
             MainActor.assumeIsolated {
+                self?.inFlightEvents.remove(identifier)
                 self?.handle(projected)
             }
+        }
+    }
+
+    /// Setup / import / export events that have started and not yet
+    /// finished. While there are any, Core Data is (or may be) writing to
+    /// the store.
+    @ObservationIgnored private var inFlightEvents: Set<UUID> = []
+
+    /// Waits until no CloudKit event is in flight, or until `deadline`.
+    ///
+    /// For work that has to finish before the app is suspended: a SQLite
+    /// write in the App Group store still under way at suspension gets the
+    /// app killed (0xdead10cc), and CloudKit mirroring writes on its own
+    /// schedule — an export after every save, an import after every push.
+    /// `grace` gives an event that a save just set off time to start before
+    /// "idle" is believed.
+    func waitUntilIdle(grace: Duration = .seconds(1), deadline: ContinuousClock.Instant) async {
+        let clock = ContinuousClock()
+        try? await Task.sleep(until: min(deadline, clock.now + grace), clock: clock)
+        while !inFlightEvents.isEmpty, clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(250))
         }
     }
 

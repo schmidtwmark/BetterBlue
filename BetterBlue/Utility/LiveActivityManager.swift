@@ -79,11 +79,12 @@ final class LiveActivityManager {
             return
         }
 
-        // Open one container for the whole call (creating one per
-        // iteration is wasteful — it'd reinit the SQLite connection
-        // pool each time). Per-iteration `ModelContext` instances
-        // share this container but scope their own change tracking.
-        guard let container = try? createSharedModelContainer() else {
+        // The app's own container when there is one (always, in the app
+        // process); otherwise one container for the whole call, without
+        // CloudKit — the app's container mirrors whatever it saves.
+        // Per-iteration `ModelContext` instances share it but scope their
+        // own change tracking.
+        guard let container = appModelContainer ?? (try? createSharedModelContainer(enableCloudKit: false)) else {
             AppLogger.liveActivity.error("Failed to create model container")
             return
         }

@@ -9,6 +9,14 @@ import BetterBlueKit
 import Foundation
 import SwiftData
 
+/// The container the main app opened at launch; nil in the extensions and
+/// on the watch. In-app code that would otherwise open a container of its
+/// own (`LiveActivityManager`'s wakeup push) uses this one: a second
+/// container on the same store is a second CloudKit mirroring delegate
+/// writing to it, and more SQLite work to be caught holding a lock when the
+/// app is suspended (0xdead10cc).
+@MainActor var appModelContainer: ModelContainer?
+
 func getSimulatorStoreURL() -> URL {
     // In simulator, use a fixed shared location to work around App Group container isolation
     let sharedSimulatorPath = "/tmp/BetterBlue_Shared"
