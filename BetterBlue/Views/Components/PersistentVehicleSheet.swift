@@ -1521,6 +1521,9 @@ struct PersistentVehicleSheet: View {
     // MARK: - Error wiring
 
     private func handleError(_ error: Error, action: String) {
+        // The vehicle was removed while the action was under way (see
+        // `BBVehicle.liveVehicle()`): nothing to report, its card is going.
+        if error is CancellationError { return }
         // Verification timeout is NOT a failure — the command was accepted
         // and usually completes; the backend just hasn't reflected it yet
         // (issue #83). No red banner: the next status refresh settles it.

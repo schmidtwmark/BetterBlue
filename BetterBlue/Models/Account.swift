@@ -419,6 +419,10 @@ extension BBAccount {
         modelContext: ModelContext,
         cached: Bool = true
     ) async throws -> VehicleStatus {
+        // Callers get here after awaits of their own, and the recursive
+        // calls below after `initialize`/`loadVehicles` — either of which
+        // can delete this vehicle (see `BBVehicle.isLive`).
+        guard bbVehicle.isLive else { throw CancellationError() }
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext, cached: cached)
@@ -431,7 +435,7 @@ extension BBAccount {
             return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext, cached: cached)
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
         let status: VehicleStatus
         do {
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken, cached: cached)
@@ -443,6 +447,7 @@ extension BBAccount {
 
             status = try await api.fetchVehicleStatus(for: vehicle, authToken: authToken, cached: cached)
         }
+        guard bbVehicle.isLive else { throw CancellationError() }
         LiveActivityManager.shared.updateActivity(for: bbVehicle, status: status, modelContext: modelContext)
         return status
     }
@@ -494,6 +499,7 @@ extension BBAccount {
         }
 
         let status = try await fetchVehicleStatus(for: vehicle, modelContext: modelContext, cached: cached)
+        guard vehicle.isLive else { throw CancellationError() }
         vehicle.updateStatus(with: status)
     }
 
@@ -611,6 +617,8 @@ extension BBAccount {
         climatePresetIcon: String? = nil,
         allowAuthRetry: Bool = true
     ) async throws {
+        // Re-entered after `initialize` below, which can delete the vehicle.
+        guard bbVehicle.isLive else { throw CancellationError() }
         guard let api, let authToken else {
             try await initialize(modelContext: modelContext)
             // Re-entering with a freshly-initialized session: a subsequent auth
@@ -632,6 +640,7 @@ extension BBAccount {
             BBLogger.debug(.api, "BBAccount: Kia vehicle missing vehicleKey, fetching fresh data...")
             let fetchedVehicles = try await api.fetchVehicles(authToken: authToken)
 
+            guard bbVehicle.isLive else { throw CancellationError() }
             guard let matchingVehicle = fetchedVehicles.first(where: { $0.vin == bbVehicle.vin }) else {
                 throw APIError.logError("Vehicle not found in fetched data", apiName: "BBAccount")
             }
@@ -657,7 +666,7 @@ extension BBAccount {
             )
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
         do {
             try await api.sendCommand(for: vehicle, command: command, authToken: authToken)
         } catch let error as APIError where allowAuthRetry && shouldRetryCommand(after: error) {
@@ -754,7 +763,7 @@ extension BBAccount {
             return try await fetchEVTripSummary(for: bbVehicle, modelContext: modelContext)
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
 
         do {
             return try await api.fetchEVTripSummary(for: vehicle, authToken: authToken)
@@ -776,7 +785,7 @@ extension BBAccount {
             return try await fetchEVTripInfo(for: bbVehicle, date: date, modelContext: modelContext)
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
 
         do {
             return try await api.fetchEVTripInfo(for: vehicle, authToken: authToken, date: date)
@@ -812,7 +821,7 @@ extension BBAccount {
             return try await requestSurroundViewCapture(for: bbVehicle, modelContext: modelContext)
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
 
         do {
             try await api.requestSurroundViewCapture(for: vehicle, authToken: authToken)
@@ -837,7 +846,7 @@ extension BBAccount {
             return try await fetchSurroundViewCaptures(for: bbVehicle, modelContext: modelContext)
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
 
         do {
             return try await api.fetchSurroundViewCaptures(for: vehicle, authToken: authToken)
@@ -868,7 +877,7 @@ extension BBAccount {
             )
         }
 
-        let vehicle = bbVehicle.toVehicle()
+        let vehicle = try bbVehicle.liveVehicle()
 
         do {
             return try await api.fetchSurroundViewImagery(
