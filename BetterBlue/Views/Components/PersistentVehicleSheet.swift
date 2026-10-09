@@ -316,6 +316,7 @@ struct PersistentVehicleSheet: View {
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y
         } action: { _, offset in
+            guard offset.isFinite else { return }
             offsetTracker.offset = offset
             scrollOffsets.report(offset, for: bbVehicle.vin)
             // Scrolled by something other than a finger or the card's own
@@ -341,6 +342,7 @@ struct PersistentVehicleSheet: View {
                 springDriver.stop()
                 offsetTracker.isScrollingInCode = false
                 offsetTracker.settleCheck?.cancel()
+                offsetTracker.settleRetries = 0
             }
             if old == .interacting, new != .interacting {
                 let released = context.geometry.contentOffset.y
@@ -506,6 +508,19 @@ struct PersistentVehicleSheet: View {
             let offset = offsetTracker.offset
             let travel = offsetTracker.travel
             if isBetweenDetents(offset) {
+                // A scroll that doesn't follow the spring would be sprung
+                // at again every time it finished, without end. Three
+                // tries from the same spot, then the card stays put.
+                if abs(offset - offsetTracker.settleOffset) < 0.5 {
+                    offsetTracker.settleRetries += 1
+                } else {
+                    offsetTracker.settleOffset = offset
+                    offsetTracker.settleRetries = 0
+                }
+                guard offsetTracker.settleRetries < 3 else {
+                    recordDetent(at: offset)
+                    return
+                }
                 springToDetent(offset > travel / 2 ? travel : 0, from: offset, velocity: 0, spring: SheetSnap.spring)
             } else {
                 recordDetent(at: offset)
@@ -2438,6 +2453,10 @@ private final class ScrollOffsetTracker {
     /// The pending check that the card has come to rest at a detent
     /// (see the card's `settleWhenStill(at:)`).
     var settleCheck: Task<Void, Never>?
+    /// Where the card was last found resting between its detents, and how
+    /// many springs from that same spot have failed to move it.
+    var settleOffset: CGFloat = .nan
+    var settleRetries = 0
 }
 
 /// A released drag's way to a detent: the offset it comes to rest at
@@ -2543,6 +2562,13 @@ private final class SheetSpringDriver: NSObject {
             initialVelocity: Double(velocity),
             epsilon: 0.1
         )
+        // Nothing to animate (or no finite time to do it in): arrive now
+        // rather than run a display link that never reaches its end.
+        guard duration.isFinite, duration > 0 else {
+            apply(to)
+            completion()
+            return
+        }
         start = CACurrentMediaTime()
         let link = CADisplayLink(target: self, selector: #selector(step(_:)))
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
@@ -2566,6 +2592,12 @@ private final class SheetSpringDriver: NSObject {
             return
         }
         let travelled = spring.value(target: Double(to - from), initialVelocity: Double(velocity), time: time)
+        guard travelled.isFinite else {
+            stop()
+            apply(to)
+            completion()
+            return
+        }
         apply(from + CGFloat(travelled))
     }
 }
@@ -3091,6 +3123,34 @@ struct VehicleSheetPager: View {
         )
     }
 
+    /// Whether a card rests at one of its detents — the only places where
+    /// its content width holds still.
+    ///
+    /// The measured heights (`contentHeights`, `controlsHeights`) are only
+    /// taken there. Between the detents the content's width follows
+    /// `edgeInset`, which follows the very geometry those heights feed:
+    /// a status line that wraps at the collapsed width and not at the
+    /// expanded one makes the controls taller → the resting height
+    /// greater → the travel shorter → the finger's offset further along
+    /// it → the card wider → the line unwraps → the controls shorter → …
+    /// With each state undoing the other, SwiftUI lays the card out
+    /// round and round, the map re-centres on every pass (the collapsed
+    /// height sets `mapBottomInset`), and the app freezes until the
+    /// system kills it for memory — with no crash log to show for it.
+    /// Taken at rest, a height can't move the width it was measured at.
+    private func restsAtDetent(_ vin: String, geo: GeometryProxy) -> Bool {
+        let layout = cardLayout(for: vin, geo: geo)
+        let scrolled = scrollOffsets[vin]
+        return layout.travel <= 0 || scrolled <= 0.5 || scrolled >= layout.travel - 0.5
+    }
+
+    /// Whether a card rests at its collapsed detent (or can't expand at
+    /// all) — where the controls are at the width the collapsed card
+    /// shows them at.
+    private func restsCollapsed(_ vin: String, geo: GeometryProxy) -> Bool {
+        cardLayout(for: vin, geo: geo).travel <= 0 || scrollOffsets[vin] <= 0.5
+    }
+
     /// Whether a card on screen stands over the settings button: the
     /// selected card — or, mid-swipe, any card, since a neighbour is
     /// then sliding in under the button too — risen to within reach of
@@ -3155,25 +3215,31 @@ struct VehicleSheetPager: View {
                         .opacity(fadesNeighbours ? 1 - abs(phase.value) : 1)
                 }
                 .onPreferenceChange(ErrorOverheadPreferenceKey.self) { value in
+                    guard value.isFinite else { return }
                     let rounded = (value * 2).rounded() / 2
                     let vin = vehicle.vin
                     if abs((errorOverheads[vin] ?? 0) - rounded) > 0.5 {
                         errorOverheads[vin] = rounded
                     }
                 }
+                // The content and controls heights are taken only while the
+                // card rests at a detent — see `restsAtDetent(_:geo:)`.
                 .onPreferenceChange(ContentHeightPreferenceKey.self) { value in
+                    guard value.isFinite else { return }
                     let rounded = (value * 2).rounded() / 2
                     let vin = vehicle.vin
-                    if abs((contentHeights[vin] ?? 0) - rounded) > 0.5 {
-                        contentHeights[vin] = rounded
-                    }
+                    guard abs((contentHeights[vin] ?? 0) - rounded) > 0.5,
+                          restsAtDetent(vin, geo: geo) else { return }
+                    contentHeights[vin] = rounded
                 }
                 .onPreferenceChange(ControlsHeightPreferenceKey.self) { value in
+                    guard value.isFinite else { return }
                     let rounded = (value * 2).rounded() / 2
                     let vin = vehicle.vin
-                    if abs((controlsHeights[vin] ?? 0) - rounded) > 0.5 {
-                        controlsHeights[vin] = rounded
-                    }
+                    // Collapsed only: this is the collapsed card's height.
+                    guard abs((controlsHeights[vin] ?? 0) - rounded) > 0.5,
+                          restsCollapsed(vin, geo: geo) else { return }
+                    controlsHeights[vin] = rounded
                 }
                 .id(index)
             }
