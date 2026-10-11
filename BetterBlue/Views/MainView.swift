@@ -352,16 +352,21 @@ struct MainView: View {
             // `sheetCoversToolbar`); collapsed, everything above the
             // card (settings button, map marker) stays tappable.
             if showsVehicles {
-                VehicleSheetPager(
-                    bbVehicles: displayedVehicles,
-                    selectedVehicleIndex: $selectedVehicleIndex,
-                    onSuccessfulRefresh: { lastError = nil },
-                    mfaState: mfaState,
-                    sheetPresentation: sheetPresentation,
-                    mapBottomInset: $mapBottomInset,
-                    coversToolbar: $sheetCoversToolbar,
-                    canCoverToolbar: $sheetCanCoverToolbar
-                )
+                // The pager lays itself out through the safe areas and
+                // is handed their insets as a value — see its `body`.
+                GeometryReader { geo in
+                    VehicleSheetPager(
+                        bbVehicles: displayedVehicles,
+                        selectedVehicleIndex: $selectedVehicleIndex,
+                        onSuccessfulRefresh: { lastError = nil },
+                        mfaState: mfaState,
+                        sheetPresentation: sheetPresentation,
+                        safeAreaInsets: geo.safeAreaInsets,
+                        mapBottomInset: $mapBottomInset,
+                        coversToolbar: $sheetCoversToolbar,
+                        canCoverToolbar: $sheetCanCoverToolbar
+                    )
+                }
             }
         }
     }

@@ -315,9 +315,10 @@ struct PersistentVehicleSheet: View {
         .modifier(BoxedScrollPosition(box: scroll))
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        // No edge effects: with one, the status bar's region is handed
-        // to the content as an inset the card can't tell from scrolling
-        // — see `VehicleSheetPager.statusBarGap`.
+        // No edge effects: the pager runs through the safe areas (see
+        // `VehicleSheetPager.statusBarGap`), so a system effect would be
+        // drawn against the window's edge, over the card. The pinned
+        // header has a backing of its own.
         .scrollEdgeEffectStyle(.none, for: .all)
         .scrollTargetBehavior(DetentSnapBehavior(travel: expansionTravel, tracker: offsetTracker))
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -2414,8 +2415,8 @@ private final class ScrollViewInsetSentinel: UIView {
         while let current = view, !(current is UIScrollView) {
             view = current.superview
         }
-        guard let scrollView = view as? UIScrollView,
-              scrollView.contentInsetAdjustmentBehavior != .never else { return }
+        guard let scrollView = view as? UIScrollView else { return }
+        guard scrollView.contentInsetAdjustmentBehavior != .never else { return }
         scrollView.contentInsetAdjustmentBehavior = .never
     }
 }
@@ -2771,6 +2772,11 @@ struct VehicleSheetPager: View {
     /// Same hoisting rationale — shared presentation for all
     /// per-vehicle sheets.
     let sheetPresentation: VehicleSheetPresentation
+    /// The window's safe-area insets, measured by `MainView` outside
+    /// this view. The pager lays itself out through the safe areas and
+    /// keeps clear of them by hand (see `body`), so its own geometry
+    /// reports none.
+    let safeAreaInsets: EdgeInsets
     /// Bottom inset the map should keep clear of the sheet. While
     /// the card spans the full window width this is the distance
     /// from the bottom of the screen to the visible top edge of a
@@ -2845,29 +2851,26 @@ struct VehicleSheetPager: View {
     /// an expanded detent at all: the card stays put and its content
     /// scrolls in place.
     private let minimumExpansionTravel: CGFloat = 44
-    /// How far below the status bar an expanded card stops. It must
-    /// not be 0: a ScrollView whose frame so much as TOUCHES a
-    /// safe-area edge is handed that edge's inset as a content inset
-    /// and extended under the bar. For a card arriving at the status
-    /// bar that knocks its scroll offset — which is its height — back
-    /// by the inset, the card drops, the inset goes away, the snap
-    /// resumes… and the card saws up and down short of its detent.
-    /// Stopping a hair short keeps every ScrollView in here clear of
-    /// the edge. (Ignoring the safe area further up doesn't help;
-    /// the inset is then measured to the screen edge instead.)
+    /// How far below the status bar an expanded card stops, like a
+    /// system sheet's gap under the bar.
     ///
-    /// On iOS 26.5–26.7 a hair isn't enough: SwiftUI hands the card's
-    /// ScrollView the inset all the same, and the saw ran round inside
-    /// one layout pass — the offset flipping between the detent and the
-    /// detent less the inset — until the system killed the app. Two
-    /// things together stop it. The card's UIScrollView is set to never
-    /// adjust its content inset (`ScrollViewInsetSentinel`), so UIKit
-    /// has no inset to shift the offset for. And the pager and the
-    /// cards opt out of scroll edge effects (`scrollEdgeEffectStyle(
-    /// .none)`): with one, SwiftUI lays the content out a status bar
-    /// lower to clear the effect it expects, whatever UIKit does. The
-    /// card's pinned header has a backing of its own.
-    private let statusBarGap: CGFloat = 2
+    /// Why the pager lays itself out through the safe areas (see
+    /// `body`): a SwiftUI ScrollView whose frame comes near a safe-area
+    /// edge is extended out to the window's edge behind it, and its
+    /// content laid out from the safe area's edge rather than the
+    /// frame's. The card reads its height off its ScrollView's offset,
+    /// so that extension, arriving as the card reached the status bar,
+    /// shifted the offset, dropped the card, undid itself, and came
+    /// back — round and round inside one layout pass until the system
+    /// killed the app (iOS 26.5–26.7; on iOS 27 this gap alone kept the
+    /// extension off, and the card's content a status bar too high and
+    /// the card short of the window's bottom were the extension's work
+    /// too). With no safe area inside the pager there is nothing to be
+    /// extended into. The card's UIScrollView is also set never to
+    /// adjust its content inset (`ScrollViewInsetSentinel`), and the
+    /// pager and the cards opt out of scroll edge effects, which would
+    /// be drawn against the window's edge, over the card.
+    static let statusBarGap: CGFloat = 2
     /// Gap between a collapsed card and the page's side and bottom
     /// edges (`PersistentVehicleSheet.outerInset`).
     private let cardOuterInset: CGFloat = 8
@@ -2907,13 +2910,19 @@ struct VehicleSheetPager: View {
     /// the pane edge. Explicit widths derived from `geo` resolve
     /// synchronously, so the card tracks the pane like a plain view.
     private func pageWidth(geo: GeometryProxy) -> CGFloat {
-        max(0, min(maxSheetWidth, geo.size.width))
+        max(0, min(maxSheetWidth, safeWidth(geo: geo)))
+    }
+
+    /// Width of the window between its side safe areas (iPhone
+    /// landscape keeps the sensor housing's strip clear).
+    private func safeWidth(geo: GeometryProxy) -> CGFloat {
+        geo.size.width - safeAreaInsets.leading - safeAreaInsets.trailing
     }
 
     /// True when the cap has kicked in and the pager is a column on
     /// the leading side of a wider window.
     private func isWidthCapped(geo: GeometryProxy) -> Bool {
-        geo.size.width > maxSheetWidth
+        safeWidth(geo: geo) > maxSheetWidth
     }
 
     /// True when a marker centered in the full frame would sit
@@ -2922,29 +2931,28 @@ struct VehicleSheetPager: View {
     /// the marker rides above the card; at or above it the marker
     /// is simply centered in the frame.
     private func markerClearsSheet(geo: GeometryProxy) -> Bool {
-        let sheetRightEdge = min(maxSheetWidth, geo.size.width) + cardOuterInset
-        return geo.size.width / 2 - markerClearance > sheetRightEdge
+        let sheetRightEdge = min(maxSheetWidth, safeWidth(geo: geo)) + cardOuterInset
+        return safeWidth(geo: geo) / 2 - markerClearance > sheetRightEdge
     }
 
-    /// Height the sheet has to work with: from the top of the safe
-    /// area (the bottom of the status bar) down to the physical
-    /// bottom of the window. `geo` itself stops at the bottom safe
-    /// area; the cards are laid out through it (see `body`).
+    /// Height the sheet has to work with: the physical height of the
+    /// window, top to bottom — `geo` spans the safe areas (see `body`).
+    /// `topClearance` keeps the cards out of the top one.
     private func areaHeight(geo: GeometryProxy) -> CGFloat {
-        geo.size.height + geo.safeAreaInsets.bottom
+        geo.size.height
     }
 
-    /// Space left between the top of the safe area and a fully
-    /// expanded card. Normally just `statusBarGap`: the card rises to
-    /// the bottom of the status bar, like a system sheet. A window
-    /// with controls in its top-leading corner (iPadOS windowing)
-    /// keeps the card below them, and a window with no status bar at
-    /// all (iPhone landscape) keeps a small gap rather than letting
-    /// the card touch its edge.
+    /// Space left between the top of the window and a fully expanded
+    /// card: the top safe area, plus normally just `statusBarGap`, so
+    /// the card rises to the bottom of the status bar like a system
+    /// sheet. A window with controls in its top-leading corner (iPadOS
+    /// windowing) keeps the card below them, and a window with no
+    /// status bar at all (iPhone landscape) keeps a small gap rather
+    /// than letting the card touch its edge.
     private func topClearance(geo: GeometryProxy) -> CGFloat {
-        max(
+        safeAreaInsets.top + max(
             geo.containerCornerInsets.topLeading.height,
-            geo.safeAreaInsets.top > 0 ? statusBarGap : cardOuterInset
+            safeAreaInsets.top > 0 ? Self.statusBarGap : cardOuterInset
         )
     }
 
@@ -2954,7 +2962,7 @@ struct VehicleSheetPager: View {
     /// a card docked against nothing would just look cut off, so
     /// there it stays a floating card and only gains height.
     private func expandsEdgeToEdge(geo: GeometryProxy) -> Bool {
-        geo.safeAreaInsets.leading == 0
+        safeAreaInsets.leading == 0
     }
 
     /// Whether the window shows anything beside the pager: open map past
@@ -2962,7 +2970,7 @@ struct VehicleSheetPager: View {
     /// Duo's status column). A neighbouring card would be on screen
     /// there, so cards fade as they page instead of sliding in whole.
     private func showsBesidePager(geo: GeometryProxy) -> Bool {
-        isWidthCapped(geo: geo) || geo.safeAreaInsets.leading > 0 || geo.safeAreaInsets.trailing > 0
+        isWidthCapped(geo: geo) || safeAreaInsets.leading > 0 || safeAreaInsets.trailing > 0
     }
 
     /// Whether a card can rise over the toolbar's trailing item at all:
@@ -2971,7 +2979,7 @@ struct VehicleSheetPager: View {
     /// toolbar has a column of its own beside the pager (iPhone Duo's
     /// side toolbar, in the trailing safe area).
     private func cardsCanCoverToolbar(geo: GeometryProxy) -> Bool {
-        pageWidth(geo: geo) > geo.size.width + geo.safeAreaInsets.trailing - toolbarItemReach.width
+        pageWidth(geo: geo) > safeWidth(geo: geo) + safeAreaInsets.trailing - toolbarItemReach.width
     }
 
     var body: some View {
@@ -3018,18 +3026,11 @@ struct VehicleSheetPager: View {
                     // post-swipe bounce).
                     .animation(nil, value: selectedVehicleIndex)
             }
-            // Extend through the bottom safe area so a collapsed
-            // card's outer edge sits the same 8pt off the physical
-            // screen on its sides and bottom, and an expanded one runs
-            // off the bottom of the screen. Respecting the safe area
-            // instead leaves the ~34pt home-indicator strip below the
-            // card, which makes the *outer* bottom gap (card → screen
-            // edge) read as much larger than the left/right gap. This
-            // is the gap the user measures visually, so it has to
-            // match.
-            // (Ignored here rather than on the GeometryReader so
-            // `geo` still reports the inset — the cards need it.)
-            .ignoresSafeArea(.container, edges: .bottom)
+            // Clear of the side safe areas (iPhone landscape's sensor
+            // housing); the pager runs through the top and bottom ones
+            // on purpose — see below.
+            .padding(.leading, safeAreaInsets.leading)
+            .padding(.trailing, safeAreaInsets.trailing)
             .onChange(of: bottomInset, initial: true) { old, new in
                 guard mapBottomInset != new else { return }
                 // Animate only the above-card ↔ frame-centered mode
@@ -3055,8 +3056,19 @@ struct VehicleSheetPager: View {
                 if canCoverToolbar != new { canCoverToolbar = new }
             }
         }
-        // A keyboard (some other sheet's) must not squeeze the pager.
-        .ignoresSafeArea(.keyboard)
+        // Through every safe area, the keyboard's (some other sheet's)
+        // included, so that no ScrollView in here has a safe-area edge
+        // in SwiftUI's eyes. A ScrollView whose frame comes near one is
+        // extended out to the window's edge behind it — and its content
+        // laid out from the safe area's edge rather than the frame's —
+        // which put the expanded card's content a status bar too high
+        // and the card itself short of the window's bottom (iOS 26.5;
+        // `statusBarGap` alone kept it off on iOS 27). The extension is
+        // what made the card's height saw against its scroll offset and
+        // freeze the app. With no safe area inside, there is nothing to
+        // extend into; the insets come in as a value instead and
+        // `topClearance` keeps the cards below the status bar.
+        .ignoresSafeArea()
         // Laid out, never drawn — see `ControlsSizingTemplate`.
         .background {
             ControlsSizingTemplate()
@@ -3260,8 +3272,8 @@ struct VehicleSheetPager: View {
                     // and a display without a home indicator has square
                     // corners: none of them gives the card's bottom
                     // corners anything to merge into.
-                    squaresBottomWhenExpanded: fadesNeighbours || geo.safeAreaInsets.bottom == 0,
-                    bottomSafeAreaInset: geo.safeAreaInsets.bottom,
+                    squaresBottomWhenExpanded: fadesNeighbours || safeAreaInsets.bottom == 0,
+                    bottomSafeAreaInset: safeAreaInsets.bottom,
                     scrollOffsets: scrollOffsets,
                     onSuccessfulRefresh: onSuccessfulRefresh,
                     mfaState: mfaState,
