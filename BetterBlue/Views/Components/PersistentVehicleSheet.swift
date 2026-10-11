@@ -257,6 +257,9 @@ struct PersistentVehicleSheet: View {
         // detent — see `DetentSnapBehavior`.
         ScrollView(.vertical) {
             contentStack
+                // Never inset the content for the status bar — see
+                // `VehicleSheetPager.statusBarGap`.
+                .background(ScrollViewInsetSentinel.View())
                 // Side margin, measured from the CARD's edge — hence
                 // the `edgeInset`: the ScrollView spans the whole page
                 // (see below), and the card's edge is that far inside
@@ -312,6 +315,10 @@ struct PersistentVehicleSheet: View {
         .modifier(BoxedScrollPosition(box: scroll))
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
+        // No edge effects: with one, the status bar's region is handed
+        // to the content as an inset the card can't tell from scrolling
+        // — see `VehicleSheetPager.statusBarGap`.
+        .scrollEdgeEffectStyle(.none, for: .all)
         .scrollTargetBehavior(DetentSnapBehavior(travel: expansionTravel, tracker: offsetTracker))
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y
@@ -2375,6 +2382,44 @@ private struct SheetChrome<S: Shape>: ViewModifier {
     }
 }
 
+// MARK: - Scroll view inset adjustment
+
+/// Sets the UIScrollView behind a SwiftUI `ScrollView` to never adjust
+/// its content inset for the safe area. Placed in the ScrollView's
+/// content, it finds the scroll view above it when it joins the window
+/// and on every update, and writes the setting only when it isn't
+/// already set, so it costs nothing afterwards. There is no SwiftUI
+/// modifier for this; see `VehicleSheetPager.statusBarGap` for why the
+/// card needs it.
+private final class ScrollViewInsetSentinel: UIView {
+    struct View: UIViewRepresentable {
+        func makeUIView(context: Context) -> ScrollViewInsetSentinel {
+            let view = ScrollViewInsetSentinel()
+            view.isUserInteractionEnabled = false
+            return view
+        }
+
+        func updateUIView(_ view: ScrollViewInsetSentinel, context: Context) {
+            view.applyToScrollView()
+        }
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        applyToScrollView()
+    }
+
+    func applyToScrollView() {
+        var view = superview
+        while let current = view, !(current is UIScrollView) {
+            view = current.superview
+        }
+        guard let scrollView = view as? UIScrollView,
+              scrollView.contentInsetAdjustmentBehavior != .never else { return }
+        scrollView.contentInsetAdjustmentBehavior = .never
+    }
+}
+
 // MARK: - Scroll-driven expansion support
 
 /// A card's scroll position, in an object of its own: bound through
@@ -2810,6 +2855,18 @@ struct VehicleSheetPager: View {
     /// Stopping a hair short keeps every ScrollView in here clear of
     /// the edge. (Ignoring the safe area further up doesn't help;
     /// the inset is then measured to the screen edge instead.)
+    ///
+    /// On iOS 26.5–26.7 a hair isn't enough: SwiftUI hands the card's
+    /// ScrollView the inset all the same, and the saw ran round inside
+    /// one layout pass — the offset flipping between the detent and the
+    /// detent less the inset — until the system killed the app. Two
+    /// things together stop it. The card's UIScrollView is set to never
+    /// adjust its content inset (`ScrollViewInsetSentinel`), so UIKit
+    /// has no inset to shift the offset for. And the pager and the
+    /// cards opt out of scroll edge effects (`scrollEdgeEffectStyle(
+    /// .none)`): with one, SwiftUI lays the content out a status bar
+    /// lower to clear the effect it expects, whatever UIKit does. The
+    /// card's pinned header has a backing of its own.
     private let statusBarGap: CGFloat = 2
     /// Gap between a collapsed card and the page's side and bottom
     /// edges (`PersistentVehicleSheet.outerInset`).
@@ -3294,6 +3351,8 @@ struct VehicleSheetPager: View {
                     .frame(height: height, alignment: .bottom)
             }
             .scrollTargetBehavior(.paging)
+            // No edge effects — see `statusBarGap`.
+            .scrollEdgeEffectStyle(.none, for: .all)
             // Don't clip at the pager's bounds: a neighbour taller
             // than the selected card stands above the pager's frame,
             // and where the window shows past the pager an incoming
