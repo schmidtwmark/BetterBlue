@@ -48,7 +48,7 @@ struct HTTPLogView: View {
                 )
                 .listRowBackground(Color.clear)
             } else {
-                ForEach(filteredLogs, id: \.log.id) { bbLog in
+                ForEach(filteredLogs, id: \.persistentModelID) { bbLog in
                     NavigationLink(
                         destination: HTTPLogDetailView(log: bbLog.log, transition: transition ?? fallbackTransition),
                     ) {
