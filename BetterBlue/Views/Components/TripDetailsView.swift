@@ -22,6 +22,7 @@ struct TripDetailsView: View {
     /// Other (daily): 0 = today, -1 = yesterday.
     @State private var periodOffset: Int = 0
     @State private var detailedTrips: [Date: [EVTripInfo]] = [:]
+    @State private var inFlightTripDates: Set<Date> = []
 
     var body: some View {
         PersistentModelGuard(model: bbVehicle) {
@@ -418,6 +419,8 @@ struct TripDetailsView: View {
         
         for trip in tripsToFetch {
             let date = trip.startDate
+            guard detailedTrips[date] == nil, inFlightTripDates.insert(date).inserted else { continue }
+            defer { inFlightTripDates.remove(date) }
             do {
                 let info = try await account.fetchEVTripInfo(for: bbVehicle, date: date, modelContext: modelContext)
                 if let info = info {
