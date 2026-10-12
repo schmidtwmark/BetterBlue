@@ -392,28 +392,45 @@ extension BBVehicle {
 
     // Simple actor to manage wake-up continuations
     private actor StatusWaitingManager {
-        private var wakeUpContinuations: [UUID: CheckedContinuation<Void, Never>] = [:]
+        private var wakeUpContinuations: [UUID: [UUID: CheckedContinuation<Void, Never>]] = [:]
 
-        func setWakeUpContinuation(
-            for vehicleId: UUID,
-            continuation: CheckedContinuation<Void, Never>,
-        ) {
-            wakeUpContinuations[vehicleId] = continuation
+        func wait(vehicleId: UUID) async {
+            let waiterId = UUID()
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    guard !Task.isCancelled else {
+                        continuation.resume()
+                        return
+                    }
+                    wakeUpContinuations[vehicleId, default: [:]][waiterId] = continuation
+                }
+            } onCancel: {
+                Task {
+                    await self.cancelWaiter(vehicleId: vehicleId, waiterId: waiterId)
+                }
+            }
+        }
+
+        private func cancelWaiter(vehicleId: UUID, waiterId: UUID) {
+            let continuation = wakeUpContinuations[vehicleId]?.removeValue(forKey: waiterId)
+            if wakeUpContinuations[vehicleId]?.isEmpty == true {
+                wakeUpContinuations.removeValue(forKey: vehicleId)
+            }
+            continuation?.resume()
         }
 
         func wakeUp(vehicleId: UUID) -> Bool {
-            if let continuation = wakeUpContinuations.removeValue(forKey: vehicleId) {
-                continuation.resume()
-                return true
+            guard let continuations = wakeUpContinuations.removeValue(forKey: vehicleId) else {
+                return false
             }
-            return false
+            for continuation in continuations.values {
+                continuation.resume()
+            }
+            return !continuations.isEmpty
         }
 
         func clearWakeUp(for vehicleId: UUID) {
-            if let continuation = wakeUpContinuations.removeValue(forKey: vehicleId) {
-                // Resume the continuation to prevent leak
-                continuation.resume()
-            }
+            _ = wakeUp(vehicleId: vehicleId)
         }
     }
 
@@ -504,9 +521,6 @@ extension BBVehicle {
     private func interruptibleSleep(seconds: Int) async throws {
         let vehicleId = id
 
-        // Ensure any existing continuation is cleared before setting up a new one
-        await Self.statusWaitingManager.clearWakeUp(for: vehicleId)
-
         try await withThrowingTaskGroup(of: Bool.self) { group in
             // Add timer task
             group.addTask {
@@ -516,14 +530,7 @@ extension BBVehicle {
 
             // Add wake-up task
             group.addTask {
-                await withCheckedContinuation { continuation in
-                    Task {
-                        await Self.statusWaitingManager.setWakeUpContinuation(
-                            for: vehicleId,
-                            continuation: continuation,
-                        )
-                    }
-                }
+                await Self.statusWaitingManager.wait(vehicleId: vehicleId)
                 return true // Wake-up was triggered
             }
 
@@ -532,7 +539,6 @@ extension BBVehicle {
 
             // Cancel remaining tasks and ensure continuation cleanup
             group.cancelAll()
-            await Self.statusWaitingManager.clearWakeUp(for: vehicleId)
 
             if wasWakeUp {
                 print(
