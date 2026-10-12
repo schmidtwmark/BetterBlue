@@ -169,7 +169,8 @@ extension BBAccount {
                 logSink: logSink,
                 rememberMeToken: rememberMeToken,
                 deviceId: deviceId,
-                onRememberMeTokenRotated: onRotate
+                onRememberMeTokenRotated: onRotate,
+                shouldLogHTTPRequest: { AppSettings.shared.debugModeEnabled }
             )
             api = createAPIClient(configuration: configuration)
         }

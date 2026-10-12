@@ -24,7 +24,8 @@ struct APIClientFactoryConfiguration {
         logSink: HTTPLogSink? = nil,
         rememberMeToken: String? = nil,
         deviceId: String? = nil,
-        onRememberMeTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil
+        onRememberMeTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil,
+        shouldLogHTTPRequest: @escaping @MainActor @Sendable () -> Bool = { true }
     ) {
         apiConfiguration = APIClientConfiguration(
             region: region,
@@ -37,7 +38,8 @@ struct APIClientFactoryConfiguration {
             logSink: logSink,
             rememberMeToken: rememberMeToken,
             deviceId: deviceId,
-            onRememberMeTokenRotated: onRememberMeTokenRotated
+            onRememberMeTokenRotated: onRememberMeTokenRotated,
+            shouldLogHTTPRequest: shouldLogHTTPRequest
         )
         self.modelContext = modelContext
     }
@@ -83,7 +85,8 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
         rememberMeToken: configuration.apiConfiguration.rememberMeToken,
         redactPII: configuration.apiConfiguration.redactPII,
         deviceId: configuration.apiConfiguration.deviceId,
-        onRememberMeTokenRotated: configuration.apiConfiguration.onRememberMeTokenRotated
+        onRememberMeTokenRotated: configuration.apiConfiguration.onRememberMeTokenRotated,
+        shouldLogHTTPRequest: configuration.apiConfiguration.shouldLogHTTPRequest
     )
 
     do {
