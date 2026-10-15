@@ -75,29 +75,21 @@ struct VehicleActivityWidget: Widget {
                             default: "blue"
                         ))
                 } else {
-                    Text(formattedRange(for: context.state.status))
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .compactIslandText()
+                    CompactIslandText(
+                        text: formattedRange(for: context.state.status),
+                        limitedWidthText: formattedRange(for: context.state.status, includesUnit: false),
+                        cameraEdge: .trailing
+                    )
                 }
             } compactTrailing: {
                 if context.state.activityType == .debug {
-                    Text("#\(context.state.wakeupCount)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .compactIslandText()
+                    CompactIslandText(text: "#\(context.state.wakeupCount)", cameraEdge: .leading)
                 } else if context.state.activityType == .climate,
                           context.state.status.climateStatus.temperature.isPlausibleForDisplay {
                     let temp = context.state.status.climateStatus.temperature
-                    Text("\(Int(temp.value))\(temp.units.symbol)")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .compactIslandText()
+                    CompactIslandText(text: "\(Int(temp.value))\(temp.units.symbol)", cameraEdge: .leading)
                 } else {
-                    Text("\(batteryPercentage(for: context.state.status))%")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .compactIslandText()
+                    CompactIslandText(text: "\(batteryPercentage(for: context.state.status))%", cameraEdge: .leading)
                 }
             } minimal: {
                 if context.state.activityType == .debug {
@@ -122,14 +114,21 @@ struct VehicleActivityWidget: Widget {
         }
     }
 
-    func formattedRange(for status: VehicleStatus) -> String {
-        let preferredUnit = AppSettings.liveDistanceUnit()
+    func formattedRange(for status: VehicleStatus, includesUnit: Bool = true) -> String {
+        let range: Distance
         if let evStatus = status.evStatus, evStatus.evRange.range.length > 0 {
-            return evStatus.evRange.range.units.format(evStatus.evRange.range.length, to: preferredUnit)
+            range = evStatus.evRange.range
         } else if let gasRange = status.gasRange, gasRange.range.length > 0 {
-            return gasRange.range.units.format(gasRange.range.length, to: preferredUnit)
+            range = gasRange.range
+        } else {
+            return "--"
         }
-        return "--"
+        let preferredUnit = AppSettings.liveDistanceUnit()
+        guard includesUnit else {
+            return range.units.convert(range.length, to: preferredUnit)
+                .formatted(.number.precision(.fractionLength(0)))
+        }
+        return range.units.format(range.length, to: preferredUnit)
     }
 
     func batteryPercentage(for status: VehicleStatus) -> Int {
@@ -143,15 +142,61 @@ struct VehicleActivityWidget: Widget {
 }
 
 private extension Text {
-    /// Compact/minimal Dynamic Island slots can be narrower than the text
-    /// (e.g. iPhone 18 Pro's smaller island sharing space with another
-    /// activity). Keep it on one line and shrink instead of wrapping ("329\nmi")
-    /// or clipping ("82%" → "32%").
+    /// Compact/minimal Dynamic Island slots can be narrower than the text.
+    /// Keep it on one line and shrink instead of wrapping ("329\nmi").
     func compactIslandText() -> some View {
         self
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.5)
+    }
+}
+
+/// Text for a compact leading/trailing Dynamic Island slot.
+///
+/// When iOS 27 shares the island between activities
+/// (`isDynamicIslandLimitedInWidth`), it stops sizing the slots to their
+/// content: each gets a fixed 28 pt square with the content centered in it.
+/// With three activities on iPhone 18 Pro those squares straddle the camera,
+/// which hides about 5 pt of each one's inner side — "82%" read "32%" and
+/// "255 mi" read "255 m" (#110). There, keep the text clear of the camera
+/// and use the shorter text if there is one.
+private struct CompactIslandText: View {
+    let text: String
+    /// Shown instead of `text` in a limited-width island, e.g. the range
+    /// without its unit, which would otherwise shrink to half size.
+    var limitedWidthText: String?
+    /// The slot's side facing the camera: trailing for compact leading,
+    /// leading for compact trailing.
+    let cameraEdge: HorizontalEdge
+
+    /// Covers the camera's overlap with a limited-width slot (4.3–5.7 pt).
+    private static let cameraClearance: CGFloat = 7
+
+    var body: some View {
+        if #available(iOS 27.0, *) {
+            LimitedWidthReader { isLimited in label(isLimited: isLimited) }
+        } else {
+            label(isLimited: false)
+        }
+    }
+
+    private func label(isLimited: Bool) -> some View {
+        Text(isLimited ? limitedWidthText ?? text : text)
+            .font(.caption2)
+            .fontWeight(.medium)
+            .compactIslandText()
+            .padding(cameraEdge == .leading ? .leading : .trailing, isLimited ? Self.cameraClearance : 0)
+    }
+}
+
+@available(iOS 27.0, *)
+private struct LimitedWidthReader<Content: View>: View {
+    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimited
+    @ViewBuilder let content: (_ isLimited: Bool) -> Content
+
+    var body: some View {
+        content(isLimited)
     }
 }
 
