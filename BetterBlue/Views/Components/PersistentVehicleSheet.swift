@@ -2047,8 +2047,21 @@ private struct SectionRowLabel: View {
 /// sharing its width equally. However many actions a vehicle has, the
 /// grid is never left with a gap — seven make four over three, the three
 /// a third of the width each.
+///
+/// A row of two or three has its tiles' icons beside their titles, as
+/// long as every title in it still fits on its two lines without
+/// breaking a word; otherwise, and in a row of four or more, the icons
+/// go above — with the type stepped down toward the default size, if
+/// large type would still break a word. Decided for the whole row, so
+/// that its tiles match.
 private struct SheetActionGrid<Content: View>: View {
     @ViewBuilder var content: Content
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// Most tiles a row has with icons beside their titles: a third of
+    /// an iPhone's card is wide enough, a quarter isn't.
+    private static var maxSideBySide: Int { 3 }
 
     var body: some View {
         Group(subviews: content) { tiles in
@@ -2057,22 +2070,92 @@ private struct SheetActionGrid<Content: View>: View {
                 .filter { !$0.isEmpty }
             VStack(spacing: SheetActionTile.spacing) {
                 ForEach(rows.indices, id: \.self) { index in
-                    HStack(spacing: SheetActionTile.spacing) {
-                        ForEach(rows[index]) { tile in
-                            tile
-                        }
-                    }
-                    // Every tile in the row as tall as its tallest.
-                    .fixedSize(horizontal: false, vertical: true)
+                    row(rows[index])
                 }
             }
         }
     }
+
+    /// The first of these that fits — every tile as wide as the widest
+    /// title needs (see `SheetActionRow`): icons beside the titles, in a
+    /// row of up to `maxSideBySide`; icons above them; then, for large
+    /// type in a narrow card, icons above them in smaller type, a size
+    /// at a time, back down to the default.
+    private func row(_ tiles: [Subview]) -> some View {
+        ViewThatFits(in: .horizontal) {
+            if tiles.count <= Self.maxSideBySide {
+                row(tiles, style: .sideBySide)
+            }
+            row(tiles, style: .stacked)
+            ForEach(smallerTypeSizes, id: \.self) { size in
+                row(tiles, style: .stacked)
+                    .dynamicTypeSize(size)
+            }
+        }
+    }
+
+    private func row(_ tiles: [Subview], style: SheetActionTileStyle) -> some View {
+        SheetActionRow(spacing: SheetActionTile.spacing) {
+            ForEach(tiles) { tile in
+                tile
+            }
+        }
+        .environment(\.sheetActionTileStyle, style)
+    }
+
+    /// The type sizes below the reader's, largest first, down to the
+    /// default — none if the reader's is the default or smaller.
+    private var smallerTypeSizes: [DynamicTypeSize] {
+        DynamicTypeSize.allCases.filter { $0 >= .large && $0 < dynamicTypeSize }.reversed()
+    }
 }
 
-/// One action tile: tinted icon and title. A tile wide enough — two or
-/// three to a row — has its icon beside the title; a narrower one — four
-/// or more to a row — has it above.
+/// One row of action tiles, all the same width, sharing the row's width
+/// equally, and all as tall as the tallest. Asked for its ideal width, it
+/// gives as many times the widest tile's ideal width — what the row
+/// needs for every tile to have the room it asks for.
+private struct SheetActionRow: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let tileWidth = proposal.width.map { tileWidth(across: $0, count: subviews.count) }
+        let sizes = subviews.map { $0.sizeThatFits(ProposedViewSize(width: tileWidth, height: nil)) }
+        let width = proposal.width
+            ?? (sizes.map(\.width).max() ?? 0) * CGFloat(subviews.count) + gaps(subviews.count)
+        return CGSize(width: width, height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let width = tileWidth(across: bounds.width, count: subviews.count)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(
+                at: CGPoint(x: bounds.minX + CGFloat(index) * (width + spacing), y: bounds.minY),
+                proposal: ProposedViewSize(width: width, height: bounds.height)
+            )
+        }
+    }
+
+    private func gaps(_ count: Int) -> CGFloat {
+        spacing * CGFloat(max(count - 1, 0))
+    }
+
+    private func tileWidth(across width: CGFloat, count: Int) -> CGFloat {
+        max((width - gaps(count)) / CGFloat(max(count, 1)), 0)
+    }
+}
+
+/// Where an action tile has its icon: beside the title or above it.
+/// Chosen for each row by `SheetActionGrid`.
+private enum SheetActionTileStyle {
+    case sideBySide, stacked
+}
+
+private extension EnvironmentValues {
+    @Entry var sheetActionTileStyle: SheetActionTileStyle = .stacked
+}
+
+/// One action tile: tinted icon and title, the icon beside the title or
+/// above it as its row has them (see `SheetActionGrid`).
 private struct SheetActionTile: View {
     let title: String
     let systemImage: String
@@ -2083,16 +2166,14 @@ private struct SheetActionTile: View {
     /// Concentric with the sheet's top corners, like any card inside it.
     static let shape = RoundedRectangle(cornerRadius: SheetLayout.innerCornerRadius, style: .continuous)
 
-    /// Narrowest tile that has its icon beside the title: a third of an
-    /// iPhone's card (~118pt) is wide enough, a quarter (~86pt) isn't.
-    /// Scales with the text, so that larger type stacks sooner.
-    @ScaledMetric(relativeTo: .caption) private var sideBySideWidth: CGFloat = 100
+    @Environment(\.sheetActionTileStyle) private var style
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            sideBySide
-                .frame(minWidth: sideBySideWidth, idealWidth: sideBySideWidth, maxWidth: .infinity)
-            stacked
+        Group {
+            switch style {
+            case .sideBySide: sideBySide
+            case .stacked: stacked
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // A fixed fill rather than `.fill.quaternary`, which resolves
@@ -2106,10 +2187,7 @@ private struct SheetActionTile: View {
         HStack(spacing: 6) {
             icon
                 .frame(width: 24)
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.primary)
+            titleText
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -2120,10 +2198,7 @@ private struct SheetActionTile: View {
         VStack(spacing: 4) {
             icon
                 .frame(height: 24)
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.primary)
+            titleText
                 .multilineTextAlignment(.center)
                 // Room for two lines even for a one-line title, so every
                 // stacked tile is the same height.
@@ -2133,10 +2208,59 @@ private struct SheetActionTile: View {
         .padding(.vertical, 10)
     }
 
+    /// The title, asking for only as much width as it needs to fit its
+    /// two lines without breaking a word (see `SheetActionTitleLayout`):
+    /// a row that can't give every tile that much tries the next way of
+    /// setting them (see `SheetActionGrid`).
+    private var titleText: some View {
+        SheetActionTitleLayout {
+            Text(title)
+            ForEach(Self.lineBreaks(of: title), id: \.self) { broken in
+                Text(broken)
+                    .hidden()
+            }
+        }
+        .font(.caption)
+        .fontWeight(.medium)
+        .foregroundStyle(.primary)
+    }
+
+    /// Each way of setting `title` on two lines, broken between words —
+    /// or, for one word, the word alone.
+    private static func lineBreaks(of title: String) -> [String] {
+        let words = title.split(separator: " ")
+        guard words.count > 1 else { return [title] }
+        return (1..<words.count).map { split in
+            words[..<split].joined(separator: " ") + "\n" + words[split...].joined(separator: " ")
+        }
+    }
+
     private var icon: some View {
         Image(systemName: systemImage)
             .font(.title3)
             .foregroundStyle(tint)
+    }
+}
+
+/// A tile's title (the first subview), set at whatever width the tile
+/// gives it. Asked for its ideal width, though, it gives the narrowest
+/// of the ways the title can be broken in two (the hidden subviews after
+/// it, each one way) rather than the title's width on one line: what it
+/// needs not to hyphenate or truncate a word.
+private struct SheetActionTitleLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let title = subviews.first else { return .zero }
+        let size = title.sizeThatFits(proposal)
+        guard proposal.width == nil,
+              let narrowest = subviews.dropFirst().map({ $0.sizeThatFits(.unspecified).width }).min()
+        else { return size }
+        return CGSize(width: narrowest, height: size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            subview.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+        }
     }
 }
 
