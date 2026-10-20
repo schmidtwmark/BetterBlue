@@ -244,6 +244,7 @@
 		EDA3DEA62E340CE200E05CFE /* Exceptions for "BetterBlue" folder in "BetterBlue" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				.claude,
 				Info.plist,
 			);
 			target = ED37F0232DFB4E4F00C02398 /* BetterBlue */;
@@ -268,6 +269,9 @@
 				ED4A2DAC2E6140280071A54A /* Exceptions for "BetterBlue" folder in "BetterBlueWatch Watch App" target */,
 				ED7054AC2E61F5C100CA7926 /* Exceptions for "BetterBlue" folder in "WidgetExtension" target */,
 				ED8103462F297C7B0072BDDE /* Exceptions for "BetterBlue" folder in "WatchWidgetExtension" target */,
+			);
+			explicitFolders = (
+				.claude,
 			);
 			path = BetterBlue;
 			sourceTree = "<group>";
