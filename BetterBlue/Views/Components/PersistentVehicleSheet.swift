@@ -59,6 +59,11 @@ struct PersistentVehicleSheet: View {
     /// as the card expands so the chrome grows out to the edges and
     /// the expanded card reads as a full-height system sheet.
     let edgeInset: CGFloat
+    /// How much wider the card's content is now than with the card
+    /// collapsed, as `edgeInset` closes. The content is set as if it
+    /// didn't have it (see `sheetWidthSlack`), so no text rewraps as the
+    /// card expands and collapses.
+    private var widthSlack: CGFloat { 2 * max(0, outerInset - edgeInset) }
     /// Distance the card's top edge rises from collapsed to expanded.
     /// The first `expansionTravel` points of scroll offset raise the
     /// card (the content stays pinned to its top edge); beyond that
@@ -265,10 +270,12 @@ struct PersistentVehicleSheet: View {
                 // (see below), and the card's edge is that far inside
                 // it. So the content keeps its distance from the edge
                 // as the card grows outward, widening with it, the way
-                // a system sheet's content does. Only widths change —
-                // the rows are single lines, so nothing gets taller or
-                // shorter mid-gesture. No top padding: the header row
-                // brings its own (the drag handle sits above the title,
+                // a system sheet's content does. Only widths change: the
+                // rows are set for the collapsed card's width and only
+                // their trailing items follow the edge out (see
+                // `widthSlack`), so no text rewraps, and nothing gets
+                // taller or shorter, mid-gesture. No top padding: the
+                // header row brings its own (the drag handle sits above the title,
                 // inside that margin).
                 // The bottom also clears the home indicator, which the
                 // expanded card runs underneath.
@@ -767,6 +774,7 @@ struct PersistentVehicleSheet: View {
             actionTiles
             detailRows
         }
+        .environment(\.sheetWidthSlack, widthSlack)
     }
 
     // MARK: - Header (ZStack: title + drag handle + refresh button)
@@ -841,7 +849,9 @@ struct PersistentVehicleSheet: View {
                     Task { await refreshStatus(forceCacheBypass: true) }
                 }
                 .disabled(isRefreshing)
+                .followingCardEdge(slack: widthSlack)
             }
+            .setForCollapsedCard(slack: widthSlack)
             // The same margin above as at the sides. With it the
             // refresh button — `margin` from the top and from the
             // trailing edge — sits concentric in a sheet-shaped
@@ -1967,6 +1977,8 @@ private struct SectionRow<Trailing: View, MenuContent: View>: View {
     @ViewBuilder var menuContent: () -> MenuContent
     @ViewBuilder var trailing: () -> Trailing
 
+    @Environment(\.sheetWidthSlack) private var widthSlack
+
     var body: some View {
         HStack(alignment: .center, spacing: SheetLayout.iconSpacing) {
             Menu {
@@ -1994,7 +2006,9 @@ private struct SectionRow<Trailing: View, MenuContent: View>: View {
             // reaches past that (see `CircularIconLabel.tapOutset`).
             trailing()
                 .padding(-CircularIconLabel.tapOutset)
+                .followingCardEdge(slack: widthSlack)
         }
+        .setForCollapsedCard(slack: widthSlack)
     }
 }
 
@@ -2058,6 +2072,10 @@ private struct SheetActionGrid<Content: View>: View {
     @ViewBuilder var content: Content
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Rows are set as if they didn't have it, so a title breaks the
+    /// same way, and a row picks the same style, whether the card is
+    /// collapsed, expanded or in between; the tiles only stretch.
+    @Environment(\.sheetWidthSlack) private var widthSlack
 
     /// Most tiles a row has with icons beside their titles: a third of
     /// an iPhone's card is wide enough, a quarter isn't.
@@ -2095,12 +2113,15 @@ private struct SheetActionGrid<Content: View>: View {
     }
 
     private func row(_ tiles: [Subview], style: SheetActionTileStyle) -> some View {
-        SheetActionRow(spacing: SheetActionTile.spacing) {
+        SheetActionRow(spacing: SheetActionTile.spacing, widthSlack: widthSlack) {
             ForEach(tiles) { tile in
                 tile
             }
         }
         .environment(\.sheetActionTileStyle, style)
+        // Tiles share the row equally, so each gets an equal share of
+        // the slack.
+        .environment(\.sheetActionTitleSlack, widthSlack / CGFloat(max(tiles.count, 1)))
     }
 
     /// The type sizes below the reader's, largest first, down to the
@@ -2113,15 +2134,17 @@ private struct SheetActionGrid<Content: View>: View {
 /// One row of action tiles, all the same width, sharing the row's width
 /// equally, and all as tall as the tallest. Asked for its ideal width, it
 /// gives as many times the widest tile's ideal width — what the row
-/// needs for every tile to have the room it asks for.
+/// needs for every tile to have the room it asks for — plus the
+/// `widthSlack`, so it fits only if it would fit at the narrowest width.
 private struct SheetActionRow: Layout {
     let spacing: CGFloat
+    var widthSlack: CGFloat = 0
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let tileWidth = proposal.width.map { tileWidth(across: $0, count: subviews.count) }
         let sizes = subviews.map { $0.sizeThatFits(ProposedViewSize(width: tileWidth, height: nil)) }
         let width = proposal.width
-            ?? (sizes.map(\.width).max() ?? 0) * CGFloat(subviews.count) + gaps(subviews.count)
+            ?? (sizes.map(\.width).max() ?? 0) * CGFloat(subviews.count) + gaps(subviews.count) + widthSlack
         return CGSize(width: width, height: sizes.map(\.height).max() ?? 0)
     }
 
@@ -2151,7 +2174,15 @@ private enum SheetActionTileStyle {
 }
 
 private extension EnvironmentValues {
+    /// How much wider the card's content is now than with the card
+    /// collapsed. Rows are set without it (`setForCollapsedCard(slack:)`,
+    /// `SheetActionGrid`), so their text breaks the same way as the card
+    /// expands and collapses.
+    @Entry var sheetWidthSlack: CGFloat = 0
     @Entry var sheetActionTileStyle: SheetActionTileStyle = .stacked
+    /// How much wider a tile is now than at the narrowest card width;
+    /// its title is set without it (see `SheetActionTitleLayout`).
+    @Entry var sheetActionTitleSlack: CGFloat = 0
 }
 
 /// One action tile: tinted icon and title, the icon beside the title or
@@ -2167,6 +2198,7 @@ private struct SheetActionTile: View {
     static let shape = RoundedRectangle(cornerRadius: SheetLayout.innerCornerRadius, style: .continuous)
 
     @Environment(\.sheetActionTileStyle) private var style
+    @Environment(\.sheetActionTitleSlack) private var titleSlack
 
     var body: some View {
         Group {
@@ -2213,7 +2245,7 @@ private struct SheetActionTile: View {
     /// a row that can't give every tile that much tries the next way of
     /// setting them (see `SheetActionGrid`).
     private var titleText: some View {
-        SheetActionTitleLayout {
+        SheetActionTitleLayout(slack: titleSlack) {
             Text(title)
             ForEach(Self.lineBreaks(of: title), id: \.self) { broken in
                 Text(broken)
@@ -2242,15 +2274,19 @@ private struct SheetActionTile: View {
     }
 }
 
-/// A tile's title (the first subview), set at whatever width the tile
-/// gives it. Asked for its ideal width, though, it gives the narrowest
-/// of the ways the title can be broken in two (the hidden subviews after
-/// it, each one way) rather than the title's width on one line: what it
-/// needs not to hyphenate or truncate a word.
+/// A tile's title (the first subview), set at the width the tile gives
+/// it less `slack` — the width it had in the collapsed card — so it
+/// breaks the same way however far the card has expanded. Asked for its
+/// ideal width, though, it gives the narrowest of the ways the title can
+/// be broken in two (the hidden subviews after it, each one way) rather
+/// than the title's width on one line: what it needs not to hyphenate or
+/// truncate a word.
 private struct SheetActionTitleLayout: Layout {
+    var slack: CGFloat = 0
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let title = subviews.first else { return .zero }
-        let size = title.sizeThatFits(proposal)
+        let size = title.sizeThatFits(setting(proposal))
         guard proposal.width == nil,
               let narrowest = subviews.dropFirst().map({ $0.sizeThatFits(.unspecified).width }).min()
         else { return size }
@@ -2258,9 +2294,15 @@ private struct SheetActionTitleLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let titleProposal = proposal.width == nil ? ProposedViewSize(bounds.size) : setting(proposal)
         for subview in subviews {
-            subview.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+            subview.place(at: bounds.origin, proposal: titleProposal)
         }
+    }
+
+    /// The proposal the title is set at: the tile's, without the slack.
+    private func setting(_ proposal: ProposedViewSize) -> ProposedViewSize {
+        ProposedViewSize(width: proposal.width.map { max(0, $0 - slack) }, height: proposal.height)
     }
 }
 
@@ -2331,6 +2373,34 @@ struct AnimatedStatusIcon: View {
     }
 }
 
+// MARK: - Rows set for the collapsed card
+
+private extension View {
+    /// Sets a row as if the card were collapsed — `slack` narrower (see
+    /// `sheetWidthSlack`) — so its text breaks the same way however far
+    /// the card has expanded. Whatever sits at the row's trailing edge
+    /// takes `followingCardEdge(slack:)` to go back out to the edge.
+    func setForCollapsedCard(slack: CGFloat) -> some View {
+        padding(.trailing, slack)
+    }
+
+    /// Moves a row's trailing element `slack` toward the trailing edge:
+    /// out to the edge of a row set by `setForCollapsedCard(slack:)`,
+    /// without changing how the rest of the row is laid out.
+    func followingCardEdge(slack: CGFloat) -> some View {
+        modifier(TrailingShift(amount: slack))
+    }
+}
+
+private struct TrailingShift: ViewModifier {
+    let amount: CGFloat
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    func body(content: Content) -> some View {
+        content.offset(x: layoutDirection == .rightToLeft ? -amount : amount)
+    }
+}
+
 // MARK: - Detail row (below-the-fold)
 
 private struct DetailRow: View {
@@ -2338,6 +2408,8 @@ private struct DetailRow: View {
     let label: String
     let value: String
     var valueColor: Color = .primary
+
+    @Environment(\.sheetWidthSlack) private var widthSlack
 
     var body: some View {
         HStack(spacing: SheetLayout.iconSpacing) {
@@ -2353,7 +2425,9 @@ private struct DetailRow: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(valueColor)
+                .followingCardEdge(slack: widthSlack)
         }
+        .setForCollapsedCard(slack: widthSlack)
     }
 }
 
