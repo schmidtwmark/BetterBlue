@@ -505,9 +505,16 @@ struct VehicleEntity: AppEntity {
     /// Whichever the legacy `Range` text uses — "mi" or "km" —
     /// reflecting the user's preferred distance unit at the moment
     /// this entity was built. Surfaced so a Shortcut can label a
-    /// computed numeric range without guessing.
+    /// computed numeric range (or the odometer) without guessing.
     @Property(title: "Range Unit")
     var rangeUnit: String?
+
+    /// Odometer as a whole number in the user's preferred distance
+    /// unit (`Range Unit`), for logging mileage from a Shortcut.
+    /// `nil` when the API hasn't reported one — a zero odometer
+    /// means "not reported", not a brand-new car.
+    @Property(title: "Odometer")
+    var odometer: Double?
 
     var primaryColor: Color { CustomColor.color(forName: primaryColorName, default: "blue") }
     var chargingColor: Color { CustomColor.color(forName: chargingColorName, default: "green") }
@@ -674,6 +681,9 @@ struct VehicleEntity: AppEntity {
         gasRangeValue = resolvedGas.value
         gasFuelPercentage = resolvedGas.percent
         rangeUnit = unit.abbreviation
+        if bbVehicle.modelContext != nil, bbVehicle.odometer.length > 0 {
+            odometer = bbVehicle.odometer.units.convert(bbVehicle.odometer.length, to: unit).rounded()
+        }
 
         if bbVehicle.fuelType.hasElectricCapability,
            bbVehicle.modelContext != nil,
