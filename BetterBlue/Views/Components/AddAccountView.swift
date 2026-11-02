@@ -51,6 +51,7 @@ struct ErrorBox: View {
 struct AddAccountView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var existingAccounts: [BBAccount]
     @State private var username = ""
     @State private var password = ""
     @State private var refreshToken = ""
@@ -108,6 +109,15 @@ struct AddAccountView: View {
             || supportedRegions(for: selectedBrand).contains(selectedRegion)
     }
 
+    /// This login is already an account. A second copy only hurts: it keeps
+    /// signing in on its own, and widgets and intents find cars by VIN, so
+    /// they can land on whichever copy is broken. Change Password and Reset
+    /// Session on the existing account cover every reason to re-add it.
+    private var isDuplicate: Bool {
+        let key = BBAccount.loginKey(brand: selectedBrand, region: selectedRegion, username: username)
+        return existingAccounts.contains { $0.loginKey == key }
+    }
+
     var body: some View {
         Form {
             serviceConfigurationSection
@@ -136,6 +146,7 @@ struct AddAccountView: View {
                             && selectedBrand != .fake
                             && pin.isEmpty)
                         || !isSupportedSelection
+                        || isDuplicate
                         || isLoading
                 )
             }
@@ -323,7 +334,16 @@ struct AddAccountView: View {
                 }
             }
         } footer: {
-            if selectedBrand == .fake {
+            if isDuplicate {
+                ErrorBox(
+                    headline: "This account is already added.",
+                    detail: AttributedString(
+                        "If it stopped working, open it in Settings and use Change Password or Reset Session."
+                    ),
+                    backgroundColor: .orange,
+                    icon: "person.2"
+                )
+            } else if selectedBrand == .fake {
                 Text("Using test account - fake data will be used")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -374,7 +394,7 @@ struct AddAccountView: View {
     private func addAccount() async {
         // The Return-key paths call this directly, bypassing the
         // disabled Add button.
-        guard isSupportedSelection else { return }
+        guard isSupportedSelection, !isDuplicate else { return }
         isLoading = true
         saveError = nil
 

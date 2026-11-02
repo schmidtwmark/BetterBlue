@@ -121,6 +121,62 @@ func cleanupOrphanedVehicles(container: ModelContainer) {
     }
 }
 
+/// Removes extra `BBAccount` rows for the same login (`loginKey`: brand,
+/// region and username). Re-adding an account that stopped working is the
+/// usual way to get one — `AddAccountView` now refuses, but older installs
+/// already have them — and two devices that each added the account before
+/// iCloud synced is another. The extra copy is never harmless: it keeps
+/// signing in on its own (on Hyundai Canada, re-raising the OTP challenge
+/// on every refresh), and widgets and intents resolve cars by VIN, so they
+/// can land on the dead copy.
+///
+/// Keep an account with a visible car, then the newest, and delete the
+/// rest with their cars and presets. Every input is synced and the
+/// creation date never changes, so each device picks the same keeper; a
+/// rule like "fetched most recently" could have two devices delete
+/// different copies and lose both once the deletions sync. Fake-brand
+/// accounts are left alone: their usernames are random unless typed, so a
+/// shared one is a deliberate test setup.
+@MainActor
+func cleanupDuplicateAccounts(container: ModelContainer) {
+    let context = container.mainContext
+
+    do {
+        let accounts = try context.fetch(FetchDescriptor<BBAccount>())
+            .filter { $0.brandEnum != .fake }
+        let groups = Dictionary(grouping: accounts, by: \.loginKey)
+
+        var deletedCount = 0
+        for (_, rows) in groups where rows.count > 1 {
+            let ordered = rows.sorted { lhs, rhs in
+                let lhsVisible = lhs.safeVehicles.contains { !$0.isHidden }
+                let rhsVisible = rhs.safeVehicles.contains { !$0.isHidden }
+                if lhsVisible != rhsVisible { return lhsVisible }
+                if lhs.dateCreated != rhs.dateCreated { return lhs.dateCreated > rhs.dateCreated }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            let keeper = ordered[0]
+            for duplicate in ordered.dropFirst() {
+                BBLogger.info(
+                    .app,
+                    "Purging duplicate \(duplicate.brandEnum.displayName) account created " +
+                        "\(duplicate.dateCreated) (\(duplicate.safeVehicles.count) vehicle(s)), " +
+                        "keeping the one created \(keeper.dateCreated)"
+                )
+                context.delete(duplicate)
+                deletedCount += 1
+            }
+        }
+
+        if deletedCount > 0 {
+            try context.save()
+            BBLogger.info(.app, "Cleaned up \(deletedCount) duplicate account(s)")
+        }
+    } catch {
+        BBLogger.error(.app, "Failed to cleanup duplicate accounts: \(error)")
+    }
+}
+
 /// Removes duplicate `BBVehicle` rows that share a VIN within one account.
 /// `BBAccount.updateVehicles()` keys existing vehicles by VIN, so it never
 /// creates a second row itself — but an iCloud merge (reinstall, second

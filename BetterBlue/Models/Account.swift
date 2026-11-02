@@ -100,6 +100,18 @@ class BBAccount {
         Region(rawValue: region) ?? .usa
     }
 
+    /// The login behind this account. Two accounts with the same key sign
+    /// in as the same user and see the same cars, so a second one is a
+    /// duplicate (see `cleanupDuplicateAccounts`).
+    var loginKey: String {
+        Self.loginKey(brand: brandEnum, region: regionEnum, username: username)
+    }
+
+    static func loginKey(brand: Brand, region: Region, username: String) -> String {
+        let normalized = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return "\(brand.rawValue)|\(region.rawValue)|\(normalized)"
+    }
+
 }
 
 // MARK: - API Client Management
