@@ -41,6 +41,14 @@ class BBAccount {
     private var cachedAuthToken: AuthToken?
     @Transient
     private var modelContextForMFA: ModelContext?
+    /// The MFA challenge the last `login()` raised, until it's verified.
+    /// While it's set, the stored token is the dead session that forced
+    /// that login, so every request entry point goes through `initialize`
+    /// (which rethrows the challenge) instead of sending the token. An
+    /// automatic refresh swallows the challenge from its best-effort
+    /// vehicle-list step; without the check, its status step then sent the
+    /// dead token and the user saw the backend's rejection (Hyundai
+    /// Canada's generic 7406) rather than "Tap to verify".
     @Transient
     private var pendingMFAError: APIError?
 
@@ -334,6 +342,14 @@ extension BBAccount {
 
     @MainActor
     private func handleAPIError(_ error: APIError, modelContext: ModelContext) async throws {
+        // A request that went out before a parallel login hit an MFA
+        // challenge. Surface the challenge instead of re-initializing:
+        // dropping `api` would discard the client holding the challenge's
+        // state, and verifying would then fail with "API not initialized".
+        if let pendingMFAError {
+            throw pendingMFAError
+        }
+
         BBLogger.info(.api, "BBAccount: API error (\(error.errorType)) detected, performing full re-initialization...")
 
         clearAPICache()
@@ -381,7 +397,7 @@ extension BBAccount {
 extension BBAccount {
     @MainActor
     func loadVehicles(modelContext: ModelContext) async throws {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await loadVehicles(modelContext: modelContext)
         }
@@ -414,7 +430,7 @@ extension BBAccount {
         // calls below after `initialize`/`loadVehicles` — either of which
         // can delete this vehicle (see `BBVehicle.isLive`).
         guard bbVehicle.isLive else { throw CancellationError() }
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchVehicleStatus(for: bbVehicle, modelContext: modelContext, cached: cached)
         }
@@ -610,7 +626,7 @@ extension BBAccount {
     ) async throws {
         // Re-entered after `initialize` below, which can delete the vehicle.
         guard bbVehicle.isLive else { throw CancellationError() }
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             // Re-entering with a freshly-initialized session: a subsequent auth
             // failure is genuine, so don't let this path stack another retry on
@@ -749,7 +765,7 @@ extension BBAccount {
     /// Fetches EV trip summaries for a vehicle. Returns nil if the API doesn't support this feature.
     @MainActor
     func fetchEVTripSummary(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws -> [EVTripSummary]? {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchEVTripSummary(for: bbVehicle, modelContext: modelContext)
         }
@@ -771,7 +787,7 @@ extension BBAccount {
     /// doesn't support this feature (only Hyundai Europe today).
     @MainActor
     func fetchEVTripInfo(for bbVehicle: BBVehicle, date: Date, modelContext: ModelContext) async throws -> [EVTripInfo]? {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchEVTripInfo(for: bbVehicle, date: date, modelContext: modelContext)
         }
@@ -807,7 +823,7 @@ extension BBAccount {
     /// cameras, shoots, and uploads, which takes a few minutes.
     @MainActor
     func requestSurroundViewCapture(for bbVehicle: BBVehicle, modelContext: ModelContext) async throws {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await requestSurroundViewCapture(for: bbVehicle, modelContext: modelContext)
         }
@@ -832,7 +848,7 @@ extension BBAccount {
         for bbVehicle: BBVehicle,
         modelContext: ModelContext
     ) async throws -> [SurroundViewCapture] {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchSurroundViewCaptures(for: bbVehicle, modelContext: modelContext)
         }
@@ -859,7 +875,7 @@ extension BBAccount {
         bbVehicle: BBVehicle,
         modelContext: ModelContext
     ) async throws -> SurroundViewCapture {
-        guard let api, let authToken else {
+        guard pendingMFAError == nil, let api, let authToken else {
             try await initialize(modelContext: modelContext)
             return try await fetchSurroundViewImagery(
                 for: capture,
