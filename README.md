@@ -18,7 +18,7 @@
 </a>
 </p>
 
-A modern iOS app for controlling your Hyundai or Kia vehicle using BlueLink and Kia Connect services. Built with SwiftUI and powered by [BetterBlueKit](https://github.com/schmidtwmark/BetterBlueKit/tree/main).
+A modern iOS app for controlling your Hyundai, Kia, or Genesis vehicle using BlueLink, Kia Connect, and Genesis Connect (Canada) services. Built with SwiftUI and powered by [BetterBlueKit](https://github.com/schmidtwmark/BetterBlueKit/tree/main).
 
 ## Features
 
@@ -138,10 +138,10 @@ The backend is fully open source - see [LiveActivityBackend/](LiveActivityBacken
 
 ## Important Notes
 
-- **Subscription Required**: You need an active BlueLink/Kia Connect subscription
+- **Subscription Required**: You need an active BlueLink, Kia Connect, or Genesis Connect subscription
 - **Battery Impact**: Frequent remote commands may drain your vehicle's 12V battery
 - **Rate Limits**: Respect API rate limits to avoid account suspension
-- **Unofficial**: This app is not affiliated with Hyundai or Kia
+- **Unofficial**: This app is not affiliated with Hyundai, Kia, or Genesis
 - **Terms of Service**: Ensure you comply with your vehicle service terms
 
 ## License

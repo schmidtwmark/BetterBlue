@@ -100,6 +100,14 @@ struct AddAccountView: View {
         BetterBlueKit.isTestAccount(username: username, password: password)
     }
 
+    /// BetterBlueKit has no client for an unsupported brand/region pair,
+    /// and the app factory would fall back to an empty fake client, so
+    /// "sign-in" would succeed with no vehicles. Don't offer to add one.
+    private var isSupportedSelection: Bool {
+        selectedBrand == .fake || isTestAccount
+            || supportedRegions(for: selectedBrand).contains(selectedRegion)
+    }
+
     var body: some View {
         Form {
             serviceConfigurationSection
@@ -127,6 +135,7 @@ struct AddAccountView: View {
                         || (selectedBrand != .kia
                             && selectedBrand != .fake
                             && pin.isEmpty)
+                        || !isSupportedSelection
                         || isLoading
                 )
             }
@@ -237,7 +246,7 @@ struct AddAccountView: View {
                         .focused($focusedField, equals: .refreshToken)
                         .submitLabel(.done)
                         .onSubmit {
-                            if selectedBrand == .hyundai {
+                            if requiresPin(brand: selectedBrand, region: selectedRegion) {
                                 focusedField = .pin
                             } else {
                                 Task {
@@ -253,9 +262,9 @@ struct AddAccountView: View {
                     SecureField("", text: $password)
                         .multilineTextAlignment(.trailing)
                         .focused($focusedField, equals: .password)
-                        .submitLabel(selectedBrand == .hyundai ? .next : .done)
+                        .submitLabel(requiresPin(brand: selectedBrand, region: selectedRegion) ? .next : .done)
                         .onSubmit {
-                            if selectedBrand == .hyundai {
+                            if requiresPin(brand: selectedBrand, region: selectedRegion) {
                                 focusedField = .pin
                             } else {
                                 Task {
@@ -268,7 +277,7 @@ struct AddAccountView: View {
 
             // Per-(brand, region) gating — BetterBlueKit owns the
             // matrix of which combinations actually require a PIN.
-            // Today: Hyundai USA / EU and Kia EU.
+            // Today: Hyundai USA / Canada / EU, Kia EU, and Genesis Canada.
             if requiresPin(brand: selectedBrand, region: selectedRegion) {
                 HStack {
                     Text("PIN")
@@ -320,7 +329,7 @@ struct AddAccountView: View {
                     .foregroundColor(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("BetterBlue requires an active Hyundai BlueLink or Kia Connect subscription.")
+                    Text("BetterBlue requires an active Hyundai BlueLink, Kia Connect, or Genesis Connect subscription.")
                     Text("BetterBlue stores your credentials securely on your device and in iCloud.")
 
                     let link = "[GitHub](https://github.com/schmidtwmark/BetterBlue)"
@@ -363,6 +372,9 @@ struct AddAccountView: View {
     }
 
     private func addAccount() async {
+        // The Return-key paths call this directly, bypassing the
+        // disabled Add button.
+        guard isSupportedSelection else { return }
         isLoading = true
         saveError = nil
 

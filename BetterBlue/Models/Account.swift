@@ -85,16 +85,7 @@ class BBAccount {
 
     // Computed properties to convert to existing types
     var brandEnum: Brand {
-        switch brand {
-        case "hyundai":
-            .hyundai
-        case "kia":
-            .kia
-        case "fake":
-            .fake
-        default:
-            .hyundai
-        }
+        Brand(rawValue: brand) ?? .hyundai
     }
 
     var regionEnum: Region {
