@@ -191,6 +191,7 @@ function reportActive() {
 
   const now = Date.now();
   const active = rows.filter((r) => r.status === 'active');
+  const nightly = rows.filter((r) => r.kind === 'nightly');
 
   // Group by activityType
   const byType = active.reduce((acc, r) => {
@@ -215,8 +216,9 @@ function reportActive() {
   const top5 = wakeupCounts.slice(0, 5);
 
   printRow('Total active registrations', fmtCount(active.length), { color: active.length > 0 ? c.green : c.dim });
+  printRow('Nightly charge checks', fmtCount(nightly.length));
   printRow('All rows in table', fmtCount(rows.length));
-  printNote('"Active" = status === \'active\'; non-active rows are stragglers.');
+  printNote('"Active" = status === \'active\'; rows that are neither active nor nightly are stragglers.');
   console.log('│');
   printRow('By activity type', '');
   for (const [k, v] of Object.entries(byType).sort((a, b) => b[1] - a[1])) {

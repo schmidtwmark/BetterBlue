@@ -97,6 +97,21 @@ struct VehicleInfoView: View {
                             }
                         }
                     }
+
+                    if bbVehicle.showsChargingSchedule {
+                        NavigationLink(destination: ChargingScheduleContent(vehicle: bbVehicle)) {
+                            HStack {
+                                Text("Charging Schedule")
+                                Spacer()
+                                if let schedule = bbVehicle.evStatus?.chargingSchedule, schedule.offPeakEnabled {
+                                    let window = schedule.offPeakWindow
+                                    Text("\(window.start.localizedString) – \(window.end.localizedString)")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

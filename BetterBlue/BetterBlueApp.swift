@@ -200,6 +200,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         SystemDiagnostics.shared.start()
+        // Push-to-start tokens let the backend start a charging card while
+        // the app isn't running (the nightly charge check).
+        LiveActivityManager.shared.startObservingPushToStartTokens()
 
         // Request notification permissions and register for remote notifications
         Task {
@@ -245,6 +248,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             Task {
                 await LiveActivityManager.shared.handleWakeupPush()
                 // The wakeup's save sets off a CloudKit export.
+                await CloudKitSyncMonitor.shared.waitUntilIdle(deadline: deadline)
+                completionHandler(.newData)
+                backgroundTask.end()
+            }
+        } else if userInfo["nightlyChargeCheck"] != nil {
+            AppLogger.push.info("Processing nightly charge check push")
+            Task {
+                await LiveActivityManager.shared.handleNightlyCheckPush()
                 await CloudKitSyncMonitor.shared.waitUntilIdle(deadline: deadline)
                 completionHandler(.newData)
                 backgroundTask.end()

@@ -76,10 +76,20 @@ struct DebugExportData {
         return DebugExportData(raw: rawJSON, redacted: redactedJSON)
     }
 
+    /// How far back status logs are exported, per vehicle.
+    static let statusLogWindow: TimeInterval = 24 * 60 * 60
+    /// Status logs exported per vehicle regardless of age — one full
+    /// refresh on the chattiest region (Canada).
+    static let minimumStatusLogsPerVehicle = 5
+    /// Upper bound on status logs exported per vehicle, so a heavily
+    /// polled vehicle doesn't balloon the export.
+    static let maxStatusLogsPerVehicle = 30
+
     /// Picks out the "most interesting" HTTP logs for one account:
-    /// latest login, latest vehicles fetch, and the latest status fetch
-    /// per vehicle. Matches `log.vin` first with fallbacks to headers
-    /// and body for logs written before `HTTPLog.vin` existed.
+    /// latest login, latest vehicles fetch, the last day of status
+    /// fetches per vehicle, and recent commands. Matches `log.vin` first
+    /// with fallbacks to headers and body for logs written before
+    /// `HTTPLog.vin` existed.
     @MainActor
     static func fetchHTTPLogsForAccount(
         accountId: UUID,
@@ -118,13 +128,18 @@ struct DebugExportData {
             .map(\.log)
 
         var vehicleStatuses: [HTTPLog] = []
+        let statusCutoff = Date().addingTimeInterval(-statusLogWindow)
         for vehicle in vehicles {
-            // Up to 2 most-recent logs per vehicle, not just the first —
-            // the EU clients make TWO fetchVehicleStatus-typed calls per
-            // refresh (/status/latest + /location/park), and taking only
-            // the newest meant the park call always shadowed the actual
-            // status body in exports (as in the e-Niro report for #41).
-            let statusLogs = allLogs.filter {
+            // Every status log from the last day (capped), not just the
+            // newest refresh. One refresh can be several
+            // fetchVehicleStatus-typed calls — EU makes 2 (/status/latest +
+            // /location/park), Canada up to 5 (rltmvhclsts, nxtsvc, vrfypin,
+            // fndmcr, lstvhclsts fallback) — and a too-small cap let the
+            // side calls shadow the actual status body (the e-Niro report
+            // for #41). Reports like "the odometer was stale at the end of
+            // my drive" (#128) also need the refresh from hours before the
+            // export, not just the latest one.
+            let matchingLogs = allLogs.filter {
                 guard $0.log.requestType == .fetchVehicleStatus else { return false }
                 if $0.log.vin == vehicle.vin { return true }
                 // Backwards-compat for logs written before HTTPLog.vin existed.
@@ -136,8 +151,16 @@ struct DebugExportData {
                     return true
                 }
                 return $0.log.url.contains(vehicle.vin)
-            }.prefix(2)
-            vehicleStatuses.append(contentsOf: statusLogs.map(\.log))
+            }
+            // `allLogs` is newest-first. Always keep the newest refresh's
+            // worth of logs, even if it's older than the window.
+            let statusLogs = matchingLogs.enumerated()
+                .prefix { index, entry in
+                    index < minimumStatusLogsPerVehicle || entry.log.timestamp >= statusCutoff
+                }
+                .prefix(maxStatusLogsPerVehicle)
+                .map(\.element.log)
+            vehicleStatuses.append(contentsOf: statusLogs)
         }
 
         // Commands (lock/unlock/climate/charge). Previously omitted entirely,

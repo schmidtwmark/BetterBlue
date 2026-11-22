@@ -769,6 +769,21 @@ extension BBAccount {
             modelContext: modelContext
         )
     }
+
+    /// Sets when the vehicle's off-peak charging starts and stops. The
+    /// rest of its schedule stays as the vehicle has it.
+    @MainActor
+    func setOffPeakHours(
+        _ vehicle: BBVehicle,
+        window: ChargingSchedule.OffPeakWindow,
+        modelContext: ModelContext
+    ) async throws {
+        try await sendCommand(
+            for: vehicle,
+            command: .setChargingSchedule(window),
+            modelContext: modelContext
+        )
+    }
 }
 
 // MARK: - EV Trip Details
@@ -924,6 +939,12 @@ extension BBAccount {
     @MainActor
     var supportsSurroundView: Bool {
         api?.supportsSurroundView() ?? false
+    }
+
+    /// Whether this account's client can write charging schedules.
+    @MainActor
+    var supportsChargingSchedule: Bool {
+        api?.supportsChargingSchedule() ?? false
     }
 
     /// Whether this account's API can ask the vehicle for a NEW capture.

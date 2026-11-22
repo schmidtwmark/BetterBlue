@@ -56,6 +56,42 @@ functions:
           method: post
           cors: true
 
+  registerNightly:
+    handler: handler.registerNightly
+    logRetentionInDays: 3
+    events:
+      - http:
+          path: nightly
+          method: post
+          cors: true
+
+  unregisterNightly:
+    handler: handler.unregisterNightly
+    logRetentionInDays: 3
+    events:
+      - http:
+          path: nightly/unregister
+          method: post
+          cors: true
+
+  ackNightly:
+    handler: handler.ackNightly
+    logRetentionInDays: 3
+    events:
+      - http:
+          path: nightly/ack
+          method: post
+          cors: true
+
+  startLiveActivity:
+    handler: handler.startLiveActivity
+    logRetentionInDays: 3
+    events:
+      - http:
+          path: liveactivity/start
+          method: post
+          cors: true
+
   sendWakeUps:
     handler: handler.sendWakeUps
     logRetentionInDays: 1  # 1-min cron, ~30k log lines/day pre-trim — keep retention minimal

@@ -9,7 +9,10 @@ A lightweight serverless backend that enables Live Activity updates for the Bett
 This backend only stores:
 - Your device's APNs push token (an anonymous identifier assigned by Apple)
 - The type of activity (e.g., "charging")
-- A timestamp for expiration purposes
+- A timestamp for expiration purposes, and when wakeups should begin (for a car waiting on its charging schedule)
+- If you turn on the nightly charge check: the local time to check at and your time zone
+
+To start a Live Activity while the app is in the background (the nightly check, or replacing a long-running "waiting to charge" card), the app asks the backend to send a push-to-start notification. That request carries Apple's push-to-start token and a stand-in card with an empty vehicle name, no VIN, no readings, and a random ID the app uses to recognize the card. The backend relays it to Apple and stores nothing; the app fills in the real numbers on the phone once the card appears.
 
 The backend does **not** receive or store:
 - Vehicle information (VIN, location, battery level, etc.)
@@ -47,7 +50,11 @@ All vehicle data fetching happens directly on your device after receiving a sile
 2. A scheduled Lambda function runs every minute and checks for active registrations
 3. For each registration, it sends a silent background push via APNs
 4. The app wakes up, fetches fresh vehicle status directly from Hyundai/Kia servers, and updates the Live Activity
-5. Registrations automatically expire after 8 hours
+5. Registrations automatically expire after 8 hours of wakeups
+
+### Nightly charge check
+
+When the nightly charge check is on, the backend sends one silent push each night at the time the app registered (by default 5 minutes after the first EV's off-peak start). The app checks whether each EV is charging; if one is and has no Live Activity, it asks the backend to start one with a push-to-start notification. If a car is still waiting on its schedule, the backend tries again 10 and 20 minutes later. Otherwise the app acknowledges the night and nothing more is sent until the next one.
 
 ## Architecture
 

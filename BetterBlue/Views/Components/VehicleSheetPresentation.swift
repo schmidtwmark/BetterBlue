@@ -44,6 +44,7 @@ final class VehicleSheetPresentation {
         case surroundView(vehicle: BBVehicle)
         case climateSettings(vehicle: BBVehicle)
         case chargeLimitSettings(vehicle: BBVehicle)
+        case chargingSchedule(vehicle: BBVehicle)
 
         /// `Identifiable` for `.sheet(item:)`. Embedding the
         /// vehicle/account id means re-triggering on the *same*
@@ -61,6 +62,7 @@ final class VehicleSheetPresentation {
             case .surroundView(let v): return "surroundView:\(v.id)"
             case .climateSettings(let v): return "climateSettings:\(v.id)"
             case .chargeLimitSettings(let v): return "chargeLimitSettings:\(v.id)"
+            case .chargingSchedule(let v): return "chargingSchedule:\(v.id)"
             }
         }
     }

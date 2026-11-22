@@ -833,6 +833,64 @@ struct SetChargeLimitsIntent: AppIntent {
     }
 }
 
+// MARK: - Charging Schedule
+
+struct SetChargingScheduleIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set Off-Peak Charging Hours"
+    static let description = IntentDescription(
+        "Set when your vehicle's off-peak charging starts and stops. The rest of its charging schedule stays as it is."
+    )
+    static let openAppWhenRun: Bool = false
+
+    @Parameter(title: "Vehicle", description: "The vehicle whose off-peak hours to change")
+    var vehicle: VehicleEntity
+
+    @Parameter(title: "Start Time", description: "When off-peak charging starts", kind: .time)
+    var startTime: Date
+
+    @Parameter(title: "Stop Time", description: "When off-peak charging stops", kind: .time)
+    var stopTime: Date
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Set off-peak charging for \(\.$vehicle) from \(\.$startTime) to \(\.$stopTime)")
+    }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let vehicleName = vehicle.displayName
+        let window = ChargingSchedule.OffPeakWindow(
+            start: Self.timeOfDay(from: startTime),
+            end: Self.timeOfDay(from: stopTime)
+        )
+
+        try await performVehicleActionWithVin(vehicle.vin) { bbVehicle, account, context in
+            // Initialize before asking about the capability: it reads
+            // through to the API client, which is nil (and would answer
+            // "unsupported") until login has happened.
+            try await account.initialize(modelContext: context)
+            guard bbVehicle.fuelType.hasElectricCapability, account.supportsChargingSchedule else {
+                throw IntentError.chargingScheduleUnsupported
+            }
+            try await account.setOffPeakHours(bbVehicle, window: window, modelContext: context)
+            // The write returns once the vehicle has the change, so pick up
+            // the new hours with a cached read, which doesn't wake the car.
+            try? await account.fetchAndUpdateVehicleStatus(for: bbVehicle, modelContext: context, cached: true)
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result(
+            dialog: "Off-peak charging for \(vehicleName) set to \(window.start.localizedString) to \(window.end.localizedString)"
+        )
+    }
+
+    private static func timeOfDay(from date: Date) -> TimeOfDay {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return TimeOfDay(hour: components.hour ?? 0, minute: components.minute ?? 0)
+    }
+}
+
 // MARK: - Surround View
 
 struct RequestSurroundViewCaptureIntent: AppIntent {
@@ -1131,6 +1189,7 @@ enum IntentError: Swift.Error, LocalizedError {
     case surroundViewCaptureUnsupported
     case noSurroundViewCaptures
     case locationUnavailable
+    case chargingScheduleUnsupported
 
     var errorDescription: String? {
         switch self {
@@ -1153,6 +1212,8 @@ enum IntentError: Swift.Error, LocalizedError {
             "No surround view images are available yet — request a capture first"
         case .locationUnavailable:
             "This vehicle hasn't reported a location yet — refresh its status and try again"
+        case .chargingScheduleUnsupported:
+            "Charging schedules aren't supported for this vehicle"
         }
     }
 }

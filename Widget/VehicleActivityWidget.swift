@@ -28,7 +28,7 @@ struct VehicleActivityWidget: Widget {
                                 default: "blue"
                             ))
                             .padding(.leading, 8)
-                    } else {
+                    } else if ChargingDisplay(context: context).phase != .placeholder {
                         Text(formattedRange(for: context.state.status))
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -48,7 +48,7 @@ struct VehicleActivityWidget: Widget {
                             .font(.headline)
                             .fontWeight(.semibold)
                             .padding(.trailing, 8)
-                    } else {
+                    } else if ChargingDisplay(context: context).phase != .placeholder {
                         Text("\(batteryPercentage(for: context.state.status))%")
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -74,12 +74,20 @@ struct VehicleActivityWidget: Widget {
                             forName: context.attributes.startClimateColorName,
                             default: "blue"
                         ))
+                } else if ChargingDisplay(context: context).phase == .placeholder {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                        .foregroundColor(chargingColor(context))
+                } else if case .waiting(let start) = ChargingDisplay(context: context).phase {
+                    WaitingIslandLabel(start: start)
+                        .staleDimmed(context.isStale)
                 } else {
                     CompactIslandText(
                         text: formattedRange(for: context.state.status),
                         limitedWidthText: formattedRange(for: context.state.status, includesUnit: false),
                         cameraEdge: .trailing
                     )
+                    .staleDimmed(context.isStale)
                 }
             } compactTrailing: {
                 if context.state.activityType == .debug {
@@ -88,8 +96,11 @@ struct VehicleActivityWidget: Widget {
                           context.state.status.climateStatus.temperature.isPlausibleForDisplay {
                     let temp = context.state.status.climateStatus.temperature
                     CompactIslandText(text: "\(Int(temp.value))\(temp.units.symbol)", cameraEdge: .leading)
+                } else if ChargingDisplay(context: context).phase == .placeholder {
+                    CompactIslandText(text: "…", cameraEdge: .leading)
                 } else {
                     CompactIslandText(text: "\(batteryPercentage(for: context.state.status))%", cameraEdge: .leading)
+                        .staleDimmed(context.isStale)
                 }
             } minimal: {
                 if context.state.activityType == .debug {
@@ -103,15 +114,38 @@ struct VehicleActivityWidget: Widget {
                             forName: context.attributes.startClimateColorName,
                             default: "blue"
                         ))
+                } else if ChargingDisplay(context: context).phase == .placeholder {
+                    Image(systemName: "bolt.fill")
+                        .font(.caption2)
+                        .foregroundColor(chargingColor(context))
+                } else if ChargingDisplay(context: context).isWaiting {
+                    Image(systemName: "clock")
+                        .font(.caption2)
+                        .foregroundColor(chargingColor(context))
+                        .staleDimmed(context.isStale)
                 } else {
                     Text("\(batteryPercentage(for: context.state.status))%")
                         .font(.caption2)
                         .compactIslandText()
+                        .staleDimmed(context.isStale)
                 }
             }
-            .widgetURL(URL(string: "betterblue://vehicle/\(context.attributes.vin)"))
+            .widgetURL(URL(string: "betterblue://vehicle/\(vehicleVIN(context))"))
             .keylineTint(.green)
         }
+    }
+
+    func chargingColor(_ context: ActivityViewContext<VehicleActivityAttributes>) -> Color {
+        CustomColor.color(
+            forName: context.state.chargingColorName ?? context.attributes.chargingColorName,
+            default: "green"
+        )
+    }
+
+    /// A card started by the backend has no VIN in its attributes; once
+    /// filled in, its status has it.
+    func vehicleVIN(_ context: ActivityViewContext<VehicleActivityAttributes>) -> String {
+        context.attributes.vin.isEmpty ? context.state.status.vin : context.attributes.vin
     }
 
     func formattedRange(for status: VehicleStatus, includesUnit: Bool = true) -> String {
@@ -138,6 +172,168 @@ struct VehicleActivityWidget: Widget {
             return Int(gasRange.percentage)
         }
         return 0
+    }
+}
+
+private extension View {
+    /// Fades a Dynamic Island reading once the content is past its stale
+    /// date, matching the greyed card.
+    func staleDimmed(_ isStale: Bool) -> some View {
+        opacity(isStale ? 0.5 : 1)
+    }
+}
+
+/// What a charging card shows, which depends on where the charge is:
+///
+/// - **Placeholder**: a card the backend just started, before the app has
+///   filled it in. It carries no readings at all.
+/// - **Waiting**: plugged in and holding for the schedule. The bar shows
+///   the battery in a muted color, with when the charge starts.
+/// - **Charging**: rate and time left on the bar.
+///
+/// Past its stale date, wakeups have stopped refreshing the card, so the
+/// rate, time left, or start time are likely wrong and the bar goes grey
+/// (see `LiveActivityManager.staleDate(for:)`).
+private struct ChargingDisplay {
+    enum Phase: Equatable {
+        case placeholder
+        case waiting(start: Date?)
+        case charging
+    }
+
+    let phase: Phase
+    /// Text at the bar's leading edge: the rate, or "Waiting".
+    let chargeSpeed: String?
+    /// Text at the bar's trailing edge: time left, or when it starts.
+    let chargeTimeRemaining: String?
+    let barColor: Color
+
+    init(context: ActivityViewContext<VehicleActivityAttributes>) {
+        let state = context.state
+        let evStatus = state.status.evStatus
+        let color = CustomColor.color(
+            forName: state.chargingColorName ?? context.attributes.chargingColorName,
+            default: "green"
+        )
+
+        if state.status.vin.isEmpty {
+            phase = .placeholder
+            chargeSpeed = nil
+            chargeTimeRemaining = nil
+            barColor = color
+            return
+        }
+
+        if let evStatus, evStatus.isWaitingForScheduledCharge {
+            let start = evStatus.expectedChargeStart(after: state.status.lastUpdated.addingTimeInterval(-60))
+            phase = .waiting(start: start)
+            guard !context.isStale else {
+                chargeSpeed = nil
+                chargeTimeRemaining = nil
+                barColor = .gray
+                return
+            }
+            chargeSpeed = "Waiting"
+            chargeTimeRemaining = start.map { "Starts \($0.formatted(date: .omitted, time: .shortened))" }
+            barColor = color.opacity(0.45)
+            return
+        }
+
+        phase = .charging
+        guard !context.isStale else {
+            chargeSpeed = nil
+            chargeTimeRemaining = nil
+            barColor = .gray
+            return
+        }
+        barColor = color
+
+        if let evStatus, evStatus.chargeSpeed > 0 {
+            chargeSpeed = String(format: "%.1f kW", evStatus.chargeSpeed)
+        } else {
+            chargeSpeed = nil
+        }
+
+        if let evStatus, evStatus.chargeTime > .seconds(0) {
+            let formattedTime = evStatus.chargeTime.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+            if let targetSOC = evStatus.currentTargetSOC {
+                chargeTimeRemaining = "\(formattedTime) to \(Int(targetSOC))%"
+            } else {
+                chargeTimeRemaining = formattedTime
+            }
+        } else {
+            chargeTimeRemaining = nil
+        }
+    }
+
+    var isWaiting: Bool {
+        if case .waiting = phase { return true }
+        return false
+    }
+}
+
+/// A card the backend has just started, before the app fills it in.
+private struct PlaceholderChargingLabel: View {
+    let color: Color
+    var compact = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "bolt.fill")
+                .font(compact ? .subheadline : .title2)
+                .foregroundColor(color)
+                .symbolEffect(.pulse)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Charging Started")
+                    .font(compact ? .subheadline : .headline)
+                    .fontWeight(.semibold)
+                Text("Updating…")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+    }
+}
+
+/// Compact Dynamic Island text for a car waiting on its schedule: a
+/// clock and the start time.
+private struct WaitingIslandLabel: View {
+    let start: Date?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "clock")
+            if let start {
+                Text(start.formatted(date: .omitted, time: .shortened))
+            }
+        }
+        .font(.caption2)
+        .fontWeight(.medium)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+    }
+}
+
+/// The footer's time: "Updated 6:39 PM", or once the content is past its
+/// stale date, "Last updated 6:39 PM" behind a clock badge, so a card
+/// that stopped updating doesn't pass for a live one.
+private struct UpdatedLabel: View {
+    let date: Date
+    let isStale: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            if isStale {
+                Image(systemName: "clock.badge.exclamationmark")
+                Text("Last updated \(date, style: .time)")
+            } else {
+                Text("Updated \(date, style: .time)")
+            }
+        }
+        .font(.caption2)
+        .foregroundColor(.secondary)
     }
 }
 
@@ -212,37 +408,24 @@ struct DynamicIslandExpandedContentView: View {
         Int(evStatus?.evRange.percentage ?? 0)
     }
 
-    private var chargeSpeed: String? {
-        guard let evStatus, evStatus.chargeSpeed > 0 else { return nil }
-        return String(format: "%.1f kW", evStatus.chargeSpeed)
-    }
-
-    private var chargeTimeRemaining: String? {
-        guard let evStatus else { return nil }
-        let duration = evStatus.chargeTime
-        guard duration > .seconds(0) else { return nil }
-        let formattedTime = duration.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-        if let targetSOC = evStatus.currentTargetSOC {
-            return "\(formattedTime) to \(Int(targetSOC))%"
-        }
-        return formattedTime
+    private var charging: ChargingDisplay {
+        ChargingDisplay(context: context)
     }
 
     var body: some View {
         VStack(spacing: 8) {
             // Progress bar for charging
-            if context.state.activityType == .charging {
+            if context.state.activityType == .charging, charging.phase == .placeholder {
+                PlaceholderChargingLabel(color: charging.barColor, compact: true)
+            } else if context.state.activityType == .charging {
                 EVChargingProgressView(
                     batteryPercentage: batteryPercentage,
                     isCharging: true,
-                    chargeSpeed: chargeSpeed,
-                    chargeTimeRemaining: chargeTimeRemaining,
+                    chargeSpeed: charging.chargeSpeed,
+                    chargeTimeRemaining: charging.chargeTimeRemaining,
                     targetSOC: evStatus?.currentTargetSOC,
                     showHeader: false,
-                    chargingColor: CustomColor.color(
-                        forName: context.attributes.chargingColorName,
-                        default: "green"
-                    )
+                    chargingColor: charging.barColor
                 )
             }
 
@@ -299,13 +482,11 @@ struct DynamicIslandExpandedContentView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                 } else {
-                    Text(context.attributes.vehicleName)
+                    Text(context.state.vehicleName ?? context.attributes.vehicleName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("Updated \(context.state.status.lastUpdated, style: .time)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    UpdatedLabel(date: context.state.status.lastUpdated, isStale: context.isStale)
                 }
 
                 // Stop button (only for climate and debug, not charging)
@@ -343,6 +524,42 @@ struct DynamicIslandExpandedContentView: View {
                 chargeTime: .seconds(3600),
                 targetSocAC: 80,
                 targetSocDC: 80
+            ),
+            location: VehicleStatus.Location(latitude: 0, longitude: 0),
+            lockStatus: .locked,
+            climateStatus: VehicleStatus.ClimateStatus(
+                defrostOn: false,
+                airControlOn: false,
+                steeringWheelHeatingOn: false,
+                temperature: Temperature(units: 1, value: "72")
+            ),
+            odometer: Distance(length: 10000, units: .miles),
+            syncDate: Date()
+        ),
+        activityType: .charging
+    )
+}
+
+#Preview("Waiting to Charge", as: .content, using: VehicleActivityAttributes(vehicleName: "My Ioniq 5", vin: "VIN123", vehicleId: UUID())) {
+    VehicleActivityWidget()
+} contentStates: {
+    VehicleActivityAttributes.ContentState(
+        status: VehicleStatus(
+            vin: "VIN123",
+            gasRange: nil,
+            evStatus: VehicleStatus.EVStatus(
+                charging: false,
+                chargeSpeed: 0,
+                evRange: VehicleStatus.FuelRange(
+                    range: Distance(length: 117, units: .miles),
+                    percentage: 28
+                ),
+                plugType: .acCharger,
+                chargeTime: .seconds(0),
+                targetSocAC: 90,
+                targetSocDC: 90,
+                waitingForScheduledCharge: true,
+                estimatedChargeStart: Calendar.current.date(bySettingHour: 23, minute: 30, second: 0, of: Date())
             ),
             location: VehicleStatus.Location(latitude: 0, longitude: 0),
             lockStatus: .locked,
@@ -473,20 +690,8 @@ struct VehicleActivityContentView: View {
         Int(evStatus?.evRange.percentage ?? 0)
     }
 
-    private var chargeSpeed: String? {
-        guard let evStatus, evStatus.chargeSpeed > 0 else { return nil }
-        return String(format: "%.1f kW", evStatus.chargeSpeed)
-    }
-
-    private var chargeTimeRemaining: String? {
-        guard let evStatus else { return nil }
-        let duration = evStatus.chargeTime
-        guard duration > .seconds(0) else { return nil }
-        let formattedTime = duration.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-        if let targetSOC = evStatus.currentTargetSOC {
-            return "\(formattedTime) to \(Int(targetSOC))%"
-        }
-        return formattedTime
+    private var charging: ChargingDisplay {
+        ChargingDisplay(context: context)
     }
 
     private var formattedRange: String {
@@ -497,18 +702,17 @@ struct VehicleActivityContentView: View {
     var body: some View {
         VStack(spacing: 12) {
             // Charging activity uses shared EVChargingProgressView (no icon for Live Activity)
-            if context.state.activityType == .charging, isLockScreen {
+            if context.state.activityType == .charging, isLockScreen, charging.phase == .placeholder {
+                PlaceholderChargingLabel(color: charging.barColor)
+            } else if context.state.activityType == .charging, isLockScreen {
                 EVChargingProgressView(
                     formattedRange: formattedRange,
                     batteryPercentage: batteryPercentage,
                     isCharging: true,
-                    chargeSpeed: chargeSpeed,
-                    chargeTimeRemaining: chargeTimeRemaining,
+                    chargeSpeed: charging.chargeSpeed,
+                    chargeTimeRemaining: charging.chargeTimeRemaining,
                     targetSOC: evStatus?.currentTargetSOC,
-                    chargingColor: CustomColor.color(
-                        forName: context.attributes.chargingColorName,
-                        default: "green"
-                    )
+                    chargingColor: charging.barColor
                 )
             }
 
@@ -587,13 +791,11 @@ struct VehicleActivityContentView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                 } else {
-                    Text(context.attributes.vehicleName)
+                    Text(context.state.vehicleName ?? context.attributes.vehicleName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("Updated \(context.state.status.lastUpdated, style: .time)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    UpdatedLabel(date: context.state.status.lastUpdated, isStale: context.isStale)
                 }
 
                 // Stop button (only for climate and debug, not charging)

@@ -95,7 +95,7 @@ struct BBDebugConfiguration: Codable {
             shouldFailStartCharge
         case .stopCharge:
             shouldFailStopCharge
-        case .setTargetSOC:
+        case .setTargetSOC, .setChargingSchedule:
             false
         }
     }
@@ -184,7 +184,8 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                     plugType: evStatus.plugType != .unplugged ? evStatus.plugType : .acCharger,
                     chargeTime: .seconds(chargeTimeMinutes * 60),
                     targetSocAC: evStatus.targetSocAC,
-                    targetSocDC: evStatus.targetSocDC
+                    targetSocDC: evStatus.targetSocDC,
+                    chargingSchedule: evStatus.chargingSchedule
                 )
             }
         case .stopCharge:
@@ -197,7 +198,8 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                     plugType: evStatus.plugType,
                     chargeTime: .seconds(0),
                     targetSocAC: evStatus.targetSocAC,
-                    targetSocDC: evStatus.targetSocDC
+                    targetSocDC: evStatus.targetSocDC,
+                    chargingSchedule: evStatus.chargingSchedule
                 )
             }
         case let .setTargetSOC(acLevel, dcLevel):
@@ -210,8 +212,17 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
                     plugType: evStatus.plugType,
                     chargeTime: evStatus.chargeTime,
                     targetSocAC: Double(acLevel),
-                    targetSocDC: Double(dcLevel)
+                    targetSocDC: Double(dcLevel),
+                    chargingSchedule: evStatus.chargingSchedule
                 )
+            }
+        case let .setChargingSchedule(window):
+            BBLogger.info(.fakeAPI, "FakeAPI: Setting off-peak hours for fake vehicle '\(bbVehicle.vin)'")
+            if var evStatus = bbVehicle.evStatus {
+                var schedule = evStatus.chargingSchedule ?? Self.defaultFakeSchedule
+                schedule.offPeakWindow = window
+                evStatus.chargingSchedule = schedule
+                bbVehicle.evStatus = evStatus
             }
         }
 
@@ -359,11 +370,37 @@ public class SwiftDataFakeVehicleProvider: FakeVehicleProvider {
         return try? modelContext.fetch(descriptor).first
     }
 
+    /// The schedule a fake EV starts with: off-peak 11 PM–7 AM, prioritized.
+    static let defaultFakeSchedule = ChargingSchedule(
+        offPeakWindow: .init(start: TimeOfDay(hour: 23, minute: 0), end: TimeOfDay(hour: 7, minute: 0)),
+        offPeakPreference: .prioritize
+    )
+
+    /// A fake EV's status as a real one would report it: with a schedule,
+    /// and waiting for it when plugged in, idle, and outside the window.
+    private func fakeEVStatus(from evStatus: VehicleStatus.EVStatus?, now: Date = Date()) -> VehicleStatus.EVStatus? {
+        guard var evStatus else { return nil }
+        let schedule = evStatus.chargingSchedule ?? Self.defaultFakeSchedule
+        evStatus.chargingSchedule = schedule
+        let waiting: Bool = {
+            guard evStatus.pluggedIn, !evStatus.charging, schedule.offPeakEnabled else { return false }
+            let window = schedule.offPeakWindow
+            let minute = Calendar.current.component(.hour, from: now) * 60 + Calendar.current.component(.minute, from: now)
+            let start = window.start.minutesSinceMidnight, end = window.end.minutesSinceMidnight
+            let insideWindow = start <= end ? (start..<end).contains(minute) : (minute >= start || minute < end)
+            return !insideWindow
+        }()
+        evStatus.waitingForScheduledCharge = waiting
+        evStatus.estimatedChargeStart = waiting ? schedule.nextOffPeakStart(onOrAfter: now) : nil
+        evStatus.estimatedChargeEnd = nil
+        return evStatus
+    }
+
     private func createVehicleStatus(from bbVehicle: BBVehicle) -> VehicleStatus {
         var status = VehicleStatus(
             vin: bbVehicle.vin,
             gasRange: bbVehicle.gasRange,
-            evStatus: bbVehicle.evStatus,
+            evStatus: fakeEVStatus(from: bbVehicle.evStatus),
             location: bbVehicle.location ?? VehicleStatus.Location(latitude: 0, longitude: 0),
             lockStatus: bbVehicle.lockStatus ?? .unknown,
             climateStatus: bbVehicle.climateStatus ?? VehicleStatus.ClimateStatus(

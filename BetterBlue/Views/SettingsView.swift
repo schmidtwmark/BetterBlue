@@ -37,6 +37,42 @@ struct SettingsView: View {
     @State private var showingLiveActivitiesInfo = false
     @State private var showingExportSheet = false
 
+    // MARK: - Nightly charge check
+
+    private var showsNightlyChargeCheck: Bool {
+        appSettings.liveActivitiesEnabled
+            && displayedVehicles.contains { $0.fuelType.hasElectricCapability }
+    }
+
+    /// The check time as a date for the picker; picking one makes it the
+    /// user's own time instead of the schedule-derived default.
+    private var nightlyCheckTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                LiveActivityManager.nightlyCheckTime(for: displayedVehicles).date(on: Date()) ?? Date()
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                appSettings.nightlyChargeCheckMinutes = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            }
+        )
+    }
+
+    private var nightlyCheckFooter: String {
+        let explanation = "Each night at this time, BetterBlue checks whether your EV has started charging "
+            + "and, if it has, starts its Live Activity — no need to open the app."
+        if appSettings.nightlyChargeCheckMinutes == nil,
+           let fallback = LiveActivityManager.defaultNightlyCheckTime(for: displayedVehicles) {
+            return explanation + " Set to 5 minutes after \(fallback.vehicleName)'s "
+                + "\(fallback.offPeakStart.localizedString) off-peak start."
+        }
+        return explanation
+    }
+
+    private func syncNightlyCheck() {
+        Task { await LiveActivityManager.shared.syncNightlyCheck() }
+    }
+
     var body: some View {
         NavigationView {
             List {
@@ -124,9 +160,32 @@ struct SettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    if showsNightlyChargeCheck {
+                        Toggle("Start When Charging Begins", isOn: $appSettings.nightlyChargeCheckEnabled)
+                        if appSettings.nightlyChargeCheckEnabled {
+                            DatePicker(
+                                "Check At",
+                                selection: nightlyCheckTimeBinding,
+                                displayedComponents: .hourAndMinute
+                            )
+                            if appSettings.nightlyChargeCheckMinutes != nil,
+                               LiveActivityManager.defaultNightlyCheckTime(for: displayedVehicles) != nil {
+                                Button("Use Charging Schedule Time") {
+                                    appSettings.nightlyChargeCheckMinutes = nil
+                                }
+                            }
+                        }
+                    }
                 } header: {
                     Text("Widget Settings")
+                } footer: {
+                    if showsNightlyChargeCheck, appSettings.nightlyChargeCheckEnabled {
+                        Text(nightlyCheckFooter)
+                    }
                 }
+                .onChange(of: appSettings.liveActivitiesEnabled) { syncNightlyCheck() }
+                .onChange(of: appSettings.nightlyChargeCheckEnabled) { syncNightlyCheck() }
+                .onChange(of: appSettings.nightlyChargeCheckMinutes) { syncNightlyCheck() }
 
                 Section {
                     Picker("Distance Unit", selection: $appSettings.preferredDistanceUnit) {

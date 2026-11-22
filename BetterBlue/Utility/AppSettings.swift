@@ -197,6 +197,8 @@ class AppSettings {
     private let widgetRefreshIntervalKey = "WidgetRefreshInterval"
     private let debugModeEnabledKey = "DebugModeEnabled"
     private let liveActivitiesEnabledKey = "LiveActivitiesEnabled"
+    private let nightlyChargeCheckEnabledKey = "NightlyChargeCheckEnabled"
+    private let nightlyChargeCheckMinutesKey = "NightlyChargeCheckMinutes"
 
     var preferredDistanceUnit: Distance.Units {
         didSet {
@@ -353,6 +355,26 @@ class AppSettings {
         }
     }
 
+    /// Check each night whether an EV has started charging and, if so,
+    /// start its Live Activity — without the app having to be opened.
+    var nightlyChargeCheckEnabled: Bool {
+        didSet {
+            userDefaults.set(nightlyChargeCheckEnabled, forKey: nightlyChargeCheckEnabledKey)
+        }
+    }
+
+    /// The nightly check's time in minutes after midnight, or nil to run
+    /// 5 minutes after the first EV's off-peak start.
+    var nightlyChargeCheckMinutes: Int? {
+        didSet {
+            if let nightlyChargeCheckMinutes {
+                userDefaults.set(nightlyChargeCheckMinutes, forKey: nightlyChargeCheckMinutesKey)
+            } else {
+                userDefaults.removeObject(forKey: nightlyChargeCheckMinutesKey)
+            }
+        }
+    }
+
     private init() {
         #if targetEnvironment(simulator)
             isSimulator = true
@@ -410,6 +432,8 @@ class AppSettings {
 
         // Live Activities is a beta feature, disabled by default
         liveActivitiesEnabled = userDefaults.bool(forKey: liveActivitiesEnabledKey)
+        nightlyChargeCheckEnabled = userDefaults.bool(forKey: nightlyChargeCheckEnabledKey)
+        nightlyChargeCheckMinutes = userDefaults.object(forKey: nightlyChargeCheckMinutesKey) as? Int
 
         // Start sync store and listen for changes from other devices
         syncStore.performSync()
@@ -500,8 +524,8 @@ class AppSettings {
         #if canImport(ActivityKit)
             Task { @MainActor in
                 for activity in Activity<VehicleActivityAttributes>.activities {
-                    let currentState = activity.content.state
-                    await activity.update(ActivityContent(state: currentState, staleDate: nil))
+                    // Units only: the status is no fresher than before.
+                    await activity.update(activity.content)
                 }
             }
         #endif

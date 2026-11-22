@@ -888,7 +888,7 @@ struct PersistentVehicleSheet: View {
         // the duration.
         let chargeSpeed: String? = {
             guard ev.charging, ev.chargeSpeed > 0 else { return nil }
-            return String(format: "%.0f kW", ev.chargeSpeed)
+            return String(format: "%.1f kW", ev.chargeSpeed)
         }()
         let timeRemaining: String? = {
             guard ev.charging, ev.chargeTime > .seconds(0) else { return nil }
@@ -965,6 +965,13 @@ struct PersistentVehicleSheet: View {
         let stateText: String = {
             // Just "Charging" — the speed now shows inside the bar.
             if isCharging { return "Charging" }
+            if ev.isWaitingForScheduledCharge {
+                // Plugged in and holding for the schedule — say when.
+                if let start = ev.expectedChargeStart(after: Date()) {
+                    return "Charging at \(start.formatted(date: .omitted, time: .shortened))"
+                }
+                return "Waiting to Charge"
+            }
             if isPluggedIn { return "Ready to Charge" }
             return "Unplugged"
         }()
@@ -974,7 +981,9 @@ struct PersistentVehicleSheet: View {
         // the brand-specific plug icon when idle / plugged-in.
         let leadingIcon: Image = isCharging
             ? Image(systemName: "bolt.fill")
-            : bbVehicle.plugIcon(for: ev.plugType)
+            : ev.isWaitingForScheduledCharge
+                ? Image(systemName: "clock.fill")
+                : bbVehicle.plugIcon(for: ev.plugType)
         SectionRow(
             icon: leadingIcon,
             iconColor: isPluggedIn ? chargingColor : .secondary,
@@ -1219,6 +1228,12 @@ struct PersistentVehicleSheet: View {
                 }
             }
 
+            if bbVehicle.showsChargingSchedule {
+                actionTile("Charging Schedule", systemImage: "calendar.badge.clock") {
+                    sheetPresentation.show(.chargingSchedule(vehicle: bbVehicle))
+                }
+            }
+
             actionTile("Climate Settings", systemImage: "fan") {
                 sheetPresentation.show(.climateSettings(vehicle: bbVehicle))
             }
@@ -1324,6 +1339,13 @@ struct PersistentVehicleSheet: View {
             sheetPresentation.show(.chargeLimitSettings(vehicle: bbVehicle))
         } label: {
             Label("Charge Limits", systemImage: "battery.100percent")
+        }
+        if bbVehicle.showsChargingSchedule {
+            Button {
+                sheetPresentation.show(.chargingSchedule(vehicle: bbVehicle))
+            } label: {
+                Label("Charging Schedule", systemImage: "calendar.badge.clock")
+            }
         }
     }
 

@@ -190,6 +190,13 @@ class BBVehicle {
         return surroundViewEnabled
     }
 
+    /// Whether to offer the charging schedule screen: an EV whose
+    /// account's API can write schedules.
+    @MainActor
+    var showsChargingSchedule: Bool {
+        fuelType.hasElectricCapability && account?.supportsChargingSchedule == true
+    }
+
     /// User override for the inferred powertrain. `nil` means "use
     /// whatever the API/self-heal decided". Setting it to a non-nil
     /// value pins `fuelType` to that choice; clearing it (set to nil)
@@ -427,9 +434,10 @@ extension BBVehicle {
         maxAttempts: Int = 3,
         initialDelaySeconds: Int = 10,
         retryDelaySeconds: Int = 10,
+        initialStatusMessage: String = "Command sent",
     ) async throws {
         // Initial delay to allow command to process
-        statusMessageUpdater?("Command sent")
+        statusMessageUpdater?(initialStatusMessage)
         try await interruptibleSleep(seconds: initialDelaySeconds)
 
         var currentAttempt = 0

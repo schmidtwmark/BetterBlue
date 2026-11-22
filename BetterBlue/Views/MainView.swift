@@ -127,6 +127,11 @@ struct MainView: View {
                 if new == .background {
                     finishStoreWorkBeforeSuspension()
                 }
+                if new == .active {
+                    // The nightly check's default time follows the first
+                    // EV's schedule, which a refresh may have changed.
+                    Task { await LiveActivityManager.shared.syncNightlyCheck() }
+                }
             }
             .onAppear {
                 BBLogger.info(.app, "[SVI-\(instanceTag)] MainView .onAppear (idx=\(selectedVehicleIndex), count=\(displayedVehicles.count))")
@@ -518,6 +523,8 @@ struct MainView: View {
             ClimateSettingsSheet(vehicle: vehicle)
         case .chargeLimitSettings(let vehicle):
             ChargeLimitSettingsSheet(vehicle: vehicle)
+        case .chargingSchedule(let vehicle):
+            ChargingScheduleSheet(vehicle: vehicle)
         }
     }
 
