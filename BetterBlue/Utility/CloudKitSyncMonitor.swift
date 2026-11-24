@@ -103,29 +103,84 @@ final class CloudKitSyncMonitor {
             guard let ckEvent = note.userInfo?[key]
                     as? NSPersistentCloudKitContainer.Event else { return }
             let identifier = ckEvent.identifier
+            let type = Self.classify(ckEvent.type)
             guard ckEvent.endDate != nil else {
                 MainActor.assumeIsolated {
-                    _ = self?.inFlightEvents.insert(identifier)
+                    self?.inFlightEvents[identifier] = InFlightEvent(type: type, started: Date())
+                    self?.onSyncActivity?(true)
                 }
                 return
             }
             let projected = Event(
                 date: ckEvent.endDate ?? Date(),
-                type: Self.classify(ckEvent.type),
+                type: type,
                 succeeded: ckEvent.succeeded,
                 error: Self.describe(ckEvent.error)
             )
             MainActor.assumeIsolated {
-                self?.inFlightEvents.remove(identifier)
+                self?.inFlightEvents.removeValue(forKey: identifier)
                 self?.handle(projected)
+                if self?.isIdle == true {
+                    self?.onSyncActivity?(false)
+                }
             }
         }
+    }
+
+    private struct InFlightEvent {
+        let type: Event.EventType
+        let started: Date
     }
 
     /// Setup / import / export events that have started and not yet
     /// finished. While there are any, Core Data is (or may be) writing to
     /// the store.
-    @ObservationIgnored private var inFlightEvents: Set<UUID> = []
+    @ObservationIgnored private var inFlightEvents: [UUID: InFlightEvent] = [:]
+
+    /// An event this old that never reported finishing isn't believed
+    /// any more. Without this, one lost "finished" notification would
+    /// have every later wait run to its deadline.
+    private static let inFlightEventLifetime: TimeInterval = 5 * 60
+
+    /// Events in flight, less any that have outlived
+    /// `inFlightEventLifetime`.
+    private var liveEvents: [InFlightEvent] {
+        let cutoff = Date().addingTimeInterval(-Self.inFlightEventLifetime)
+        inFlightEvents = inFlightEvents.filter { $0.value.started > cutoff }
+        return Array(inFlightEvents.values)
+    }
+
+    private var isIdle: Bool { liveEvents.isEmpty }
+
+    /// Called with `true` each time a sync event starts and with `false`
+    /// when the last one in flight finishes. The iOS app holds a
+    /// background task in between (`SyncBackgroundGuard`); kept as a hook
+    /// because this file is shared with targets that have no
+    /// `UIApplication`.
+    @ObservationIgnored var onSyncActivity: ((Bool) -> Void)?
+
+    /// Waits for the import a CloudKit push announces, then for sync to
+    /// go idle, or until `deadline`.
+    ///
+    /// Core Data doesn't import the moment a push arrives: it hands the
+    /// work to the system's scheduler, which starts it when it sees fit,
+    /// often seconds later. "Nothing in flight" straight after the push
+    /// therefore says nothing about the import, and letting the app be
+    /// suspended on the strength of it leaves the import to start as the
+    /// app freezes (0xdead10cc, TestFlight feedback on build 74). So wait
+    /// until an import has finished since the push, or until
+    /// `startTimeout` passes with no import under way.
+    func waitForImport(startTimeout: Duration = .seconds(10), deadline: ContinuousClock.Instant) async {
+        let clock = ContinuousClock()
+        let pushArrived = Date()
+        let startBy = min(deadline, clock.now + startTimeout)
+        while clock.now < startBy,
+              !liveEvents.contains(where: { $0.type == .import }),
+              (lastImport?.date ?? .distantPast) < pushArrived {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        await waitUntilIdle(deadline: deadline)
+    }
 
     /// Waits until no CloudKit event is in flight, or until `deadline`.
     ///
@@ -138,7 +193,7 @@ final class CloudKitSyncMonitor {
     func waitUntilIdle(grace: Duration = .seconds(1), deadline: ContinuousClock.Instant) async {
         let clock = ContinuousClock()
         try? await Task.sleep(until: min(deadline, clock.now + grace), clock: clock)
-        while !inFlightEvents.isEmpty, clock.now < deadline {
+        while !isIdle, clock.now < deadline {
             try? await Task.sleep(for: .milliseconds(250))
         }
     }

@@ -200,6 +200,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         SystemDiagnostics.shared.start()
+        SyncBackgroundGuard.shared.start()
         // Push-to-start tokens let the backend start a charging card while
         // the app isn't running (the nightly charge check).
         LiveActivityManager.shared.startObservingPushToStartTokens()
@@ -261,9 +262,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 backgroundTask.end()
             }
         } else if CKNotification(fromRemoteNotificationDictionary: userInfo) != nil {
-            // A change from another device: Core Data imports it.
+            // A change from another device: Core Data imports it, though
+            // not at once — stay awake until it has.
             Task {
-                await CloudKitSyncMonitor.shared.waitUntilIdle(grace: .seconds(2), deadline: deadline)
+                await CloudKitSyncMonitor.shared.waitForImport(deadline: deadline)
                 completionHandler(.newData)
                 backgroundTask.end()
             }
@@ -308,6 +310,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 final class BackgroundTask {
     private var identifier: UIBackgroundTaskIdentifier = .invalid
 
+    /// False once ended, expired, or if iOS refused the task.
+    var isActive: Bool { identifier != .invalid }
+
     init(name: String) {
         identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             MainActor.assumeIsolated { self?.end() }
@@ -318,6 +323,50 @@ final class BackgroundTask {
         guard identifier != .invalid else { return }
         UIApplication.shared.endBackgroundTask(identifier)
         identifier = .invalid
+    }
+}
+
+/// Keeps the app awake while CloudKit sync writes to the App Group
+/// store, whatever set the sync off. The push handler and
+/// `MainView.finishStoreWorkBeforeSuspension` each cover one way the app
+/// comes to be running in the background; sync also runs when iOS
+/// decides to start Core Data's own scheduled activity, with no call
+/// into the app at all. A store write still under way at suspension gets
+/// the app killed (0xdead10cc), so hold a background task for as long as
+/// a sync event is in flight. iOS caps how long that can be: a sync that
+/// outlasts the task (a new device's first import) is still exposed.
+@MainActor
+final class SyncBackgroundGuard {
+    static let shared = SyncBackgroundGuard()
+
+    private var task: BackgroundTask?
+    private var release: Task<Void, Never>?
+    /// How long to hold on after sync goes idle. Imports and the exports
+    /// they set off run back to back; this bridges the gaps.
+    private static let idleGrace: Duration = .seconds(1)
+
+    func start() {
+        CloudKitSyncMonitor.shared.onSyncActivity = { [weak self] inFlight in
+            self?.syncActivityChanged(inFlight: inFlight)
+        }
+    }
+
+    private func syncActivityChanged(inFlight: Bool) {
+        release?.cancel()
+        release = nil
+        if inFlight {
+            // A task iOS already expired is no use: take a new one.
+            if task?.isActive != true {
+                task = BackgroundTask(name: "BetterBlue.cloudKitSync")
+            }
+        } else {
+            release = Task { [weak self] in
+                try? await Task.sleep(for: Self.idleGrace)
+                guard !Task.isCancelled else { return }
+                self?.task?.end()
+                self?.task = nil
+            }
+        }
     }
 }
 
