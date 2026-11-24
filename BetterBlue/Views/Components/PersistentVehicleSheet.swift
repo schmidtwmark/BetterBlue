@@ -104,17 +104,30 @@ struct PersistentVehicleSheet: View {
     /// Written straight from the scroll, so that it costs the card no
     /// redraw of its own on top of the pager's.
     let scrollOffsets: SheetScrollOffsets
+    /// The room over the expanded card for its top edge to rise into as
+    /// it bounces there (see `VehicleSheetPager.cardLayout(for:geo:)`).
+    let bounceRoom: CGFloat
+    /// True when the expanded card holds all of its content, so that the
+    /// scroll ends at the expanded detent with nothing left to scroll.
+    /// Pulled or thrown past it, the card then bounces as a whole
+    /// instead of sliding its content up under its header.
+    let contentFits: Bool
     /// The live offset, where `DetentSnapBehavior` and the detent
     /// bookkeeping can read it.
     @State private var offsetTracker = ScrollOffsetTracker()
-    /// Springs the scroll to a detent — after a release, or when the
+    /// Flies the card to a detent — after a release, or when the
     /// detent is changed from outside the scroll.
-    @State private var springDriver = SheetSpringDriver()
+    @State private var springDriver = SheetFlightDriver()
+    /// Bounces the card's top edge as content thrown on through the
+    /// expanded detent passes it (see `bounceAtDetent(passedAt:)`), and
+    /// lets what a stopped bounce still showed die away.
+    @State private var giveDriver = SheetFlightDriver()
     /// Explicit scroll position, used to spring the scroll to a detent.
     @State private var scroll = ScrollPositionBox()
     let onSuccessfulRefresh: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appSettings = AppSettings.shared
     @Query private var allClimatePresets: [ClimatePreset]
 
@@ -258,8 +271,9 @@ struct PersistentVehicleSheet: View {
         // stays where it is. Because it is one UIScrollView pan the
         // whole way, a drag carries continuously from expanding into
         // scrolling, and dragging back through the top continues into
-        // collapsing. A flick's momentum, though, stops at the expanded
-        // detent — see `DetentSnapBehavior`.
+        // collapsing. So does a hard enough throw: it coasts on through
+        // the expanded detent into the content. A lighter one stops at
+        // the detent, with a bounce — see `DetentSnapBehavior`.
         ScrollView(.vertical) {
             contentStack
                 // Never inset the content for the status bar — see
@@ -302,16 +316,21 @@ struct PersistentVehicleSheet: View {
                 // reachable after the first `expansionTravel` points
                 // of offset were spent raising the card.
                 .padding(.bottom, expansionTravel)
-                // Pin the content while the card rises — and while it is
-                // pulled down past its collapsed detent, where the
-                // scroll's bounce would otherwise drop the content down
-                // inside the card: the card gives way instead (see
+                // Pin the content while the card rises. Read from the
+                // scroll as it is drawn rather than from a state set off
+                // it, which would redraw the whole card on every frame.
+                //
+                // And past either detent where the scroll ends there —
+                // below the collapsed one always, above the expanded one
+                // when the card holds all its content (`contentFits`):
+                // the scroll's bounce would otherwise drop the content
+                // down inside the card, or slide it up under a header
+                // that has stopped. The card gives way instead (see
                 // `VehicleSheetPager.cardLayout(for:geo:)`), its content
-                // going with its top edge. Read from the scroll as it is
-                // drawn rather than from a state set off it, which would
-                // redraw the whole card on every frame.
-                .visualEffect { [expansionTravel] content, proxy in
-                    content.offset(y: min(-proxy.frame(in: .scrollView).minY, expansionTravel))
+                // going with its top edge.
+                .visualEffect { [expansionTravel, contentFits] content, proxy in
+                    let offset = -proxy.frame(in: .scrollView).minY
+                    return content.offset(y: contentFits ? offset : min(offset, expansionTravel))
                 }
                 // Outside that pin, which it would otherwise ride on top
                 // of — it has one of its own.
@@ -322,6 +341,12 @@ struct PersistentVehicleSheet: View {
         .modifier(BoxedScrollPosition(box: scroll))
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
+        // The card does the clipping (`SheetChrome`), not the scroll: a
+        // card bouncing above its expanded detent is taller than its
+        // ScrollView for a moment, and content that carries on below
+        // the scroll's frame should carry on to the card's bottom edge
+        // rather than stop at a line above it.
+        .scrollClipDisabled()
         // No edge effects: the pager runs through the safe areas (see
         // `VehicleSheetPager.statusBarGap`), so a system effect would be
         // drawn against the window's edge, over the card. The pinned
@@ -330,10 +355,19 @@ struct PersistentVehicleSheet: View {
         .scrollTargetBehavior(DetentSnapBehavior(travel: expansionTravel, tracker: offsetTracker))
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y
-        } action: { _, offset in
+        } action: { old, offset in
             guard offset.isFinite else { return }
             offsetTracker.offset = offset
             scrollOffsets.report(offset, for: bbVehicle.vin)
+            // Thrown on through the expanded detent: the card's top edge
+            // stops there while its content carries on, and bounces as
+            // it does.
+            if offsetTracker.carriesMomentum, old < expansionTravel, offset >= expansionTravel {
+                offsetTracker.carriesMomentum = false
+                if !reduceMotion {
+                    bounceAtDetent(passedAt: offsetTracker.carrySpeedAtDetent)
+                }
+            }
             // Scrolled by something other than a finger or the card's own
             // spring (see `settleWhenStill(at:)`).
             if offsetTracker.phase == .idle, !springDriver.isRunning {
@@ -353,42 +387,65 @@ struct PersistentVehicleSheet: View {
         // collapsed it.
         .onScrollPhaseChange { old, new, context in
             offsetTracker.phase = new
-            if new == .interacting {
-                springDriver.stop()
+            // A finger letting go, as the phases tell it. They run behind
+            // the finger: on a quick flick `DetentSnapBehavior` has sorted
+            // the release before the scroll is said to be touched at all,
+            // and the scroll may then never be said to have been — the
+            // first thing reported after it is the release.
+            let unseenFinger = offsetTracker.isReleaseSorted && old != .interacting && new != .interacting
+            let letGo = unseenFinger || (old == .interacting && new != .interacting)
+            if new == .interacting || unseenFinger {
+                stopSprings()
                 offsetTracker.isScrollingInCode = false
                 offsetTracker.settleCheck?.cancel()
                 offsetTracker.settleRetries = 0
             }
-            if old == .interacting, new != .interacting {
+            // A new finger ends a throw still on its way into the content
+            // — not the throw it is itself about to turn out to be.
+            if new == .interacting, !offsetTracker.isReleaseSorted {
+                offsetTracker.carriesMomentum = false
+            }
+            if letGo {
+                offsetTracker.isReleaseSorted = false
+                // The speed is this release's alone: one that
+                // `DetentSnapBehavior` wasn't asked about has none.
+                let velocity = offsetTracker.releaseVelocity
+                offsetTracker.releaseVelocity = 0
+                if new == .decelerating, offsetTracker.carriesMomentum {
+                    // Thrown hard enough to carry on into the content
+                    // (see `DetentSnapBehavior`): the scroll coasts there
+                    // by itself, raising the card on its way through.
+                    return
+                }
+                offsetTracker.carriesMomentum = false
                 let released = context.geometry.contentOffset.y
                 let isPartway = released > 0 && released < expansionTravel - 0.5
                 if offsetTracker.isSnapPending || isPartway {
                     offsetTracker.isSnapPending = false
-                    let velocity = offsetTracker.releaseVelocity
                     let snap = SheetSnap(released: released, velocity: velocity, travel: expansionTravel)
                     if isPartway {
-                        springToDetent(snap.offset, from: released, velocity: velocity, spring: snap.spring)
+                        springToDetent(snap.offset, from: released, velocity: velocity)
                     } else if released > 0 {
                         // Let go in the content after all (the card already
                         // expanded): its momentum stops at the top of it.
-                        springToDetent(expansionTravel, from: released, velocity: velocity, spring: snap.spring)
+                        springToDetent(expansionTravel, from: released, velocity: velocity)
                     } else {
                         // Let go at or below the collapsed detent after all.
                         // A fast flick down can get there before its release
                         // is seen, and stays collapsed; a card pulled down
                         // and flicked back up goes where the flick sends it.
                         let expands = snap.offset > 0
-                        springToDetent(
-                            snap.offset,
-                            from: released,
-                            velocity: expands ? velocity : 0,
-                            spring: expands ? snap.spring : SheetSnap.spring
-                        )
+                        springToDetent(snap.offset, from: released, velocity: expands ? velocity : 0)
                     }
                     return
                 }
+                // (Let go past a detent where the scroll ends — below
+                // the collapsed one, or above the expanded one of a card
+                // that holds all its content — the scroll's own bounce
+                // brings the card back, as it gave way.)
             }
             guard new == .idle, !springDriver.isRunning else { return }
+            offsetTracker.carriesMomentum = false
             settleWhenStill(at: context.geometry.contentOffset.y)
         }
         // Detent changed from outside the scroll (drag-handle tap):
@@ -400,12 +457,7 @@ struct PersistentVehicleSheet: View {
                 ? offsetTracker.offset < expansionTravel - 2
                 : offsetTracker.offset > 2
             guard needsMove else { return }
-            springToDetent(
-                new == .expanded ? expansionTravel : 0,
-                from: offsetTracker.offset,
-                velocity: 0,
-                spring: SheetSnap.spring
-            )
+            springToDetent(new == .expanded ? expansionTravel : 0, from: offsetTracker.offset, velocity: 0)
         }
         // The room to expand into changed under an expanded card
         // (rotation, window resize, an error card appearing above it).
@@ -425,7 +477,7 @@ struct PersistentVehicleSheet: View {
             // programmatic scroll issued while a ScrollView is being
             // resized is dropped.
             Task { @MainActor in
-                springDriver.stop()
+                stopSprings()
                 offsetTracker.isScrollingInCode = true
                 scroll.position.scrollTo(y: target)
             }
@@ -481,23 +533,116 @@ struct PersistentVehicleSheet: View {
         .padding(.bottom, edgeInset)
     }
 
-    /// Springs the scroll from `from` to a detent's offset, and settles
-    /// the detent flag when it arrives.
-    private func springToDetent(_ offset: CGFloat, from: CGFloat, velocity: CGFloat, spring: Spring) {
+    /// Flies the card from `from` to a detent's offset, let go at
+    /// `velocity` (points per second, positive raising the card), and
+    /// settles the detent flag when it arrives.
+    ///
+    /// A card thrown at a detent runs on past it and comes back (see
+    /// `SheetFlight`). The scroll doesn't: it stops at the detent, and
+    /// the pager shows the rest as it shows the scroll's own bounce
+    /// there (`SheetScrollOffsets.fly(_:for:replacingScroll:)`) — the
+    /// card's top edge past the detent, its content going with it.
+    /// Scrolled instead, a card past the expanded detent would slide
+    /// its content up under a top edge that had stopped dead, and one
+    /// past the collapsed detent has nowhere to scroll to at all.
+    ///
+    /// A card carried to its expanded detent and let go slowly is set
+    /// down there without a bounce, as one opened from its drag handle
+    /// is; going down it takes a flick, as it does on a system sheet.
+    /// With Reduce Motion on the card never bounces: it comes to rest
+    /// at the detent, whatever it was sent there with.
+    private func springToDetent(_ offset: CGFloat, from: CGFloat, velocity: CGFloat) {
         offsetTracker.isScrollingInCode = true
-        springDriver.run(
+        let vin = bbVehicle.vin
+        // What an earlier bounce still shows goes on dying away under
+        // this flight, rather than vanishing as it starts.
+        giveDriver.stop()
+        let leftover = scrollOffsets.flown(for: vin)
+        let expanding = offset > 0
+        // Whether the card is at its detent already, or past it with
+        // the rest showing as bounce. Below the collapsed detent it
+        // always is. Past the expanded detent that is only so where it
+        // isn't scrolling: a card coming back down out of scrolled
+        // content is. One that holds all its content has nothing to
+        // scroll there — and a hard throw is often past the detent
+        // already when the finger lets go.
+        let startsPast = expanding
+            ? from >= offset && (contentFits || from <= offset + 0.5)
+            : from <= 0
+        // A card sent up from below its collapsed detent sets off from
+        // where it shows, which is nearer the detent than its scroll is.
+        let from = expanding && from < 0 ? SheetSnap.dip(for: from) : from
+        let speed = expanding ? velocity : -velocity
+        let flight = SheetFlight(
             from: from,
             to: offset,
             velocity: velocity,
-            spring: spring,
-            takingOver: offsetTracker.phase != .idle
-        ) { y in
-            scroll.position.scrollTo(y: y)
+            expanding: expanding,
+            startsPast: startsPast,
+            room: bounceRoom,
+            bounces: !reduceMotion && speed >= (expanding ? SheetSnap.bounceVelocity : SheetSnap.flickVelocity)
+        )
+        // Where the card shows past a detent is the flight's from here
+        // on, whatever its scroll was showing there. So is any of its
+        // way that lies below the collapsed detent, where there is
+        // nowhere for the scroll to be.
+        let show = { (time: TimeInterval) in
+            let state = flight.state(at: time)
+            let fading = leftover * SheetSnap.fade(at: time)
+            scrollOffsets.fly(state.bounce + min(0, state.offset) + fading, for: vin)
+            return state.offset
+        }
+        _ = show(0)
+        springDriver.run(for: flight.duration, takingOver: offsetTracker.phase != .idle) { time in
+            scroll.position.scrollTo(y: max(0, show(time)))
         } completion: {
+            scrollOffsets.land(for: vin)
             let settled: SheetDetent = offset > 0 ? .expanded : .collapsed
             if detent != settled { detent = settled }
             // The room to expand into may have changed on the way.
             settleWhenStill(at: offsetTracker.offset)
+        }
+    }
+
+    /// The bounce of a card's top edge as content thrown on through its
+    /// expanded detent passes it at `speed` (points per second): the
+    /// edge runs on past the detent and comes back, as it would had the
+    /// card stopped there, rather than stopping as if against a wall
+    /// while the content carries on.
+    private func bounceAtDetent(passedAt speed: CGFloat) {
+        let vin = bbVehicle.vin
+        let flight = SheetFlight(
+            from: 0,
+            to: 0,
+            velocity: speed,
+            expanding: true,
+            startsPast: true,
+            room: bounceRoom,
+            bounces: true
+        )
+        giveDriver.run(for: flight.duration, takingOver: false) { time in
+            scrollOffsets.fly(flight.state(at: time).bounce, for: vin)
+        } completion: {
+            scrollOffsets.land(for: vin)
+        }
+    }
+
+    /// Stops the card's springs for something else to move it — a
+    /// finger, above all. What a bounce still showed dies away over the
+    /// next moment, on top of whatever the scroll shows by then.
+    private func stopSprings() {
+        springDriver.stop()
+        giveDriver.stop()
+        let vin = bbVehicle.vin
+        let leftover = scrollOffsets.flown(for: vin)
+        guard leftover != 0 else {
+            scrollOffsets.land(for: vin)
+            return
+        }
+        giveDriver.run(for: SheetSnap.fadeTime, takingOver: true) { time in
+            scrollOffsets.fly(leftover * SheetSnap.fade(at: time), for: vin, replacingScroll: false)
+        } completion: {
+            scrollOffsets.land(for: vin)
         }
     }
 
@@ -536,7 +681,7 @@ struct PersistentVehicleSheet: View {
                     recordDetent(at: offset)
                     return
                 }
-                springToDetent(offset > travel / 2 ? travel : 0, from: offset, velocity: 0, spring: SheetSnap.spring)
+                springToDetent(offset > travel / 2 ? travel : 0, from: offset, velocity: 0)
             } else {
                 recordDetent(at: offset)
             }
@@ -806,11 +951,13 @@ struct PersistentVehicleSheet: View {
             // so only then do the backing and its border come in.
             .background(alignment: .top) {
                 HeaderBackdrop(isOpaque: travel > 0)
-                    .visualEffect { content, proxy in
+                    .visualEffect { [contentFits] content, proxy in
                         let offset = -proxy.frame(in: .scrollView).minY
+                        // Nothing ever scrolls under the header of a card
+                        // that holds all its content.
                         return content
                             .offset(y: offset)
-                            .opacity(min(1, max(0, (offset - travel) / fadeIn)))
+                            .opacity(contentFits ? 0 : min(1, max(0, (offset - travel) / fadeIn)))
                     }
             }
     }
@@ -2670,9 +2817,53 @@ private struct BoxedScrollPosition: ViewModifier {
 /// one that is.
 @Observable
 final class SheetScrollOffsets {
+    /// Where a flight has a card past a detent, in points: positive
+    /// above the expanded detent, negative below the collapsed one.
+    struct Flown {
+        var past: CGFloat
+        /// Whether that is all the card shows there, or comes on top of
+        /// what its scroll's own bounce shows.
+        var replacesScroll: Bool
+    }
+
     private var offsets: [String: CGFloat] = [:]
+    private var flights: [String: Flown] = [:]
 
     subscript(vin: String) -> CGFloat { offsets[vin] ?? 0 }
+
+    /// Where a card's flight has it past a detent, if one has it.
+    func flight(for vin: String) -> Flown? { flights[vin] }
+
+    /// How far past a detent a flight has a card: 0 with none.
+    func flown(for vin: String) -> CGFloat { flights[vin]?.past ?? 0 }
+
+    /// Records where a flight has a card past a detent (see
+    /// `SheetFlight`) — to the half point, as an offset is. A flight
+    /// that holds the scroll at the detent says all there is to show
+    /// past it (`replacingScroll`): the scroll can be a frame behind,
+    /// still reporting the bounce the flight took over from.
+    func fly(_ past: CGFloat, for vin: String, replacingScroll: Bool = true) {
+        let rounded = (past * 2).rounded() / 2
+        if let flight = flights[vin], flight.replacesScroll == replacingScroll,
+           abs(flight.past - rounded) < 0.25 {
+            return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            flights[vin] = Flown(past: rounded, replacesScroll: replacingScroll)
+        }
+    }
+
+    /// The flight is over: the card shows what its scroll does again.
+    func land(for vin: String) {
+        guard flights[vin] != nil else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            flights[vin] = nil
+        }
+    }
 
     /// Records a card's offset — to the half point, and only once it has
     /// moved by more than a quarter of one: finer steps would only redraw
@@ -2707,6 +2898,16 @@ private final class ScrollOffsetTracker {
     /// Whether `DetentSnapBehavior` stopped the drag that just ended
     /// for the card to spring from.
     var isSnapPending = false
+    /// Whether `DetentSnapBehavior` has sorted a release that the
+    /// scroll's phases haven't reported yet.
+    var isReleaseSorted = false
+    /// Whether the drag that just ended was a throw hard enough to coast
+    /// on through the expanded detent into the content, and hasn't got
+    /// there yet.
+    var carriesMomentum = false
+    /// The speed (points per second) that throw reaches the expanded
+    /// detent at.
+    var carrySpeedAtDetent: CGFloat = 0
     /// True from the moment the card starts scrolling itself (springing
     /// to a detent) until a finger next takes over. The target behavior
     /// is consulted on those scrolls too, and must leave them alone.
@@ -2728,16 +2929,19 @@ private final class ScrollOffsetTracker {
     var settleRetries = 0
 }
 
-/// A released drag's way to a detent: the offset it comes to rest at
-/// and the spring that takes it there. The numbers are a system
-/// sheet's (`UISheetPresentationController`, iOS 26–27). Apple doesn't
-/// publish them; they were measured by driving a stock sheet with
-/// synthesized drags and logging its position every frame.
+/// Where a released drag comes to rest, and the numbers of the motion
+/// that takes it there (`SheetFlight`). Which detent, and the spring's
+/// stiffness, are a system sheet's (`UISheetPresentationController`,
+/// iOS 26–27). Apple doesn't publish them; they were measured by
+/// driving a stock sheet with synthesized drags and logging its
+/// position every frame. Past a detent the card moves as its own
+/// scroll does where the scroll ends: the system's scroll bounce, of
+/// which the card shows a share.
 private struct SheetSnap {
     /// Release speed, in points per second, at and above which a drag
     /// is a flick: the card goes on to the next detent in the flick's
-    /// direction wherever it was let go, and arrives with a little
-    /// overshoot (`flickSpring`).
+    /// direction wherever it was let go. Going down, a flick is also
+    /// what it takes for the card to dip there.
     static let flickVelocity: CGFloat = 1000
     /// A slower release is carried on by this many seconds of its
     /// speed, less the first `velocityDeadZone`, and then settles at
@@ -2747,12 +2951,124 @@ private struct SheetSnap {
     /// short of it.
     static let projectionTime: CGFloat = 0.13
     static let velocityDeadZone: CGFloat = 130
-    /// The spring every detent change runs on, released or
-    /// programmatic. Critically damped, so the card stops at the
-    /// detent without bouncing.
-    static let spring = Spring(response: 0.344, dampingRatio: 1)
-    /// A flick's: the same stiffness, a little underdamped.
-    static let flickSpring = Spring(response: 0.344, dampingRatio: 0.8)
+    /// Response of the spring a card closes in on a detent with. How
+    /// damped it is depends on the throw (see `SheetFlight`).
+    static let response: Double = 0.344
+    /// That spring for a card that isn't thrown — set down, or sent
+    /// from its drag handle. Critically damped, so the card stops at
+    /// the detent without running past it.
+    static let spring = Spring(response: response, dampingRatio: 1)
+    /// Share of a scroll's bounce past a detent that the card's top edge
+    /// shows, where the scroll ends at the detent: below the collapsed
+    /// one, and above the expanded one of a card that holds all its
+    /// content. The bounce alone resists the finger too little to read
+    /// as "this is as far as it goes": rubber-banded against the inner
+    /// ScrollView's full expanded height, it lets a 200pt pull move the
+    /// scroll some 80pt.
+    static let give: CGFloat = 0.5
+
+    /// How far below its collapsed detent a card shows for a scroll
+    /// bounced `past` it (both negative).
+    static func dip(for past: CGFloat) -> CGFloat { past * give }
+
+    /// How far above its expanded detent a card shows for a scroll
+    /// bounced `past` it, with `room` over the card to rise into: the
+    /// same share as below the collapsed detent while there is room to
+    /// spare, less and less toward the end of it. (Below the collapsed
+    /// detent there is always room.)
+    static func rise(for past: CGFloat, room: CGFloat) -> CGFloat {
+        room > 0 ? room * tanh(max(0, past) * give / room) : 0
+    }
+
+    /// The system's scroll bounce. A scroll let go `x` points past its
+    /// end, moving outward at `v` points per second, is
+    /// `(x + v·t)·e^(-rate·t)` past it `t` seconds later: let go at
+    /// rest it dies away steadily, and one coasting into its end at
+    /// `v` runs on `v / (rate·e)` and comes back. Measured, like the
+    /// sheet's spring, by logging a scroll's offset every frame as it
+    /// bounced (iOS 27.0). That is a critically damped spring of this
+    /// rate set off at `v - rate·x`.
+    static let scrollBounceRate: Double = 10.8
+    static let scrollBounce = Spring(response: 2 * .pi / scrollBounceRate, dampingRatio: 1)
+    /// How far past its end a scroll that reaches it at `speed` (points
+    /// per second) runs on before it turns round.
+    static func scrollBounce(at speed: Double) -> Double {
+        max(0, speed) / (scrollBounceRate * M_E)
+    }
+
+    /// Slowest release, going up, that counts as a throw. A card carried
+    /// up and let go slower than this is set down at the detent without
+    /// a bounce, as one opened from its drag handle is.
+    static let bounceVelocity: CGFloat = 250
+
+    /// The spring of a card's dip below its collapsed detent when a
+    /// flick lands it there, and the most it dips. Firm and a good deal
+    /// looser than the one that brings it there: at the bottom of the
+    /// dip a twentieth of a second after it gets to the detent, and
+    /// back up a tenth of a second later.
+    static let dipResponse: Double = 0.26
+    static let dipDamping: Double = 0.65
+    static let dipSpring = Spring(response: dipResponse, dampingRatio: dipDamping)
+    static let dipLimit: Double = 4
+    /// Points it dips for each point per second it was flicked at,
+    /// while that is well short of the limit.
+    static let dipPerSpeed: Double = 0.0045
+
+    /// How far a card flicked at its collapsed detent at `speed`
+    /// (points per second) dips below it.
+    static func dip(at speed: Double) -> Double {
+        guard speed > 0 else { return 0 }
+        return dipLimit * tanh(speed * dipPerSpeed / dipLimit)
+    }
+
+    /// The speed a card has to reach its collapsed detent at for its
+    /// dip there to be `depth` points.
+    static func dipSpeed(reaching depth: Double) -> Double {
+        let omega = 2 * .pi / dipResponse
+        let slack = (1 - dipDamping * dipDamping).squareRoot()
+        // A spring set off from rest at a given speed peaks at this
+        // share of the speed over its natural frequency.
+        let peak = exp(-dipDamping / slack * atan2(slack, dipDamping))
+        return max(0, depth) * omega / peak
+    }
+
+    /// How long what a stopped bounce still showed takes to die away
+    /// under whatever moves the card next, and how much of it is left
+    /// `time` seconds in.
+    static let fadeTime: TimeInterval = 0.15
+    static func fade(at time: TimeInterval) -> CGFloat {
+        let left = 1 - min(1, max(0, time) / fadeTime)
+        return CGFloat(left * left)
+    }
+
+    /// How far a scroll let go at `velocity` (points per second) coasts
+    /// before it stops: UIScrollView's normal deceleration keeps 99.8%
+    /// of its speed each millisecond.
+    static func coast(at velocity: CGFloat) -> CGFloat { velocity * 0.499 }
+    /// A throw that would coast at least this far past the expanded
+    /// detent carries on into the content; one with less left in it
+    /// stops at the detent and bounces there. From near the collapsed
+    /// detent that is a release at some 2,000 points per second or
+    /// more: a deliberate throw, where an everyday flick to open the
+    /// card is nearer 1,500.
+    static let carryThreshold: CGFloat = 800
+    /// How much of that coast the detent takes out of a throw that
+    /// carries on. Without it the gentlest throw to carry would scroll
+    /// the content by the whole threshold, and the controls at the top
+    /// of the card would be gone after any brisk swipe; with it the
+    /// distance grows from little, the harder the throw.
+    static let detentDrag: CGFloat = 650
+    /// Content with less than this to scroll isn't worth carrying into.
+    static let minimumCarryRoom: CGFloat = 80
+
+    /// How far past the expanded detent a throw carries on into the
+    /// content, or nil if it stops at the detent. `coasting` is how far
+    /// past the detent it would coast left alone, `room` how far the
+    /// content can scroll.
+    static func carriedDistance(coasting: CGFloat, room: CGFloat) -> CGFloat? {
+        guard coasting >= carryThreshold, room >= minimumCarryRoom else { return nil }
+        return min(coasting - detentDrag, room)
+    }
 
     /// Offset the card comes to rest at: 0 (collapsed) or `travel`.
     let offset: CGFloat
@@ -2774,14 +3090,264 @@ private struct SheetSnap {
         self.offset = expands ? travel : 0
         self.velocity = velocity
     }
+}
 
-    var spring: Spring {
-        abs(velocity) >= Self.flickVelocity ? Self.flickSpring : Self.spring
+/// A card's way to a detent from wherever it was let go, start to rest,
+/// as one motion.
+///
+/// The card closes in on the detent on the sheet's spring, and whatever
+/// speed it still has when it gets there carries it past. What it does
+/// there is what its scroll does where the scroll ends at a detent,
+/// with the card showing its share (`SheetSnap.give`) — so that a card
+/// thrown at its expanded detent and one pulled past it and let go
+/// move alike:
+///
+/// - Above the expanded detent it runs on and comes back as a scroll
+///   coasting into its end does (`SheetSnap.scrollBounce`), as far as
+///   the room over the card allows. It gets to the detent as fast as
+///   its scroll would have, coasting there from where it was let go:
+///   the spring that takes it there is damped just enough for that —
+///   the harder the throw, the less. (On one spring for every throw the
+///   card arrives at much the same speed whatever it was thrown at: the
+///   spring is stiff, and has long since taken over from the finger by
+///   then.)
+/// - Below the collapsed detent a flick dips it a few points on a firm
+///   spring (`SheetSnap.dipSpring`).
+///
+/// A flight that starts past a detent — its scroll bounced there, the
+/// card showing its share — takes that over where it stands and brings
+/// it back as the scroll would have.
+///
+/// How far the card goes is settled before it sets off, never by
+/// holding it back on the way: squashed under a limit as it moved, an
+/// earlier version sat against the limit until its spring came back
+/// within it — for longer the harder it had been thrown.
+private struct SheetFlight {
+    /// How long until the card is at rest.
+    let duration: TimeInterval
+
+    private let from: Double
+    private let to: Double
+    private let velocity: Double
+    private let approach: Spring
+    /// When the card gets to the detent. Nil for one that only ever
+    /// closes in on it, and so never bounces.
+    private let arrival: TimeInterval?
+    private let rebound: Spring
+    /// Where past the detent the bounce starts, and how fast the card
+    /// is going there. Both measured outward, as the card shows them.
+    private let start: Double
+    private let speed: Double
+    /// Which way is past the detent: 1 above the expanded one, -1 below
+    /// the collapsed.
+    private let outward: Double
+
+    /// The least damped a throw's spring gets. Going up, hardly at all:
+    /// the card is to get to the detent as fast as its scroll would
+    /// have coasting, which is never faster than it was thrown. Going
+    /// down, looser than this it would be the spring, not the flick,
+    /// that dipped the card.
+    private static let loosestRise = 0.05
+    private static let loosestDip = 0.6
+
+    /// - Parameters:
+    ///   - from: The scroll offset the card is let go at.
+    ///   - to: The detent's.
+    ///   - velocity: Points per second, positive raising the card.
+    ///   - expanding: Whether the detent is the expanded one.
+    ///   - startsPast: Whether the card is at the detent already, or
+    ///     past it — its scroll bounced there, not scrolling content.
+    ///   - room: The most the card may show above its expanded detent.
+    ///   - bounces: Whether it may run on past the detent at all.
+    init(
+        from: CGFloat,
+        to: CGFloat,
+        velocity: CGFloat,
+        expanding: Bool,
+        startsPast: Bool,
+        room: CGFloat,
+        bounces: Bool
+    ) {
+        let outward: Double = expanding ? 1 : -1
+        let give = Double(SheetSnap.give)
+        let room = Double(max(0, room))
+        let approach: Spring
+        let arrival: TimeInterval?
+        let rebound: Spring
+        let start: Double
+        let speed: Double
+        if startsPast {
+            // All bounce, from where the scroll's own left the card.
+            let past = max(0, outward * Double(from - to))
+            start = expanding
+                ? Double(SheetSnap.rise(for: CGFloat(past), room: CGFloat(room)))
+                : give * past
+            // Still moving outward it runs on first, by the card's share
+            // of how far that speed would take its scroll — within the
+            // room left.
+            let kick = bounces ? give * max(0, outward * Double(velocity)) : 0
+            let left = expanding ? max(0, room - start) : Double.infinity
+            approach = SheetSnap.spring
+            arrival = 0
+            rebound = SheetSnap.scrollBounce
+            // (Less the speed the bounce starts back at from where it
+            // stands — see `SheetSnap.scrollBounceRate`.)
+            speed = kick * Self.share(of: SheetSnap.scrollBounce(at: kick), within: left)
+                - SheetSnap.scrollBounceRate * start
+        } else {
+            let toward: Double = to >= from ? 1 : -1
+            let distance = abs(Double(to - from))
+            let closing = toward * Double(velocity)
+            // The speed to get to the detent at, and the share of it the
+            // card sets off past the detent with. A card coming back
+            // down out of scrolled content is heading inward: it stops
+            // at the detent.
+            let wanted: Double
+            let shown: Double
+            if !bounces || toward != outward {
+                wanted = 0
+                shown = 0
+                rebound = SheetSnap.spring
+            } else if expanding {
+                // As fast as its scroll would still have been going had
+                // it coasted there, which loses a little speed with
+                // every point.
+                let coasting = closing - distance / Double(SheetSnap.coast(at: 1))
+                wanted = room > 0 ? max(0, coasting) : 0
+                shown = give * Self.share(of: give * SheetSnap.scrollBounce(at: wanted), within: room)
+                rebound = SheetSnap.scrollBounce
+            } else {
+                wanted = SheetSnap.dipSpeed(reaching: SheetSnap.dip(at: closing))
+                shown = 1
+                rebound = SheetSnap.dipSpring
+            }
+            let damping = wanted > 0
+                ? Self.damping(
+                    distance: distance,
+                    closing: closing,
+                    arrivingAt: wanted,
+                    loosest: expanding ? Self.loosestRise : Self.loosestDip
+                )
+                : 1
+            let landing = Self.arrival(distance: distance, closing: closing, damping: damping)
+            approach = Spring(response: SheetSnap.response, dampingRatio: damping)
+            arrival = landing?.time
+            start = 0
+            // Only a card let go too near the detent to slow down in
+            // time arrives faster than wanted, and loses the difference
+            // there.
+            speed = min(landing?.speed ?? 0, wanted) * shown
+        }
+        self.from = Double(from)
+        self.to = Double(to)
+        self.velocity = Double(velocity)
+        self.outward = outward
+        self.approach = approach
+        self.arrival = arrival
+        self.rebound = rebound
+        self.start = start
+        self.speed = speed
+        let settling = if let arrival {
+            arrival + Self.settling(of: rebound, start: start, speed: speed)
+        } else {
+            approach.settlingDuration(target: Double(to - from), initialVelocity: Double(velocity), epsilon: 0.1)
+        }
+        // Nothing to do (or no finite time to do it in): at rest now.
+        duration = settling.isFinite ? max(0, settling) : 0
+    }
+
+    /// Where the card is `time` seconds after it was let go: the offset
+    /// of its scroll, and how far past the detent it shows — positive
+    /// above the expanded detent, negative below the collapsed one.
+    /// (Past the bottom of a dip the card comes back through the detent
+    /// by a fraction of a point before it settles; that shows the same
+    /// way, with the sign turned round.)
+    func state(at time: TimeInterval) -> (offset: CGFloat, bounce: CGFloat) {
+        guard time < duration else { return (CGFloat(to), 0) }
+        if let arrival, time >= arrival {
+            let past = start + rebound.value(target: -start, initialVelocity: speed, time: time - arrival)
+            return (CGFloat(to), past.isFinite ? CGFloat(outward * past) : 0)
+        }
+        let moved = approach.value(target: to - from, initialVelocity: velocity, time: time)
+        return (moved.isFinite ? CGFloat(from + moved) : CGFloat(to), 0)
+    }
+
+    /// The share of a bounce that would reach `reach` points that fits
+    /// in `room`: nearly all of a small one, less and less of a larger.
+    private static func share(of reach: Double, within room: Double) -> Double {
+        guard reach > 0, room.isFinite else { return 1 }
+        return room > 0 ? room * tanh(reach / room) / reach : 0
+    }
+
+    /// When, and how fast, a spring of the sheet's stiffness and the
+    /// given damping first brings a card to a detent `distance` points
+    /// off, let go closing on it at `closing` points per second. Nil if
+    /// it never quite gets there.
+    private static func arrival(
+        distance: Double,
+        closing: Double,
+        damping: Double
+    ) -> (time: Double, speed: Double)? {
+        guard distance > 0 else { return (0, max(0, closing)) }
+        let omega = 2 * .pi / SheetSnap.response
+        guard damping < 1 else {
+            // Critically damped, it gets there only if let go faster
+            // than the spring itself would be bringing it in.
+            let rate = closing - omega * distance
+            guard rate > 0 else { return nil }
+            let time = distance / rate
+            return (time, rate * exp(-omega * time))
+        }
+        let decay = damping * omega
+        let frequency = omega * (1 - damping * damping).squareRoot()
+        let quadrature = (closing - decay * distance) / frequency
+        let time = atan2(distance, quadrature) / frequency
+        return (time, frequency * hypot(distance, quadrature) * exp(-decay * time))
+    }
+
+    /// How long a card `start` points past its detent, moving outward
+    /// at `speed`, takes on `rebound` to come within a quarter point of
+    /// the detent for good — the pager shows no less. Found by walking
+    /// the spring: once per flight, and good for any spring.
+    private static func settling(of rebound: Spring, start: Double, speed: Double) -> Double {
+        guard start > 0.25 || speed > 0 else { return 0 }
+        let step = 1.0 / 120
+        var settled = 0.0
+        var time = 0.0
+        while time < 3 {
+            time += step
+            let past = start + rebound.value(target: -start, initialVelocity: speed, time: time)
+            if !past.isFinite { break }
+            if abs(past) > 0.25 { settled = time }
+        }
+        return settled + step
+    }
+
+    /// The damping that brings the card to its detent at `speed`: the
+    /// less damped the spring, the faster it gets there. Critical if
+    /// the card arrives at least that fast anyway.
+    private static func damping(
+        distance: Double,
+        closing: Double,
+        arrivingAt speed: Double,
+        loosest: Double
+    ) -> Double {
+        func arrivalSpeed(_ damping: Double) -> Double {
+            arrival(distance: distance, closing: closing, damping: damping)?.speed ?? 0
+        }
+        guard arrivalSpeed(1) < speed else { return 1 }
+        var loose = loosest
+        var tight = 1.0
+        guard arrivalSpeed(loose) > speed else { return loose }
+        for _ in 0..<24 {
+            let middle = (loose + tight) / 2
+            if arrivalSpeed(middle) > speed { loose = middle } else { tight = middle }
+        }
+        return (loose + tight) / 2
     }
 }
 
-/// Springs a card's scroll to a detent, setting the offset every frame
-/// from the spring's equation.
+/// Runs a card's flight to a detent, handing every frame its time.
 ///
 /// SwiftUI follows a spring when it animates a scroll, but only from
 /// rest: a scroll animation can't be handed the speed the finger let go
@@ -2791,59 +3357,45 @@ private struct SheetSnap {
 /// and then set off again. Driven here, it carries on at the finger's
 /// speed, as a system sheet does.
 @MainActor
-private final class SheetSpringDriver: NSObject {
+private final class SheetFlightDriver: NSObject {
     private var link: CADisplayLink?
     private var start: CFTimeInterval = 0
-    private var from: CGFloat = 0
-    private var to: CGFloat = 0
-    private var velocity: CGFloat = 0
-    private var spring = SheetSnap.spring
     private var duration: TimeInterval = 0
-    private var apply: (CGFloat) -> Void = { _ in }
+    private var frame: (TimeInterval) -> Void = { _ in }
     private var completion: () -> Void = {}
 
     var isRunning: Bool { link != nil }
 
-    /// Springs from `from` to `to`, starting at `velocity` (points per
-    /// second), handing each frame's offset to `apply`. `takingOver`
-    /// moves the scroll to `from` straight away, to stop the momentum of
-    /// a scroll that is still coasting; a scroll at rest is left alone
-    /// until the first frame (moving it to where it already is would
-    /// only cost the frame that starts the spring a redraw).
+    /// Calls `frame` with the seconds since now on every frame for
+    /// `duration`, once more with `duration` itself, and then
+    /// `completion`. `takingOver` also calls it straight away, with 0,
+    /// to stop the momentum of a scroll that is still coasting; a
+    /// scroll at rest is left alone until the first frame (moving it to
+    /// where it already is would only cost the frame that starts the
+    /// flight a redraw).
     func run(
-        from: CGFloat,
-        to: CGFloat,
-        velocity: CGFloat,
-        spring: Spring,
+        for duration: TimeInterval,
         takingOver: Bool,
-        apply: @escaping (CGFloat) -> Void,
+        frame: @escaping (TimeInterval) -> Void,
         completion: @escaping () -> Void
     ) {
         stop()
-        self.from = from
-        self.to = to
-        self.velocity = velocity
-        self.spring = spring
-        self.apply = apply
-        self.completion = completion
-        duration = spring.settlingDuration(
-            target: Double(to - from),
-            initialVelocity: Double(velocity),
-            epsilon: 0.1
-        )
-        // Nothing to animate (or no finite time to do it in): arrive now
-        // rather than run a display link that never reaches its end.
+        // Nothing to animate: arrive now rather than run a display link
+        // for it.
         guard duration.isFinite, duration > 0 else {
-            apply(to)
+            frame(.infinity)
             completion()
             return
         }
+        self.duration = duration
+        self.frame = frame
+        self.completion = completion
         start = CACurrentMediaTime()
         let link = CADisplayLink(target: self, selector: #selector(step(_:)))
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
         link.add(to: .main, forMode: .common)
         self.link = link
-        if takingOver { apply(from) }
+        if takingOver { frame(0) }
     }
 
     func stop() {
@@ -2856,18 +3408,11 @@ private final class SheetSpringDriver: NSObject {
         let time = link.targetTimestamp - start
         guard time < duration else {
             stop()
-            apply(to)
+            frame(duration)
             completion()
             return
         }
-        let travelled = spring.value(target: Double(to - from), initialVelocity: Double(velocity), time: time)
-        guard travelled.isFinite else {
-            stop()
-            apply(to)
-            completion()
-            return
-        }
-        apply(from + CGFloat(travelled))
+        frame(time)
     }
 }
 
@@ -2880,19 +3425,34 @@ private final class SheetSpringDriver: NSObject {
 /// the card's `onScrollPhaseChange`). A scroll view's own
 /// deceleration, retargeted to a detent, would crawl the last stretch.
 ///
-/// The expanded detent stops momentum, as it does on a system sheet:
-/// a flick released in scrolled content runs back to the top of the
-/// content and leaves the card expanded instead of carrying on into a
-/// collapse. A finger still on the screen is not stopped: it can drag
-/// through the detent either way. Released in the content, the scroll
-/// decelerates naturally.
+/// The one release that does coast is a hard throw upward, with more
+/// left in it than the rest of the travel uses up: it carries on through
+/// the expanded detent and scrolls the content, less what the detent
+/// takes out of it (`SheetSnap.carriedDistance`). The scroll view ends
+/// well past the detent then, so the card is still moving briskly as it
+/// gets there. A lighter throw stops at the detent and bounces.
+///
+/// Coming the other way the expanded detent stops momentum, as it does
+/// on a system sheet: a flick released in scrolled content runs back to
+/// the top of the content and leaves the card expanded instead of
+/// carrying on into a collapse. A finger still on the screen is not
+/// stopped: it can drag through the detent either way. Released in the
+/// content, the scroll decelerates naturally.
 private struct DetentSnapBehavior: ScrollTargetBehavior {
     let travel: CGFloat
     let tracker: ScrollOffsetTracker
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
-        guard !tracker.isScrollingInCode else { return }
+        // The card's own scrolls are left alone. A release with any
+        // speed to it is a finger's, though, whatever the flag says: it
+        // is cleared when the scroll reports a finger on it, and a quick
+        // flick can be over before it reports one (see the card's
+        // `onScrollPhaseChange`). Passed over, that flick was left to
+        // coast wherever the scroll took it.
+        guard !tracker.isScrollingInCode || context.velocity.dy != 0 else { return }
+        tracker.isReleaseSorted = true
         tracker.isSnapPending = false
+        tracker.carriesMomentum = false
         // The context's velocity is in points per millisecond.
         tracker.releaseVelocity = context.velocity.dy * 1000
         guard travel > 1 else { return }
@@ -2908,6 +3468,21 @@ private struct DetentSnapBehavior: ScrollTargetBehavior {
         // Pulled down below the collapsed detent and let go: the
         // scroll's own bounce brings it back.
         guard released > 0 || target.rect.origin.y > 0 else { return }
+        // Thrown hard enough to carry on into the content. Worked out
+        // from the speed rather than taken from the proposed target,
+        // which stops at the end of the content.
+        let rise = travel - released
+        if let carried = SheetSnap.carriedDistance(
+            coasting: SheetSnap.coast(at: tracker.releaseVelocity) - rise,
+            room: context.contentSize.height - context.containerSize.height - travel
+        ) {
+            tracker.carriesMomentum = true
+            // The scroll slows evenly over the distance it is given, so
+            // its speed at the detent is the share of that distance left.
+            tracker.carrySpeedAtDetent = tracker.releaseVelocity * carried / (carried + rise)
+            target.rect.origin.y = travel + carried
+            return
+        }
         tracker.isSnapPending = true
         target.rect.origin.y = released
     }
@@ -2997,21 +3572,26 @@ struct VehicleSheetPager: View {
     /// keeps clear of them by hand (see `body`), so its own geometry
     /// reports none.
     let safeAreaInsets: EdgeInsets
-    /// Bottom inset the map should keep clear of the sheet. While
-    /// the card spans the full window width this is the distance
-    /// from the bottom of the screen to the visible top edge of a
-    /// *collapsed* card, so `MainView` can inset the map's safe area
-    /// and MapKit centers the vehicle marker in the area above the
-    /// card. Once the window is wide enough that a marker centered
-    /// in the whole frame clears the card horizontally (see
-    /// `markerClearsSheet`), this is 0 and the marker is centered in
-    /// the frame instead.
-    @Binding var mapBottomInset: CGFloat
+    /// The part of the map the sheet covers, so `MainView` can inset
+    /// the map's safe area and MapKit centers the vehicle marker clear
+    /// of the card (see `sheetInsets(geo:)`). Normally a bottom inset:
+    /// the distance from the bottom of the screen to the visible top
+    /// edge of a *collapsed* card, putting the marker in the area above
+    /// the card. Where that area is too short for the marker and the
+    /// card is a column with room beside it (iPhone landscape), a
+    /// leading inset instead, putting the marker beside the card. Once
+    /// the window is wide enough that a marker centered in the whole
+    /// frame clears the card horizontally (see `markerClearsSheet`),
+    /// all zero and the marker is centered in the frame.
+    @Binding var mapInsets: MapSheetInsets
     /// True while a card stands over the settings button in the
     /// toolbar's trailing corner, so `MainView` can fade the button
     /// out: the card's rounded corner would otherwise leave a slice of
     /// it showing, out of reach behind the sheet.
     @Binding var coversToolbar: Bool
+    /// True while a card stands over the map's recenter button, which
+    /// hangs under the settings button (`recenterButtonDrop` lower).
+    @Binding var coversRecenterButton: Bool
     /// Whether a card can rise over the toolbar's trailing item at all
     /// in this window (see `cardsCanCoverToolbar(geo:)`). Where it
     /// can't, `MainView` leaves the settings button in the toolbar.
@@ -3094,18 +3674,18 @@ struct VehicleSheetPager: View {
     /// Gap between a collapsed card and the page's side and bottom
     /// edges (`PersistentVehicleSheet.outerInset`).
     private let cardOuterInset: CGFloat = 8
-    /// Share of a card's bounce, pulled down past its collapsed detent,
-    /// that comes off its height. The bounce alone resists the finger too
-    /// little to read as "this is as low as it goes": rubber-banded
-    /// against the inner ScrollView's full expanded height, it lets a
-    /// 200pt pull take some 80pt off a card that is only ~350pt tall.
-    private let pullDownGive: CGFloat = 0.5
+    /// How near the top of the window the top edge of a card bouncing
+    /// at its expanded detent may come.
+    private let bounceMargin: CGFloat = 8
     /// Size of the corner of the window the settings button lives in,
     /// measured from the top of the safe area and from the trailing
     /// edge. A card whose top comes within this of its highest
     /// position, in a pager that reaches this close to the trailing
     /// edge, is over the button.
     private let toolbarItemReach = CGSize(width: 64, height: 64)
+    /// How much further down than the settings button the recenter
+    /// button under it ends: its own height and the gap between them.
+    private let recenterButtonDrop: CGFloat = 52
     /// Widest the pager (and therefore each card) will grow. Below
     /// this the card fills the window edge-to-edge; above it the
     /// card stops growing and stays pinned to the leading edge,
@@ -3120,6 +3700,11 @@ struct VehicleSheetPager: View {
     /// display-name label that hangs below it. Used to decide when
     /// a frame-centered marker is clear of the card.
     private let markerClearance: CGFloat = 80
+    /// Height the marker needs to be shown above a collapsed card: the
+    /// 50pt circle and the name label under it, centered in the strip,
+    /// with a margin. A shorter strip clips the marker against the top
+    /// of the window (issue #133).
+    private let markerHeadroom: CGFloat = 120
 
     /// Width of the pager and of every card in it: the window
     /// width up to `maxSheetWidth`. Computed from the
@@ -3153,6 +3738,33 @@ struct VehicleSheetPager: View {
     private func markerClearsSheet(geo: GeometryProxy) -> Bool {
         let sheetRightEdge = min(maxSheetWidth, safeWidth(geo: geo)) + cardOuterInset
         return safeWidth(geo: geo) / 2 - markerClearance > sheetRightEdge
+    }
+
+    /// True when the marker has to go beside the card: the strip above
+    /// a collapsed card is too short for it, and the card is a column
+    /// with room for the marker between it and the trailing safe area.
+    /// iPhone landscape, where the card is nearly as tall as the window.
+    private func markerGoesBesideSheet(geo: GeometryProxy) -> Bool {
+        guard isWidthCapped(geo: geo) else { return false }
+        let headroom = areaHeight(geo: geo) - collapsedSheetTop(geo: geo)
+        let roomBeside = safeWidth(geo: geo) - pageWidth(geo: geo) - cardOuterInset
+        return headroom < markerHeadroom && roomBeside >= 2 * markerClearance
+    }
+
+    /// Where the map has to keep clear of the sheet for the marker to
+    /// show: nothing, the column the card stands in, or the collapsed
+    /// card's height.
+    private func sheetInsets(geo: GeometryProxy) -> MapSheetInsets {
+        if markerClearsSheet(geo: geo) {
+            return MapSheetInsets()
+        }
+        if markerGoesBesideSheet(geo: geo) {
+            return MapSheetInsets(
+                leading: safeAreaInsets.leading + pageWidth(geo: geo) + cardOuterInset,
+                trailing: safeAreaInsets.trailing
+            )
+        }
+        return MapSheetInsets(bottom: collapsedSheetTop(geo: geo))
     }
 
     /// Height the sheet has to work with: the physical height of the
@@ -3214,18 +3826,15 @@ struct VehicleSheetPager: View {
             let pagerHeight = currentVin.map {
                 cardLayout(for: $0, geo: geo).top + (errorOverheads[$0] ?? 0)
             } ?? 0
-            // Hold the last reported inset while `geo` is degenerate
+            // Hold the last reported insets while `geo` is degenerate
             // (the zero-height first layout pass) instead of reporting
             // a collapsed height clamped to ~0 from it — the map would
             // briefly center the marker behind the card.
-            let bottomInset: CGFloat = if areaHeight(geo: geo) < collapsedHeightFloor {
-                mapBottomInset
-            } else if markerClearsSheet(geo: geo) {
-                0
-            } else {
-                collapsedSheetTop(geo: geo)
-            }
+            let insets = areaHeight(geo: geo) < collapsedHeightFloor
+                ? mapInsets
+                : sheetInsets(geo: geo)
             let coversToolbarNow = cardsCoverToolbar(geo: geo)
+            let coversRecenterButtonNow = cardsCoverToolbar(geo: geo, drop: recenterButtonDrop)
             let canCoverToolbarNow = cardsCanCoverToolbar(geo: geo)
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
@@ -3251,25 +3860,43 @@ struct VehicleSheetPager: View {
             // on purpose — see below.
             .padding(.leading, safeAreaInsets.leading)
             .padding(.trailing, safeAreaInsets.trailing)
-            .onChange(of: bottomInset, initial: true) { old, new in
-                guard mapBottomInset != new else { return }
-                // Animate only the above-card ↔ frame-centered mode
-                // flip (a window resize crossing the clearance
-                // threshold). Measurement-driven height changes at
-                // launch stay instant so the map doesn't slide
-                // around while the card is still sizing itself.
-                if (old == 0) != (new == 0) {
+            .onChange(of: insets, initial: true) { old, new in
+                guard mapInsets != new else { return }
+                // Animate only a change of mode: above the card,
+                // beside it, or frame-centered (a window resize
+                // crossing a clearance threshold). Measurement-driven
+                // height changes at launch stay instant so the map
+                // doesn't slide around while the card is still sizing
+                // itself.
+                //
+                // And only where the map is a fixed canvas. A live-sized
+                // map (iPhone) changes mode when the device rotates, and
+                // animating its insets through the rotation had SwiftUI
+                // resize the map view on every frame of it: fourteen
+                // sizes in half a second, a new Metal drawable for each.
+                // MapKit's renderer released one that a frame in flight
+                // still needed, which Xcode's Metal validation stops the
+                // app for. The rotation hides the jump anyway.
+                let modeChanged = (old.bottom == 0) != (new.bottom == 0)
+                    || (old.leading == 0) != (new.leading == 0)
+                if modeChanged, MapCanvas.size != nil {
                     withAnimation(.easeInOut(duration: 0.5)) {
-                        mapBottomInset = new
+                        mapInsets = new
                     }
                 } else {
-                    mapBottomInset = new
+                    mapInsets = new
                 }
             }
             .onChange(of: coversToolbarNow, initial: true) { _, new in
                 guard coversToolbar != new else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     coversToolbar = new
+                }
+            }
+            .onChange(of: coversRecenterButtonNow, initial: true) { _, new in
+                guard coversRecenterButton != new else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    coversRecenterButton = new
                 }
             }
             .onChange(of: canCoverToolbarNow, initial: true) { _, new in
@@ -3351,6 +3978,12 @@ struct VehicleSheetPager: View {
         /// the highest any card may go, whether or not this one goes
         /// that far.
         let headroom: CGFloat
+        /// Whether the expanded card holds all of its content, with
+        /// nothing left to scroll.
+        let contentFits: Bool
+        /// The room over the expanded card for its top edge to rise
+        /// into as it bounces there.
+        let bounceRoom: CGFloat
 
         /// Distance from the bottom of the window to the card's top
         /// edge.
@@ -3363,10 +3996,12 @@ struct VehicleSheetPager: View {
     /// top edge from there to the top of the window, or as far as its
     /// content needs if that's less (anything beyond scrolls content),
     /// and over that same stretch the gap around the card closes, so it
-    /// lands as an edge-to-edge sheet. Pulled down below collapsed, it
-    /// gives way by part of the bounce (`pullDownGive`). Each
-    /// card follows ITS OWN offset: swiping between vehicles preserves
-    /// whatever expanded/collapsed state the user left them in.
+    /// lands as an edge-to-edge sheet. Past a detent where its scroll
+    /// ends — pulled down below collapsed, or up above expanded when it
+    /// holds all its content — it gives way by part of the scroll's
+    /// bounce (`SheetSnap.give`). Each card follows ITS OWN offset:
+    /// swiping between vehicles preserves whatever expanded/collapsed
+    /// state the user left them in.
     private func cardLayout(for vin: String, geo: GeometryProxy) -> CardLayout {
         // The highest the card's top edge may go: the bottom of the
         // status bar, less the room an error card needs above it.
@@ -3385,10 +4020,8 @@ struct VehicleSheetPager: View {
         // card under it — up to the ceiling, past which the content
         // scrolls. (Until the content is measured, up to the ceiling.)
         let edgeToEdge = expandsEdgeToEdge(geo: geo)
-        let expandedTop = min(
-            ceiling,
-            (contentHeights[vin] ?? .infinity) + (edgeToEdge ? 0 : cardOuterInset)
-        )
+        let contentTop = (contentHeights[vin] ?? .infinity) + (edgeToEdge ? 0 : cardOuterInset)
+        let expandedTop = min(ceiling, contentTop)
         let room = max(0, expandedTop - restingTop)
         let travel = room >= minimumExpansionTravel ? room : 0
         let scrolled = scrollOffsets[vin]
@@ -3396,22 +4029,43 @@ struct VehicleSheetPager: View {
         let progress = travel > 0 ? offset / travel : 0
         let expandedInset = travel > 0 && edgeToEdge ? 0 : cardOuterInset
         let edgeInset = cardOuterInset + (expandedInset - cardOuterInset) * progress
-        // Pulled down past the collapsed detent, the card gives way a
-        // little: part of the scroll's bounce comes off its top edge, and
+        let contentFits = travel > 0 && contentTop <= ceiling
+        // The room over the expanded card for a bounce: what is left up
+        // to the ceiling, and on over the status bar to within a margin
+        // of the top of the window.
+        let bounceRoom = max(0, ceiling - (restingTop + travel))
+            + max(0, topClearance(geo: geo) - bounceMargin)
+        // Past a detent where its scroll ends, the card gives way a
+        // little: part of the scroll's bounce shows at its top edge, and
         // the bounce's own return springs it back. (The card keeps its
-        // content pinned to that edge.)
-        let give = min(0, scrolled) * pullDownGive
+        // content pinned to that edge.) A flight that has the card says
+        // where it shows instead — or, dying away, as well.
+        let flight = scrollOffsets.flight(for: vin)
+        var past = flight?.past ?? 0
+        if flight?.replacesScroll != true {
+            if scrolled < 0 {
+                past += SheetSnap.dip(for: scrolled)
+            } else if contentFits, scrolled > travel {
+                past += SheetSnap.rise(for: scrolled - travel, room: bounceRoom)
+            }
+        }
         // Round to integer points so the card's top edge snaps to
         // pixel boundaries — fractional values cause SwiftUI to
         // re-snap mid-drag, producing visible 1pt judder.
-        let top = min((restingTop + offset + give).rounded(), restingTop + travel)
+        let settled = min((restingTop + offset + min(0, past)).rounded(), restingTop + travel)
+        let top = settled + max(0, past).rounded()
         return CardLayout(
             cardHeight: max(0, top - edgeInset),
             edgeInset: edgeInset,
             travel: travel,
             expandedHeight: max(0, restingTop + travel - expandedInset),
             progress: progress,
-            headroom: ceiling - top
+            // Less what the card shows above its expanded detent: a
+            // bounce there is over in a moment, and the buttons that
+            // get out of a card's way shouldn't blink for it.
+            headroom: ceiling - settled,
+            contentFits: contentFits,
+            bounceRoom: bounceRoom
         )
     }
 
@@ -3427,7 +4081,7 @@ struct VehicleSheetPager: View {
     /// it → the card wider → the line unwraps → the controls shorter → …
     /// With each state undoing the other, SwiftUI lays the card out
     /// round and round, the map re-centres on every pass (the collapsed
-    /// height sets `mapBottomInset`), and the app freezes until the
+    /// height sets `mapInsets`), and the app freezes until the
     /// system kills it for memory — with no crash log to show for it.
     /// Taken at rest, a height can't move the width it was measured at.
     private func restsAtDetent(_ vin: String, geo: GeometryProxy) -> Bool {
@@ -3449,12 +4103,15 @@ struct VehicleSheetPager: View {
     /// the top of the window, in a pager that can get under the button.
     /// Only cards that can come back down count; one stuck at full
     /// height in a tiny window must not take the button away for good.
-    private func cardsCoverToolbar(geo: GeometryProxy) -> Bool {
+    ///
+    /// `drop` asks the same of a button hanging that much lower than the
+    /// settings button, which a rising card reaches sooner.
+    private func cardsCoverToolbar(geo: GeometryProxy, drop: CGFloat = 0) -> Bool {
         guard cardsCanCoverToolbar(geo: geo) else { return false }
         return bbVehicles.contains { vehicle in
             guard isPaging || vehicle.vin == currentVin else { return false }
             let layout = cardLayout(for: vehicle.vin, geo: geo)
-            return layout.travel > 0 && layout.headroom < toolbarItemReach.height
+            return layout.travel > 0 && layout.headroom < toolbarItemReach.height + drop
         }
     }
 
@@ -3495,6 +4152,8 @@ struct VehicleSheetPager: View {
                     squaresBottomWhenExpanded: fadesNeighbours || safeAreaInsets.bottom == 0,
                     bottomSafeAreaInset: safeAreaInsets.bottom,
                     scrollOffsets: scrollOffsets,
+                    bounceRoom: layout.bounceRoom,
+                    contentFits: layout.contentFits,
                     onSuccessfulRefresh: onSuccessfulRefresh,
                     mfaState: mfaState,
                     sheetPresentation: sheetPresentation

@@ -52,17 +52,24 @@ struct MainView: View {
     @State private var isLoading = false
     @State var lastError: APIError?
 
-    /// Bottom inset the map keeps clear of the vehicle sheet,
-    /// reported by `VehicleSheetPager`: the selected vehicle's
-    /// collapsed card height while the card spans the window, 0
-    /// once the window is wide enough that the card sits beside
-    /// open map. Fed to `SimpleMapView` as a safe-area inset so the
-    /// marker is centered in whatever map area is unobstructed.
-    @State private var mapBottomInset: CGFloat = 0
+    /// The part of the map the vehicle sheet covers, reported by
+    /// `VehicleSheetPager`: the selected vehicle's collapsed card
+    /// height while the marker rides above the card, the card's width
+    /// where it goes beside the card instead (iPhone landscape), and
+    /// nothing once the window is wide enough that the card sits
+    /// beside open map. Fed to `SimpleMapView` as safe-area insets so
+    /// the marker is centered in whatever map area is unobstructed.
+    @State private var mapSheetInsets = MapSheetInsets()
     /// True while an expanded vehicle sheet stands over the settings
     /// button, reported by `VehicleSheetPager`. The button fades out
     /// for as long as it is (see `SettingsButton`).
     @State private var sheetCoversToolbar = false
+    /// The same for the recenter button, which hangs under the settings
+    /// button and so goes under a rising sheet sooner.
+    @State private var sheetCoversRecenterButton = false
+    /// Whether the user has moved the map off the selected vehicle, and
+    /// the way back (see `RecenterButton`).
+    @State private var mapRecentering = MapRecentering()
     /// Whether a vehicle sheet can rise over the toolbar's trailing item
     /// at all in this window, reported by `VehicleSheetPager` — the
     /// common case, an iPhone in portrait, until it says otherwise.
@@ -97,9 +104,9 @@ struct MainView: View {
     }
 
     /// Determine the map center for a vehicle. This is simply the
-    /// vehicle's own coordinate: the vertical offset that keeps the
-    /// marker clear of the sheet is handled by the map's bottom
-    /// safe-area inset (`mapBottomInset`) rather than by
+    /// vehicle's own coordinate: the offset that keeps the
+    /// marker clear of the sheet is handled by the map's
+    /// safe-area insets (`mapSheetInsets`) rather than by
     /// shifting the region's center — a pixel-to-degree conversion
     /// that only held for one screen aspect ratio.
     private func calculateMapCenter(
@@ -207,6 +214,9 @@ struct MainView: View {
                     BBLogger.info(.app, "[SVI] selectVehicle notification → \(index) (vin=\(vin))")
                     selectedVehicleIndex = index
                     updateMapRegion(reason: "deep link to vehicle")
+                    // Asked for by name, the vehicle gets the map back
+                    // even if it was already the one selected.
+                    mapRecentering.recenter()
                     Task {
                         await refreshCurrentVehicleIfNeeded(modelContext: modelContext)
                     }
@@ -278,7 +288,8 @@ struct MainView: View {
                         SimpleMapView(
                             currentVehicle: currentVehicle,
                             mapRegion: $mapRegion,
-                            bottomInset: mapBottomInset,
+                            recentering: mapRecentering,
+                            sheetInsets: mapSheetInsets,
                             canvasSlack: (
                                 trailing: max(0, canvas.width - geo.size.width),
                                 bottom: max(0, canvas.height - geo.size.height)
@@ -292,7 +303,8 @@ struct MainView: View {
             SimpleMapView(
                 currentVehicle: currentVehicle,
                 mapRegion: $mapRegion,
-                bottomInset: mapBottomInset,
+                recentering: mapRecentering,
+                sheetInsets: mapSheetInsets,
             )
         }
     }
@@ -340,10 +352,15 @@ struct MainView: View {
             // Where the navigation bar would put its trailing item — see
             // `SettingsButton` for why it isn't one here.
             if settingsButtonFloats {
-                SettingsButton(isCovered: $sheetCoversToolbar) {
-                    showingSettings = true
+                VStack(spacing: RecenterButton.spacing) {
+                    SettingsButton(isCovered: $sheetCoversToolbar) {
+                        showingSettings = true
+                    }
+                    .matchedTransitionSource(id: "settings", in: transition)
+                    // Under the settings button, once the user has moved
+                    // the map off the vehicle.
+                    RecenterButton(recentering: mapRecentering, isCovered: $sheetCoversRecenterButton)
                 }
-                .matchedTransitionSource(id: "settings", in: transition)
                 .padding(.trailing, Self.navigationBarMargin)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
@@ -367,8 +384,9 @@ struct MainView: View {
                         mfaState: mfaState,
                         sheetPresentation: sheetPresentation,
                         safeAreaInsets: geo.safeAreaInsets,
-                        mapBottomInset: $mapBottomInset,
+                        mapInsets: $mapSheetInsets,
                         coversToolbar: $sheetCoversToolbar,
+                        coversRecenterButton: $sheetCoversRecenterButton,
                         canCoverToolbar: $sheetCanCoverToolbar
                     )
                 }
@@ -382,6 +400,21 @@ struct MainView: View {
             stateContent
                 .toolbar {
                     if !settingsButtonFloats {
+                        // The recenter button, where the settings button
+                        // is the toolbar's: beside it, on the inside, so
+                        // that the settings button doesn't move when
+                        // this one comes and goes.
+                        if showsVehicles, mapRecentering.isOffCenter {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    mapRecentering.recenter()
+                                } label: {
+                                    Image(systemName: RecenterButton.systemImage)
+                                        .foregroundStyle(.primary)
+                                }
+                                .accessibilityLabel(RecenterButton.label)
+                            }
+                        }
                         // Real toolbar button — system-sized hit target
                         // (44pt) in the navigation bar's trailing slot.
                         ToolbarItem(placement: .topBarTrailing) {
@@ -602,6 +635,43 @@ private struct SettingsButton: View {
         .buttonStyle(.plain)
         .opacity(isCovered ? 0 : 1)
         .allowsHitTesting(!isCovered)
+    }
+}
+
+/// Puts the map back on the selected vehicle. It shows only once the
+/// user has moved the map off it (`MapRecentering`), under the settings
+/// button where that one floats, and like it gets out of the way of a
+/// vehicle sheet rising over it. (Where the settings button is the
+/// toolbar's, so is this — see `navigationContent`.)
+private struct RecenterButton: View {
+    static let systemImage = "scope"
+    static let label: LocalizedStringKey = "Center on Vehicle"
+    /// Gap between the settings button and this one. (The pager's
+    /// `recenterButtonDrop` is this plus the button's height.)
+    static let spacing: CGFloat = 8
+
+    let recentering: MapRecentering
+    @Binding var isCovered: Bool
+
+    var body: some View {
+        let isShown = recentering.isOffCenter && !isCovered
+        Button {
+            recentering.recenter()
+        } label: {
+            Image(systemName: Self.systemImage)
+                .imageScale(.large)
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+        }
+        .buttonStyle(.plain)
+        .opacity(isShown ? 1 : 0)
+        .scaleEffect(isShown ? 1 : 0.7)
+        .allowsHitTesting(isShown)
+        .animation(.snappy(duration: 0.25), value: isShown)
+        .accessibilityLabel(Self.label)
+        .accessibilityHidden(!isShown)
     }
 }
 
