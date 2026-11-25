@@ -180,7 +180,8 @@ extension BBAccount {
                 logSink: logSink,
                 rememberMeToken: rememberMeToken,
                 deviceId: deviceId,
-                onRememberMeTokenRotated: onRotate
+                onRememberMeTokenRotated: onRotate,
+                onRefreshTokenRotated: refreshTokenRotationHandler()
             )
             api = createAPIClient(configuration: configuration)
         }
@@ -213,7 +214,7 @@ extension BBAccount {
             authToken = try await api.login()
 
             // persist refresh token in Account (can be used for login when token expired)
-            if let token = authToken {
+            if let token = authToken, !token.refreshToken.isEmpty {
                 refreshToken = token.refreshToken
             }
 
@@ -224,6 +225,34 @@ extension BBAccount {
             // Store MFA error so other parallel operations know MFA is required
             pendingMFAError = error
             throw error
+        }
+    }
+
+    @MainActor
+    private func refreshTokenRotationHandler() -> @MainActor @Sendable (String) -> Void {
+        let accountID = id
+        let container = modelContext?.container
+        return { [weak self] token in
+            guard !token.isEmpty else { return }
+            do {
+                if let account = self, let context = account.modelContext {
+                    guard !account.isDeleted else { return }
+                    account.refreshToken = token
+                    try context.save()
+                } else if let container {
+                    // Kit can finish a rotation after its caller has been cancelled.
+                    let context = ModelContext(container)
+                    let descriptor = FetchDescriptor<BBAccount>(predicate: #Predicate { $0.id == accountID })
+                    guard let account = try context.fetch(descriptor).first else { return }
+                    account.refreshToken = token
+                    try context.save()
+                } else {
+                    // Account creation and credential checks start before insertion.
+                    self?.refreshToken = token
+                }
+            } catch {
+                BBLogger.error(.auth, "BBAccount: failed to save rotated refresh token: \(error)")
+            }
         }
     }
 

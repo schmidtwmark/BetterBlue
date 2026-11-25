@@ -332,10 +332,9 @@ struct AccountInfoView: View {
         }
     }
 
+    @discardableResult
     fileprivate func checkNewAccountData(password: String = "", pin: String = "",
-                                         refreshToken: String = "") async throws {
-        // We don't need to create a new Account struct, just test authentication
-        // Test the new credentials by trying to authenticate
+                                         refreshToken: String = "") async throws -> String {
         let testAccount = BBAccount(
             username: account.username,
             password: password,
@@ -345,6 +344,7 @@ struct AccountInfoView: View {
             region: account.regionEnum,
         )
         try await testAccount.initialize(modelContext: modelContext)
+        return testAccount.refreshToken
     }
     
     private func savePassword() async {
@@ -390,11 +390,11 @@ struct AccountInfoView: View {
         saveError = nil
 
         do {
-            try await checkNewAccountData(password: account.password, refreshToken: newToken)
+            let validatedToken = try await checkNewAccountData(password: account.password, refreshToken: newToken)
 
             await MainActor.run {
                 BBAccount.updateAccount(account, password: account.password, pin: account.pin,
-                                        refreshToken: newToken, modelContext: modelContext)
+                                        refreshToken: validatedToken, modelContext: modelContext)
                 isLoading = false
                 saveError = nil
                 successMessage = "Refresh Token updated successfully"

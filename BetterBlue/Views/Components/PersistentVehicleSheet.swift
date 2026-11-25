@@ -1130,7 +1130,7 @@ struct PersistentVehicleSheet: View {
             ? Image(systemName: "bolt.fill")
             : ev.isWaitingForScheduledCharge
                 ? Image(systemName: "clock.fill")
-                : bbVehicle.plugIcon(for: ev.plugType)
+                : bbVehicle.plugIcon(for: ev)
         SectionRow(
             icon: leadingIcon,
             iconColor: isPluggedIn ? chargingColor : .secondary,
