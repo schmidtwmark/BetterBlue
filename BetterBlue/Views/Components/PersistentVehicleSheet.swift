@@ -1122,24 +1122,13 @@ struct PersistentVehicleSheet: View {
             if isPluggedIn { return "Ready to Charge" }
             return "Unplugged"
         }()
-        // While actively charging, swap the static plug-type glyph
-        // for a lightning bolt — reinforces the "energy flowing"
-        // cue alongside the icon's pulse animation. Falls back to
-        // the brand-specific plug icon when idle / plugged-in.
-        let leadingIcon: Image = isCharging
-            ? Image(systemName: "bolt.fill")
-            : ev.isWaitingForScheduledCharge
-                ? Image(systemName: "clock.fill")
-                : bbVehicle.plugIcon(for: ev.plugType)
         SectionRow(
-            icon: leadingIcon,
+            icon: bbVehicle.plugIcon(for: ev),
             iconColor: isPluggedIn ? chargingColor : .secondary,
             // Pulse the status icon (left side) while charging is
             // active. The trailing quick-action button stays static.
             iconAnimation: isCharging ? .pulse : .none,
-            // No `title:` — the bolt icon already says "charging,"
-            // so the status line ("Ready to Charge" / "Charging at
-            // 50 kW" / "Unplugged") stands on its own.
+            // The status line distinguishes active, scheduled, and idle charging.
             // While an action is in-flight, show its live status
             // text (e.g. "Starting Charge", "Waiting for vehicle").
             // Falls back to the steady-state stateText when idle.

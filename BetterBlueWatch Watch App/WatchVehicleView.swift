@@ -141,7 +141,7 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performChargeAction(shouldStart: true, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "bolt.slash"),
+            icon: currentVehicle.plugIcon(for: currentVehicle.evStatus),
             label: "Start Charge",
             inProgressLabel: "Starting",
             completedText: "Charging",
@@ -155,7 +155,7 @@ struct WatchVehicleView: View {
             action: { statusUpdater in
                 try await performChargeAction(shouldStart: false, statusUpdater: statusUpdater)
             },
-            icon: Image(systemName: "bolt.fill"),
+            icon: currentVehicle.plugIcon(for: currentVehicle.evStatus),
             label: "Stop Charge",
             inProgressLabel: "Stopping",
             completedText: "Stopped",

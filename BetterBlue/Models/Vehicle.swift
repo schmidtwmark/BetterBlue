@@ -620,19 +620,19 @@ extension BBVehicle {
         CustomColor.color(forName: stopColorName, default: "red")
     }
 
-    /// Returns the appropriate plug icon based on current charging state and user's port type preference
-    func plugIcon(for plugType: VehicleStatus.PlugType?) -> Image {
-        guard let plugType else {
+    /// Shows the cable connection and uses the vehicle's port style when the plug type is known.
+    func plugIcon(for status: VehicleStatus.EVStatus?) -> Image {
+        guard let status, status.pluggedIn else {
             return Image("custom.powerplug.portrait.slash")
         }
 
-        switch plugType {
-        case .unplugged:
-            return Image("custom.powerplug.portrait.slash")
+        switch status.knownPlugType {
         case .acCharger:
             return Image(systemName: chargePortType.acPlugIcon)
         case .dcCharger:
             return Image(systemName: chargePortType.dcPlugIcon)
+        case .unplugged, nil:
+            return Image(systemName: "powerplug.fill")
         }
     }
 }

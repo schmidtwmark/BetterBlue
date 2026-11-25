@@ -77,6 +77,15 @@ BetterBlue/
 - **Combine/Async**: Reactive programming and concurrency
 - **CloudKit**: iCloud sync for settings and accounts
 
+European CCI clients save rotated refresh credentials immediately through the
+account's SwiftData context. This includes refreshes from the iOS app, widget
+timelines, App Intents, Live Activity updates, and the watch app. Watch
+complications read stored status without creating an API client.
+
+Charging controls show a generic connected plug when the vehicle reports a
+cable without an AC or DC type. The charging display leaves the target
+percentage unset in that state.
+
 ## Development
 
 ### Building from source
