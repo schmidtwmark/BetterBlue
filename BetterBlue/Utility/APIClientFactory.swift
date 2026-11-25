@@ -24,9 +24,10 @@ struct APIClientFactoryConfiguration {
         logSink: HTTPLogSink? = nil,
         rememberMeToken: String? = nil,
         deviceId: String? = nil,
-        onRememberMeTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil
+        onRememberMeTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil,
+        onRefreshTokenRotated: (@MainActor @Sendable (String) -> Void)? = nil
     ) {
-        apiConfiguration = APIClientConfiguration(
+        var apiConfiguration = APIClientConfiguration(
             region: region,
             brand: brand,
             username: username,
@@ -39,6 +40,8 @@ struct APIClientFactoryConfiguration {
             deviceId: deviceId,
             onRememberMeTokenRotated: onRememberMeTokenRotated
         )
+        apiConfiguration.onRefreshTokenRotated = onRefreshTokenRotated
+        self.apiConfiguration = apiConfiguration
         self.modelContext = modelContext
     }
 }
@@ -65,29 +68,8 @@ func createAPIClient(configuration: APIClientFactoryConfiguration) -> any APICli
     // Use BetterBlueKit factory for real API clients
     BBLogger.info(.api, "APIClientFactory: Creating \(effectiveBrand.displayName) API client for \(configuration.apiConfiguration.region.rawValue)")
 
-    // Create a configuration with the effective brand. Forward every
-    // field from the caller's configuration — `deviceId`, `redactPII`,
-    // and the rotation callback are all load-bearing for Kia session
-    // stability and were silently dropped by an earlier version of
-    // this code, which caused Kia to treat each `initialize()` as a
-    // brand-new device and demand MFA again.
-    let effectiveConfiguration = APIClientConfiguration(
-        region: configuration.apiConfiguration.region,
-        brand: effectiveBrand,
-        username: configuration.apiConfiguration.username,
-        password: configuration.apiConfiguration.password,
-        refreshToken: configuration.apiConfiguration.refreshToken,
-        pin: configuration.apiConfiguration.pin,
-        accountId: configuration.apiConfiguration.accountId,
-        logSink: configuration.apiConfiguration.logSink,
-        rememberMeToken: configuration.apiConfiguration.rememberMeToken,
-        redactPII: configuration.apiConfiguration.redactPII,
-        deviceId: configuration.apiConfiguration.deviceId,
-        onRememberMeTokenRotated: configuration.apiConfiguration.onRememberMeTokenRotated
-    )
-
     do {
-        let underlyingClient = try createBetterBlueKitAPIClient(configuration: effectiveConfiguration)
+        let underlyingClient = try createBetterBlueKitAPIClient(configuration: configuration.apiConfiguration)
         return CachedAPIClient(underlyingClient: underlyingClient)
     } catch {
         // This shouldn't happen in normal usage since we check the brand above,
